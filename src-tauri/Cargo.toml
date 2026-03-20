@@ -1,0 +1,27 @@
+[package]
+name = "psi-fatture-sa"
+version = "0.1.0"
+description = "PSI Fatture - Gestionale fatture per psicologi"
+authors = ["Valerio"]
+edition = "2021"
+
+[lib]
+name = "psi_fatture_sa_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1.37", features = ["serde-with-str"] }
+dirs = "5"
+anyhow = "1"
+thiserror = "2"
