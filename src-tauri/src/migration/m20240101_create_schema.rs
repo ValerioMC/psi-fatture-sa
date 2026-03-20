@@ -1,36 +1,27 @@
-/// Database initialization and migration for PSI Fatture SA.
-///
-/// Manages the SQLite connection and applies schema migrations.
-use anyhow::Result;
-use rusqlite::Connection;
-use std::path::PathBuf;
+use sea_orm_migration::prelude::*;
 
-/// Returns the path to the SQLite database file.
-/// Stored in the app's data directory.
-pub fn db_path() -> PathBuf {
-    let data_dir = dirs::data_local_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("psi-fatture-sa");
-    std::fs::create_dir_all(&data_dir).ok();
-    data_dir.join("database.db")
+pub struct Migration;
+
+impl MigrationName for Migration {
+    fn name(&self) -> &str {
+        "m20240101_create_schema"
+    }
 }
 
-/// Opens a connection to the SQLite database and applies migrations.
-pub fn open() -> Result<Connection> {
-    let path = db_path();
-    let conn = Connection::open(path)?;
-    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
-    migrate(&conn)?;
-    Ok(conn)
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let db = manager.get_connection();
+        db.execute_unprepared(SCHEMA_SQL).await?;
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        Ok(())
+    }
 }
 
-/// Applies all schema migrations in order.
-fn migrate(conn: &Connection) -> Result<()> {
-    conn.execute_batch(SCHEMA_V1)?;
-    Ok(())
-}
-
-const SCHEMA_V1: &str = "
+const SCHEMA_SQL: &str = "
 CREATE TABLE IF NOT EXISTS professional_config (
     id          INTEGER PRIMARY KEY CHECK (id = 1),
     title       TEXT NOT NULL DEFAULT '',
@@ -54,7 +45,6 @@ CREATE TABLE IF NOT EXISTS professional_config (
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
 CREATE TABLE IF NOT EXISTS clients (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     client_type     TEXT NOT NULL DEFAULT 'persona_fisica',
@@ -75,7 +65,6 @@ CREATE TABLE IF NOT EXISTS clients (
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
 CREATE TABLE IF NOT EXISTS services (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     name          TEXT NOT NULL,
@@ -86,7 +75,6 @@ CREATE TABLE IF NOT EXISTS services (
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
 CREATE TABLE IF NOT EXISTS invoices (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id        INTEGER NOT NULL REFERENCES clients(id),
@@ -110,7 +98,6 @@ CREATE TABLE IF NOT EXISTS invoices (
     updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(year, invoice_number)
 );
-
 CREATE TABLE IF NOT EXISTS invoice_lines (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_id  INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
@@ -121,13 +108,11 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
     vat_rate    REAL NOT NULL DEFAULT 0.0,
     line_total  REAL NOT NULL DEFAULT 0.0
 );
-
 CREATE TABLE IF NOT EXISTS recurrence_groups (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
 CREATE TABLE IF NOT EXISTS appointments (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id           INTEGER NOT NULL REFERENCES clients(id),
@@ -141,7 +126,6 @@ CREATE TABLE IF NOT EXISTS appointments (
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
 CREATE INDEX IF NOT EXISTS idx_invoices_year    ON invoices(year);
 CREATE INDEX IF NOT EXISTS idx_invoices_status  ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_client  ON invoices(client_id);

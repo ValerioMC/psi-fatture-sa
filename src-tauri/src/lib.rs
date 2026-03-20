@@ -1,59 +1,57 @@
-mod commands;
-mod db;
-mod domain;
+mod app;
+mod migration;
 
-use commands::{
-    appointments::{
-        create_appointment, create_recurring_appointments, delete_appointment, get_appointment,
-        list_appointments, update_appointment,
-    },
-    clients::{create_client, delete_client, get_client, list_clients, update_client},
-    config::{get_config, upsert_config},
-    dashboard::get_dashboard,
-    invoices::{
-        create_invoice, delete_invoice, get_invoice, get_next_invoice_number, list_invoices,
-        update_invoice,
-    },
-    services::{create_service, delete_service, get_service, list_services, update_service},
+use sea_orm::DatabaseConnection;
+
+use app::controller::{
+    appointment_controller::*,
+    client_controller::*,
+    config_controller::*,
+    dashboard_controller::*,
+    invoice_controller::*,
+    service_controller::*,
 };
+
+/// Application state shared across all Tauri commands.
+pub struct AppState {
+    pub db: DatabaseConnection,
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let db = tauri::async_runtime::block_on(app::db::connection::init_db())
+        .expect("Failed to initialize database");
+
     tauri::Builder::default()
+        .manage(AppState { db })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
-            // Config
             get_config,
             upsert_config,
-            // Clients
             list_clients,
             get_client,
             create_client,
             update_client,
             delete_client,
-            // Services
             list_services,
             get_service,
             create_service,
             update_service,
             delete_service,
-            // Invoices
             list_invoices,
             get_invoice,
             create_invoice,
             update_invoice,
             delete_invoice,
             get_next_invoice_number,
-            // Appointments
             list_appointments,
             get_appointment,
             create_appointment,
             create_recurring_appointments,
             update_appointment,
             delete_appointment,
-            // Dashboard
             get_dashboard,
         ])
         .run(tauri::generate_context!())

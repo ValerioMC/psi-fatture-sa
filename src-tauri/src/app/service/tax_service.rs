@@ -1,6 +1,5 @@
 /// Italian tax calculation logic for PSI Fatture SA.
 ///
-/// Ported from apps/invoices/tax_utils.py.
 /// Handles forfettario and ordinario regimes, ENPAP, ritenuta d'acconto,
 /// marca da bollo, IRPEF, and INPS contributions.
 
