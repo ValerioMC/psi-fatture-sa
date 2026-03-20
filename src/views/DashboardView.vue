@@ -44,6 +44,7 @@ onMounted(loadDashboard)
 
 <template>
   <div class="p-8">
+    <div class="max-w-5xl mx-auto">
     <!-- Header -->
     <div class="flex items-center justify-between mb-8 animate-in">
       <div>
@@ -250,6 +251,7 @@ onMounted(loadDashboard)
           Ricarica
         </button>
       </div>
+    </div>
     </div>
   </div>
 </template>

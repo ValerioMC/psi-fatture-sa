@@ -154,9 +154,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="p-8 flex gap-6 min-h-0">
+  <div class="p-6 max-w-4xl mx-auto">
     <!-- Calendar area -->
-    <div class="flex-1 min-w-0 animate-in">
+    <div class="animate-in">
       <PageHeader title="Agenda">
         <button
           type="button"
@@ -252,11 +252,11 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Side panel: selected day -->
-    <div class="w-72 shrink-0 animate-in-d1">
-      <div class="glass-card rounded-xl p-5 sticky top-6">
+    <!-- Appuntamenti del giorno selezionato -->
+    <div class="mt-5 animate-in-d1">
+      <div class="glass-card rounded-xl p-5">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-semibold text-sage-900">
+          <h3 class="text-sm font-semibold text-sage-900 capitalize">
             {{ new Date(selectedDate + 'T00:00:00').toLocaleDateString('it-IT', {
               weekday: 'long',
               day: 'numeric',
@@ -265,34 +265,34 @@ onMounted(async () => {
           </h3>
           <button
             type="button"
-            class="w-7 h-7 flex items-center justify-center text-sage-600 hover:bg-sage-50 rounded-lg transition-colors"
-            title="Aggiungi appuntamento"
+            class="flex items-center gap-1.5 text-xs font-semibold text-sage-600 hover:text-sage-800 hover:bg-sage-50 px-3 py-1.5 rounded-lg transition-colors"
             @click="openCreate(selectedDate)"
           >
-            <Plus class="w-4 h-4" />
+            <Plus class="w-3.5 h-3.5" />
+            Aggiungi
           </button>
         </div>
 
-        <div v-if="selectedDayAppointments.length === 0" class="text-sm text-sage-400 text-center py-6">
-          Nessun appuntamento
+        <div v-if="selectedDayAppointments.length === 0" class="py-8 text-center">
+          <p class="text-sm text-sage-400">Nessun appuntamento per questo giorno.</p>
         </div>
 
-        <div v-else class="space-y-2">
+        <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <div
             v-for="appt in selectedDayAppointments"
             :key="appt.id"
-            class="rounded-lg border border-sage-100 p-3 cursor-pointer hover:bg-sage-50/40 transition-colors"
+            class="rounded-xl border border-sage-100 p-3.5 cursor-pointer hover:bg-sage-50/60 hover:border-sage-200 hover:shadow-sm transition-all"
             @click="openEdit(appt)"
           >
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-medium text-sage-500">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <span class="text-xs font-semibold text-sage-500 tabular-nums">
                 {{ appt.start_time.slice(0, 5) }} – {{ appt.end_time.slice(0, 5) }}
               </span>
               <StatusBadge :status="appt.status" type="appointment" />
             </div>
-            <p class="text-sm font-medium text-sage-900">{{ appt.client_name }}</p>
-            <p v-if="appt.service_name" class="text-xs text-sage-500 mt-0.5">{{ appt.service_name }}</p>
-            <p v-if="appt.notes" class="text-xs text-sage-400 mt-1 truncate">{{ appt.notes }}</p>
+            <p class="text-sm font-semibold text-sage-900 truncate">{{ appt.client_name }}</p>
+            <p v-if="appt.service_name" class="text-xs text-sage-500 mt-0.5 truncate">{{ appt.service_name }}</p>
+            <p v-if="appt.notes" class="text-xs text-sage-400 mt-1.5 truncate italic">{{ appt.notes }}</p>
           </div>
         </div>
       </div>

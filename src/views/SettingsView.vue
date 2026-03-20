@@ -66,9 +66,10 @@ async function onSubmit() {
 
 <template>
   <div class="p-8">
+    <div class="max-w-2xl mx-auto">
     <PageHeader title="Impostazioni Profilo" subtitle="Gestisci i tuoi dati professionali e fiscali." />
 
-    <form class="max-w-2xl space-y-6" @submit.prevent="onSubmit">
+    <form class="space-y-6" @submit.prevent="onSubmit">
       <!-- Personal info -->
       <div class="glass-card rounded-xl p-6 animate-in">
         <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Dati personali</h2>
@@ -292,5 +293,6 @@ async function onSubmit() {
         </button>
       </div>
     </form>
+    </div>
   </div>
 </template>

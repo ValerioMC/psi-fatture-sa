@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Download, ArrowLeft, Loader2 } from 'lucide-vue-next'
-import { save } from '@tauri-apps/plugin-dialog'
-import { writeFile } from '@tauri-apps/plugin-fs'
+import { ArrowLeft, Printer } from 'lucide-vue-next'
 import { getInvoice, getClient, getConfig } from '@/api'
 import type { Invoice, Client, ProfessionalConfig } from '@/types'
 import { formatCurrency, formatDateLong } from '@/utils/format'
-import { buildInvoicePdf } from '@/utils/invoice-pdf'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,7 +14,6 @@ const invoice = ref<Invoice | null>(null)
 const client = ref<Client | null>(null)
 const config = ref<ProfessionalConfig | null>(null)
 const loading = ref(true)
-const saving = ref(false)
 const error = ref<string | null>(null)
 
 onMounted(async () => {
@@ -38,13 +34,41 @@ onMounted(async () => {
 
 const isForfettario = computed(() => config.value?.tax_regime === 'forfettario')
 const hasIva = computed(() => (invoice.value?.total_tax ?? 0) > 0)
+
 const professionalFullName = computed(() => {
   if (!config.value) return ''
   return [config.value.title, config.value.first_name, config.value.last_name]
     .filter(Boolean).join(' ')
 })
 
-const notes = computed(() => {
+const clientDisplayName = computed(() => {
+  if (!client.value) return ''
+  if (client.value.client_type === 'azienda') return client.value.last_name
+  return `${client.value.first_name} ${client.value.last_name}`.trim()
+})
+
+const PAYMENT_LABELS: Record<string, string> = {
+  bonifico: 'Bonifico bancario',
+  contanti: 'Contanti',
+  pos: 'POS / Carta di credito',
+  altro: 'Altro',
+}
+
+const PAYMENT_CONDITIONS: Record<string, string> = {
+  bonifico: 'Pagamento immediato',
+  contanti: 'Contestuale alla prestazione',
+  pos: 'Contestuale alla prestazione',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Bozza',
+  issued: 'Emessa',
+  paid: 'Pagata',
+  overdue: 'Scaduta',
+  cancelled: 'Annullata',
+}
+
+const legalNotes = computed((): string[] => {
   const lines: string[] = []
   if (!invoice.value || !config.value) return lines
   if (isForfettario.value)
@@ -60,34 +84,19 @@ const notes = computed(() => {
   return lines
 })
 
-async function handlePrint() {
-  if (!invoice.value || !client.value || !config.value) return
-  saving.value = true
-  error.value = null
-  try {
-    const defaultFilename = `fattura-${invoice.value.invoice_number}-${invoice.value.year}.pdf`
-    const savePath = await save({
-      defaultPath: defaultFilename,
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    })
-    if (!savePath) return
-    const pdf = buildInvoicePdf(invoice.value, client.value, config.value, notes.value)
-    await writeFile(savePath, new Uint8Array(pdf.output('arraybuffer')))
-  } catch (e) {
-    error.value = `Errore durante il salvataggio: ${String(e)}`
-  } finally {
-    saving.value = false
-  }
+function handlePrint() {
+  window.print()
 }
 </script>
 
 <template>
-  <div style="background: linear-gradient(135deg, #f6f8f6 0%, #e8dfd3 100%); min-height: 100vh;">
-    <!-- ── Toolbar ── -->
+  <div class="print-root">
+
+    <!-- ── Toolbar (screen only) ── -->
     <div class="print:hidden fixed top-5 right-5 z-50 flex items-center gap-2">
       <button
         type="button"
-        class="flex items-center gap-2 glass-card text-sage-700 hover:text-sage-900 px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all"
+        class="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-slate-200 text-slate-600 hover:text-slate-900 px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all"
         @click="router.push(`/invoices/${invoiceId}`)"
       >
         <ArrowLeft class="w-4 h-4" />
@@ -96,216 +105,775 @@ async function handlePrint() {
       <button
         v-if="!loading && invoice"
         type="button"
-        :disabled="saving"
-        class="group relative overflow-hidden flex items-center gap-2 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-sm transition-all disabled:opacity-60"
-        style="background: linear-gradient(135deg, #5d8062, #0c8aeb);"
+        class="flex items-center gap-2 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-sm transition-all hover:opacity-90"
+        style="background: linear-gradient(135deg, #3d6142, #0c8aeb);"
         @click="handlePrint"
       >
-        <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
-        <Loader2 v-if="saving" class="w-4 h-4 animate-spin relative z-10" />
-        <Download v-else class="w-4 h-4 relative z-10" />
-        <span class="relative z-10">{{ saving ? 'Salvataggio...' : 'Salva PDF' }}</span>
+        <Printer class="w-4 h-4" />
+        Stampa / Salva PDF
       </button>
     </div>
 
     <!-- ── Loading ── -->
-    <div v-if="loading" class="flex items-center justify-center min-h-screen">
+    <div v-if="loading" class="print:hidden flex items-center justify-center min-h-screen">
       <div class="flex flex-col items-center gap-3">
         <div class="w-8 h-8 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
         <p class="text-sm text-sage-400">Caricamento fattura...</p>
       </div>
     </div>
 
-    <!-- ── Error toast ── -->
+    <!-- ── Error ── -->
     <div
-      v-if="error"
-      class="print:hidden fixed bottom-5 right-5 glass-card border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl shadow-lg"
+      v-else-if="error"
+      class="print:hidden max-w-md mx-auto mt-24 bg-red-50 border border-red-200 rounded-xl p-6 text-center"
     >
-      {{ error }}
+      <p class="text-sm font-semibold text-red-700 mb-1">Errore nel caricamento</p>
+      <p class="text-xs text-red-500 font-mono break-all">{{ error }}</p>
     </div>
 
     <!-- ── Invoice document ── -->
     <div
-      v-if="!loading && invoice && client && config"
-      class="invoice-page bg-white mx-auto my-10 print:my-0 max-w-[780px] shadow-xl print:shadow-none overflow-hidden"
-      style="border-radius: 16px;"
+      v-else-if="invoice && client && config"
+      class="invoice-doc"
     >
-      <!-- Accent bar -->
-      <div
-        class="h-1.5 w-full print:h-1"
-        style="background: linear-gradient(to right, #5d8062, #0c8aeb, #d4a017)"
-      />
+      <!-- Gradient top bar -->
+      <div class="header-band" />
 
-      <div class="p-14 print:p-12">
-        <!-- ── Header ── -->
-        <div class="flex justify-between items-start mb-10">
-          <!-- Professional details -->
-          <div>
-            <p class="text-xl font-bold text-sage-900 mb-2 tracking-tight">{{ professionalFullName }}</p>
-            <div class="space-y-0.5 text-sm text-sage-500 leading-relaxed">
-              <p>P.IVA: <span class="text-sage-700">{{ config.vat_number }}</span></p>
-              <p>C.F.: <span class="text-sage-700">{{ config.fiscal_code }}</span></p>
-              <p>{{ config.address }}, {{ config.zip_code }} {{ config.city }} ({{ config.province }})</p>
-              <p v-if="config.phone">Tel: {{ config.phone }}</p>
-              <p v-if="config.pec_email">PEC: {{ config.pec_email }}</p>
-              <p v-if="config.albo_number">Albo: n. {{ config.albo_number }} – {{ config.albo_region }}</p>
+      <div class="doc-body">
+
+        <!-- ══════════════════════════════
+             HEADER
+        ══════════════════════════════ -->
+        <div class="doc-header">
+          <!-- Left: professional info -->
+          <div class="header-left">
+            <div class="company-name">{{ professionalFullName }}</div>
+            <div class="company-profession">
+              Psicologo<template v-if="config.is_psicoanalista"> &nbsp;—&nbsp; Psicoanalista</template>
+            </div>
+            <div v-if="config.albo_number || config.albo_region" class="albo-info">
+              <template v-if="config.albo_number">Iscriz. Albo n.&nbsp;<strong>{{ config.albo_number }}</strong></template>
+              <template v-if="config.albo_number && config.albo_region">&nbsp;—&nbsp;</template>
+              <template v-if="config.albo_region">Regione&nbsp;<strong>{{ config.albo_region }}</strong></template>
+            </div>
+            <div class="company-details">
+              <template v-if="config.address">{{ config.address }}<br></template>
+              {{ config.zip_code }} {{ config.city }} ({{ config.province }})<br>
+              P.IVA&nbsp;{{ config.vat_number }}&nbsp;·&nbsp;C.F.&nbsp;{{ config.fiscal_code }}
+              <template v-if="config.pec_email"><br>PEC:&nbsp;{{ config.pec_email }}</template>
+              <template v-if="config.phone">&nbsp;·&nbsp;Tel:&nbsp;{{ config.phone }}</template>
             </div>
           </div>
 
-          <!-- Invoice number box -->
-          <div class="text-right">
-            <div
-              class="inline-block rounded-2xl px-6 py-4 text-center"
-              style="background: linear-gradient(135deg, #f6f8f6, #e3ebe3); border: 1.5px solid rgba(93,128,98,0.2);"
-            >
-              <p class="text-[10px] font-bold text-sage-400 uppercase tracking-widest mb-1">Fattura</p>
-              <p class="text-3xl font-bold text-sage-800 tracking-tight leading-none">
-                {{ invoice.invoice_number }}<span class="text-sage-400 text-xl">/{{ invoice.year }}</span>
-              </p>
+          <!-- Right: invoice identity -->
+          <div class="header-right">
+            <div class="invoice-label">Fattura</div>
+            <div class="invoice-number">
+              <span class="invoice-prefix">N.</span>{{ invoice.invoice_number }}
             </div>
-            <div class="mt-3 space-y-1 text-sm text-sage-500">
-              <p>Data emissione: <span class="font-semibold text-sage-700">{{ formatDateLong(invoice.issue_date) }}</span></p>
-              <p v-if="invoice.due_date">Scadenza: <span class="font-semibold text-sage-700">{{ formatDateLong(invoice.due_date) }}</span></p>
+            <div class="invoice-meta">
+              <div class="meta-row">
+                <span class="meta-label">Anno</span>
+                <span class="meta-value">{{ invoice.year }}</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Data emissione</span>
+                <span class="meta-value">{{ formatDateLong(invoice.issue_date) }}</span>
+              </div>
+              <div v-if="invoice.due_date" class="meta-row">
+                <span class="meta-label">Scadenza</span>
+                <span class="meta-value">{{ formatDateLong(invoice.due_date) }}</span>
+              </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Divider -->
-        <div class="h-px mb-8" style="background: linear-gradient(to right, #a1baa3, rgba(163,186,163,0.1))" />
-
-        <!-- ── Client block ── -->
-        <div class="mb-8">
-          <p class="text-[10px] font-bold text-sage-400 uppercase tracking-widest mb-2.5">Spett.le</p>
-          <div
-            class="rounded-xl px-5 py-4 text-sm leading-relaxed"
-            style="background: linear-gradient(135deg, #f6f8f6, #f0f4f0); border: 1px solid rgba(163,186,163,0.25);"
-          >
-            <p class="font-bold text-sage-900 text-base mb-1">{{ client.first_name }} {{ client.last_name }}</p>
-            <div class="space-y-0.5 text-sage-500">
-              <p v-if="client.fiscal_code">C.F.: <span class="text-sage-700">{{ client.fiscal_code }}</span></p>
-              <p v-if="client.vat_number">P.IVA: <span class="text-sage-700">{{ client.vat_number }}</span></p>
-              <p>{{ client.address }}, {{ client.zip_code }} {{ client.city }} ({{ client.province }})</p>
-              <p v-if="client.email">{{ client.email }}</p>
-            </div>
+            <span :class="`status-badge status-${invoice.status}`">{{ STATUS_LABELS[invoice.status] }}</span>
           </div>
         </div>
 
-        <!-- ── Lines table ── -->
-        <table class="w-full text-sm mb-8">
-          <thead>
-            <tr style="background: linear-gradient(135deg, #2f4233, #3a513e);">
-              <th class="py-3 px-4 text-left text-xs font-semibold text-sage-100 uppercase tracking-wider rounded-tl-lg">Descrizione</th>
-              <th class="py-3 px-3 text-center text-xs font-semibold text-sage-100 uppercase tracking-wider w-12">Qtà</th>
-              <th class="py-3 px-3 text-right text-xs font-semibold text-sage-100 uppercase tracking-wider w-28">Prezzo unit.</th>
-              <th class="py-3 px-3 text-right text-xs font-semibold text-sage-100 uppercase tracking-wider w-16">IVA%</th>
-              <th class="py-3 px-4 text-right text-xs font-semibold text-sage-100 uppercase tracking-wider w-28 rounded-tr-lg">Totale</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(line, i) in invoice.lines"
-              :key="line.id"
-              :style="{ background: i % 2 === 0 ? 'rgba(246,248,246,0.6)' : 'white' }"
-            >
-              <td class="py-3.5 px-4 text-sage-800">{{ line.description }}</td>
-              <td class="py-3.5 px-3 text-center text-sage-500">{{ line.quantity }}</td>
-              <td class="py-3.5 px-3 text-right text-sage-500">{{ formatCurrency(line.unit_price) }}</td>
-              <td class="py-3.5 px-3 text-right text-sage-500">{{ line.vat_rate }}%</td>
-              <td class="py-3.5 px-4 text-right font-semibold text-sage-800">{{ formatCurrency(line.line_total) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <hr class="doc-divider">
 
-        <!-- ── Totals ── -->
-        <div class="flex justify-end mb-8">
-          <div class="w-72 text-sm space-y-2">
-            <div class="flex justify-between text-sage-500">
-              <span>Totale netto</span>
-              <span>{{ formatCurrency(invoice.total_net) }}</span>
+        <!-- ══════════════════════════════
+             INFO CARD: Client + Payment
+        ══════════════════════════════ -->
+        <div class="info-card">
+          <!-- Destinatario -->
+          <div class="info-col info-col-left">
+            <div class="section-label">Destinatario</div>
+            <div class="client-name">{{ clientDisplayName }}</div>
+            <div class="client-details">
+              <template v-if="client.fiscal_code"><span class="cf-tag">C.F.</span>{{ client.fiscal_code }}<br></template>
+              <template v-if="client.vat_number"><span class="cf-tag">P.IVA</span>{{ client.vat_number }}<br></template>
+              <template v-if="client.address">{{ client.address }}<br></template>
+              {{ client.zip_code }} {{ client.city }}<template v-if="client.province"> ({{ client.province }})</template>
+              <template v-if="client.email"><br>{{ client.email }}</template>
             </div>
-            <div v-if="hasIva" class="flex justify-between text-sage-500">
-              <span>IVA</span>
-              <span>{{ formatCurrency(invoice.total_tax) }}</span>
+          </div>
+
+          <!-- Pagamento -->
+          <div class="info-col info-col-right">
+            <div class="section-label">Pagamento</div>
+            <div class="payment-tag">{{ PAYMENT_LABELS[invoice.payment_method] ?? invoice.payment_method }}</div>
+            <div v-if="PAYMENT_CONDITIONS[invoice.payment_method]" class="pay-field">
+              <span class="pay-label">Condizioni</span>
+              <span class="pay-value">{{ PAYMENT_CONDITIONS[invoice.payment_method] }}</span>
             </div>
-            <div v-if="invoice.apply_enpap && invoice.contributo_enpap > 0" class="flex justify-between text-sage-500">
-              <span>Contributo ENPAP (2%)</span>
-              <span>{{ formatCurrency(invoice.contributo_enpap) }}</span>
-            </div>
-            <div class="flex justify-between text-sage-600 border-t border-sage-100 pt-2">
-              <span>Totale lordo</span>
-              <span>{{ formatCurrency(invoice.total_gross) }}</span>
-            </div>
-            <div v-if="invoice.ritenuta_acconto > 0" class="flex justify-between text-sage-500">
-              <span>Ritenuta d'acconto (20%)</span>
-              <span class="text-red-500">– {{ formatCurrency(invoice.ritenuta_acconto) }}</span>
-            </div>
-            <div v-if="invoice.marca_da_bollo" class="flex justify-between text-sage-500">
-              <span>Marca da bollo</span>
-              <span>+ {{ formatCurrency(2) }}</span>
-            </div>
-            <!-- Total due -->
-            <div
-              class="flex justify-between items-center font-bold text-base rounded-xl px-4 py-3 mt-1"
-              style="background: linear-gradient(135deg, #2f4233, #3a513e); color: white;"
-            >
-              <span>Totale dovuto</span>
-              <span>{{ formatCurrency(invoice.total_due) }}</span>
-            </div>
+            <template v-if="invoice.payment_method === 'bonifico' && config.iban">
+              <div class="pay-field">
+                <span class="pay-label">IBAN</span>
+                <span class="iban-value">{{ config.iban }}</span>
+              </div>
+              <div class="pay-field">
+                <span class="pay-label">Intestato a</span>
+                <span class="pay-value">{{ [config.first_name, config.last_name].filter(Boolean).join(' ') }}</span>
+              </div>
+            </template>
           </div>
         </div>
 
-        <!-- ── Payment info ── -->
-        <div
-          v-if="config.iban"
-          class="rounded-xl px-5 py-3.5 text-sm mb-6 flex items-center gap-3"
-          style="background: linear-gradient(135deg, #f6f8f6, #e3ebe3); border: 1px solid rgba(163,186,163,0.25);"
-        >
-          <div
-            class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style="background: linear-gradient(135deg, #5d8062, #0c8aeb);"
-          >
-            <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-          </div>
-          <div>
-            <span class="font-semibold text-sage-700">Pagamento: </span>
-            <span class="text-sage-600 font-mono text-xs">{{ config.iban }}</span>
-            <span v-if="invoice.payment_method === 'bonifico'" class="text-sage-400 ml-1">(Bonifico bancario)</span>
+        <!-- ══════════════════════════════
+             ITEMS TABLE
+        ══════════════════════════════ -->
+        <div class="items-label">Dettaglio prestazioni</div>
+        <div class="items-table-wrap">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th class="th-desc">Descrizione</th>
+                <th class="th-center">Qtà</th>
+                <th class="th-right">Prezzo unit.</th>
+                <th class="th-center">IVA</th>
+                <th class="th-right th-last">Importo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(line, i) in invoice.lines"
+                :key="line.id ?? i"
+                :class="i % 2 === 1 ? 'tr-alt' : ''"
+              >
+                <td class="td-desc">{{ line.description }}</td>
+                <td class="td-center td-secondary">{{ line.quantity }}</td>
+                <td class="td-right td-secondary">{{ formatCurrency(line.unit_price) }}</td>
+                <td class="td-center td-secondary">
+                  <span v-if="line.vat_rate === 0" class="vat-exempt">Esente</span>
+                  <template v-else>{{ line.vat_rate }}%</template>
+                </td>
+                <td class="td-amount">{{ formatCurrency(line.line_total) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ══════════════════════════════
+             TOTALS
+        ══════════════════════════════ -->
+        <div class="totals-outer">
+          <div class="totals-table-wrap">
+            <table class="totals-table">
+              <tr>
+                <td class="totals-label">Imponibile</td>
+                <td class="totals-value">{{ formatCurrency(invoice.total_net) }}</td>
+              </tr>
+              <tr v-if="hasIva">
+                <td class="totals-label">IVA</td>
+                <td class="totals-value">{{ formatCurrency(invoice.total_tax) }}</td>
+              </tr>
+              <tr v-if="invoice.apply_enpap && invoice.contributo_enpap > 0">
+                <td class="totals-label">Contributo ENPAP 2%</td>
+                <td class="totals-value">{{ formatCurrency(invoice.contributo_enpap) }}</td>
+              </tr>
+              <tr v-if="invoice.ritenuta_acconto > 0" class="totals-deduct">
+                <td class="totals-label">Ritenuta d'acconto 20%</td>
+                <td class="totals-value">− {{ formatCurrency(invoice.ritenuta_acconto) }}</td>
+              </tr>
+              <tr v-if="invoice.marca_da_bollo">
+                <td class="totals-label">Marca da bollo</td>
+                <td class="totals-value">{{ formatCurrency(2) }}</td>
+              </tr>
+              <tr class="totals-separator"><td colspan="2" /></tr>
+              <tr class="totals-grand">
+                <td class="totals-grand-label">Totale dovuto</td>
+                <td class="totals-grand-value">{{ formatCurrency(invoice.total_due) }}</td>
+              </tr>
+            </table>
           </div>
         </div>
 
-        <!-- ── Legal notes ── -->
-        <div v-if="notes.length > 0" class="border-t border-sage-100 pt-5">
-          <p class="text-[10px] font-bold text-sage-400 uppercase tracking-widest mb-3">Note legali</p>
-          <div class="space-y-1.5">
-            <p v-for="(note, i) in notes" :key="i" class="text-xs text-sage-400 leading-relaxed">
-              {{ note }}
+        <!-- ══════════════════════════════
+             FOOTER
+        ══════════════════════════════ -->
+        <div class="footer-section">
+
+          <!-- Fiscal notes -->
+          <div v-if="legalNotes.length > 0" class="legal-notes">
+            <div class="legal-notes-header">Note fiscali</div>
+            <p v-for="(note, i) in legalNotes" :key="i">{{ note }}</p>
+          </div>
+
+          <!-- STS tessera sanitaria authorization -->
+          <div class="sts-box">
+            <div class="sts-section-label">Autorizzazione Sistema Tessera Sanitaria</div>
+            <p>
+              Ai sensi dell'art.&nbsp;3, commi&nbsp;1 e&nbsp;2, del D.Lgs. 21&nbsp;luglio&nbsp;2014, n.&nbsp;175
+              (Dichiarazione dei redditi precompilata), l'intestatario della presente ricevuta sanitaria
+              &nbsp;
+              <span :class="['sts-option', client.sts_authorization ? 'sts-selected' : '']">
+                <span class="sts-checkbox">{{ client.sts_authorization ? '✓' : '' }}</span>AUTORIZZA
+              </span>
+              <span :class="['sts-option', !client.sts_authorization ? 'sts-selected' : '']">
+                <span class="sts-checkbox">{{ !client.sts_authorization ? '✓' : '' }}</span>NON AUTORIZZA
+              </span>
+              la trasmissione dei dati relativi alla presente spesa sanitaria al Sistema Tessera Sanitaria
+              ai fini dell'elaborazione della dichiarazione dei redditi precompilata.
             </p>
           </div>
-        </div>
 
-        <!-- ── Invoice notes ── -->
-        <div v-if="invoice.notes" class="mt-4 rounded-xl px-4 py-3 text-sm" style="background: rgba(163,186,163,0.12);">
-          <span class="font-semibold text-sage-600">Note: </span>
-          <span class="text-sage-500">{{ invoice.notes }}</span>
+          <!-- Invoice notes -->
+          <div v-if="invoice.notes" class="user-notes-box">
+            <div class="user-notes-label">Note</div>
+            <p>{{ invoice.notes }}</p>
+          </div>
+
+          <!-- Bottom bar -->
+          <div class="bottom-bar">
+            <span class="bar-name">{{ professionalFullName }}</span>
+            <span class="bar-dot">·</span>
+            P.IVA&nbsp;{{ config.vat_number }}
+            <span class="bar-dot">·</span>
+            C.F.&nbsp;{{ config.fiscal_code }}
+            <template v-if="config.pec_email">
+              <span class="bar-dot">·</span>PEC:&nbsp;{{ config.pec_email }}
+            </template>
+            <br>
+            <template v-if="config.address">{{ config.address }},&nbsp;</template>
+            {{ config.zip_code }} {{ config.city }} ({{ config.province }})
+          </div>
+
         </div>
       </div>
     </div>
+
   </div>
 </template>
 
 <style scoped>
+/* ── Root: screen background ── */
+.print-root {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #eef2ee 0%, #e4dbd2 100%);
+  padding-top: 60px;
+  padding-bottom: 80px;
+}
+
+/* ── Invoice document card ── */
+.invoice-doc {
+  max-width: 794px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.13), 0 4px 16px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 9pt;
+  color: #1e2d22;
+  line-height: 1.55;
+}
+
+/* ── Gradient top bar ── */
+.header-band {
+  height: 6px;
+  background: linear-gradient(90deg, #3d6142 0%, #5d8062 45%, #2b7ab3 100%);
+}
+
+/* ── Body padding ── */
+.doc-body {
+  padding: 36px 48px 40px;
+}
+
+/* ══════════════════════════════
+   HEADER
+══════════════════════════════ */
+.doc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.header-left { flex: 1; min-width: 0; }
+.header-right { flex-shrink: 0; text-align: right; }
+
+.company-name {
+  font-family: Georgia, 'Times New Roman', 'Book Antiqua', serif;
+  font-size: 19pt;
+  font-weight: 700;
+  color: #1a2b1d;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  margin-bottom: 4px;
+}
+
+.company-profession {
+  font-size: 7.5pt;
+  color: #5d8062;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  margin-bottom: 5px;
+}
+
+.albo-info {
+  font-size: 7.5pt;
+  color: #6b8f70;
+  margin-bottom: 2px;
+  line-height: 1.45;
+}
+.albo-info strong { color: #3d6142; font-weight: 600; }
+
+.company-details {
+  margin-top: 8px;
+  font-size: 7.5pt;
+  color: #7a9580;
+  line-height: 1.7;
+}
+
+/* Invoice identity */
+.invoice-label {
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #5d8062;
+  margin-bottom: 4px;
+}
+
+.invoice-number {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 30pt;
+  font-weight: 700;
+  color: #1a2b1d;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.invoice-prefix {
+  font-size: 15pt;
+  font-weight: 400;
+  color: #9cb8a0;
+  margin-right: 2px;
+}
+
+.invoice-meta {
+  border-top: 1px solid #e0ebe1;
+  padding-top: 8px;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.meta-label {
+  font-size: 7pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9cb8a0;
+}
+
+.meta-value {
+  font-size: 8pt;
+  font-weight: 600;
+  color: #1a2b1d;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 7pt;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+.status-paid     { background: #dcfce7; color: #166534; }
+.status-issued   { background: #dbeafe; color: #1e40af; }
+.status-draft    { background: #f3f4f6; color: #4b5563; }
+.status-overdue  { background: #fee2e2; color: #991b1b; }
+.status-cancelled { background: #fef9c3; color: #854d0e; }
+
+/* ── Divider ── */
+.doc-divider {
+  border: none;
+  border-top: 1px solid #e0ebe1;
+  margin: 0 0 20px;
+}
+
+/* ══════════════════════════════
+   INFO CARD
+══════════════════════════════ */
+.info-card {
+  display: flex;
+  margin-bottom: 20px;
+  border: 1px solid #dde8dd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.info-col { padding: 14px 18px; }
+
+.info-col-left {
+  flex: 0 0 48%;
+  background: #f7faf7;
+  border-right: 1px solid #dde8dd;
+}
+
+.info-col-right { flex: 1; background: #ffffff; }
+
+.section-label {
+  font-size: 6.5pt;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #5d8062;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.client-name {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13pt;
+  font-weight: 700;
+  color: #1a2b1d;
+  margin-bottom: 5px;
+  letter-spacing: -0.2px;
+  line-height: 1.2;
+}
+
+.client-details {
+  font-size: 7.5pt;
+  color: #6b8f70;
+  line-height: 1.65;
+}
+
+.cf-tag {
+  font-size: 6.5pt;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #5d8062;
+  text-transform: uppercase;
+  margin-right: 3px;
+}
+
+.payment-tag {
+  display: inline-block;
+  background: #f0f7f1;
+  border: 1px solid #ccdece;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 8pt;
+  font-weight: 600;
+  color: #3d6142;
+  margin-bottom: 9px;
+}
+
+.pay-field { margin-bottom: 6px; }
+
+.pay-label {
+  font-size: 6.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #9cb8a0;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 1px;
+}
+
+.pay-value {
+  font-size: 8pt;
+  font-weight: 600;
+  color: #1a2b1d;
+}
+
+.iban-value {
+  font-family: 'Courier New', 'Courier', monospace;
+  font-size: 7.5pt;
+  letter-spacing: 0.8px;
+  color: #1a2b1d;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+/* ══════════════════════════════
+   ITEMS TABLE
+══════════════════════════════ */
+.items-label {
+  font-size: 6.5pt;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #5d8062;
+  font-weight: 700;
+  margin-bottom: 7px;
+}
+
+.items-table-wrap {
+  border: 1px solid #dde8dd;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.items-table thead tr {
+  background: #f0f5f0;
+  border-bottom: 1.5px solid #d0dfd0;
+}
+
+.items-table thead th {
+  padding: 9px 12px;
+  font-size: 6.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #3d6142;
+  border: none;
+}
+
+.th-desc  { text-align: left; padding-left: 15px !important; width: 44%; }
+.th-center { text-align: center; width: 9%; }
+.th-right { text-align: right; width: 18%; }
+.th-last  { padding-right: 15px !important; }
+
+.items-table tbody td {
+  padding: 9px 12px;
+  font-size: 8.5pt;
+  border: none;
+  border-bottom: 1px solid #f0f5f0;
+  vertical-align: top;
+}
+.items-table tbody td:first-child { padding-left: 15px; }
+.items-table tbody td:last-child  { padding-right: 15px; }
+.items-table tbody tr:last-child td { border-bottom: none; }
+.tr-alt { background: #fafcfa; }
+
+.td-desc      { font-weight: 500; color: #1a2b1d; }
+.td-center    { text-align: center; }
+.td-right     { text-align: right; }
+.td-secondary { color: #5e7862; font-size: 8pt; }
+.td-amount    { font-weight: 700; color: #1a2b1d; text-align: right; }
+
+.vat-exempt {
+  display: inline-block;
+  background: #f0f5f0;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 7pt;
+  font-weight: 600;
+  color: #5d8062;
+}
+
+/* ══════════════════════════════
+   TOTALS
+══════════════════════════════ */
+.totals-outer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.totals-table-wrap {
+  width: 295px;
+  border: 1px solid #dde8dd;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.totals-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.totals-table td {
+  padding: 7px 16px;
+  font-size: 8.5pt;
+  border: none;
+  border-bottom: 1px solid #f0f5f0;
+}
+
+.totals-label { color: #7a9580; font-weight: 400; }
+.totals-value { text-align: right; font-weight: 600; color: #1a2b1d; }
+
+.totals-deduct .totals-label { color: #c53030; }
+.totals-deduct .totals-value { color: #c53030; }
+
+.totals-separator td { padding: 0; border-bottom: 2px solid #dde8dd; }
+
+.totals-grand { background: #1a2b1d !important; }
+.totals-grand td { border-bottom: none !important; }
+.totals-grand-label {
+  padding: 12px 16px !important;
+  color: #c8deca;
+  font-size: 8pt;
+  font-weight: 600;
+}
+.totals-grand-value {
+  padding: 12px 16px !important;
+  text-align: right;
+  color: #ffffff;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15pt;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+/* ══════════════════════════════
+   FOOTER
+══════════════════════════════ */
+.footer-section { margin-top: 26px; }
+
+/* Legal notes */
+.legal-notes {
+  background: #fffbf0;
+  border: 1px solid #f0d890;
+  border-radius: 6px;
+  padding: 11px 15px;
+  margin-bottom: 10px;
+}
+
+.legal-notes-header {
+  font-size: 6.5pt;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #9a7210;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.legal-notes p {
+  font-size: 7pt;
+  color: #6b4f0a;
+  margin: 3px 0;
+  line-height: 1.55;
+}
+
+/* STS authorization */
+.sts-box {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 11px 15px;
+  margin-bottom: 10px;
+}
+
+.sts-section-label {
+  font-size: 6.5pt;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #888;
+  font-weight: 700;
+  margin-bottom: 7px;
+}
+
+.sts-box p {
+  font-size: 7.5pt;
+  color: #333;
+  margin: 0;
+  line-height: 1.65;
+}
+
+.sts-option {
+  display: inline-block;
+  margin: 0 10px 0 0;
+  vertical-align: middle;
+}
+
+.sts-selected {
+  font-weight: 700;
+  color: #1a2b1d;
+}
+
+.sts-checkbox {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid #7a7a7a;
+  margin-right: 4px;
+  vertical-align: middle;
+  border-radius: 2px;
+  text-align: center;
+  line-height: 10px;
+  font-size: 8pt;
+  font-weight: 700;
+  color: #3d6142;
+}
+
+/* Invoice notes */
+.user-notes-box {
+  background: #f7faf7;
+  border: 1px solid #dde8dd;
+  border-radius: 6px;
+  padding: 10px 15px;
+  margin-bottom: 10px;
+}
+
+.user-notes-label {
+  font-size: 6.5pt;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #5d8062;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.user-notes-box p {
+  font-size: 8pt;
+  color: #1a2b1d;
+  margin: 0;
+  line-height: 1.65;
+}
+
+/* Bottom bar */
+.bottom-bar {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #e0ebe1;
+  text-align: center;
+  font-size: 7pt;
+  color: #9cb8a0;
+  line-height: 1.7;
+}
+
+.bar-name { color: #3d6142; font-weight: 600; }
+.bar-dot  { color: #c8deca; margin: 0 4px; }
+
+/* ══════════════════════════════
+   PRINT MEDIA QUERY
+══════════════════════════════ */
 @media print {
-  .invoice-page {
+  .print-root {
+    background: none !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  .invoice-doc {
     max-width: 100% !important;
     margin: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
   }
+
   @page {
-    margin: 0;
     size: A4;
+    margin: 0;
   }
 }
 </style>

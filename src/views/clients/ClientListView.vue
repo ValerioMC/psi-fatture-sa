@@ -48,6 +48,7 @@ function clientTypeLabel(type: string): string {
 
 <template>
   <div class="p-8">
+    <div class="max-w-5xl mx-auto">
     <PageHeader title="Clienti" subtitle="Gestisci i tuoi pazienti e clienti.">
       <button
         type="button"
@@ -142,5 +143,6 @@ function clientTypeLabel(type: string): string {
       @confirm="handleDelete"
       @cancel="clientToDelete = null"
     />
+    </div>
   </div>
 </template>

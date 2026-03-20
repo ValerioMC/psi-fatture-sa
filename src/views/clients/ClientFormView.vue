@@ -86,6 +86,7 @@ async function onSubmit() {
 
 <template>
   <div class="p-8">
+    <div class="max-w-2xl mx-auto">
     <PageHeader
       :title="isEdit ? 'Modifica Cliente' : 'Nuovo Cliente'"
       :subtitle="isEdit ? 'Aggiorna i dati del cliente.' : 'Aggiungi un nuovo paziente o cliente.'"
@@ -93,7 +94,7 @@ async function onSubmit() {
 
     <div v-if="loading" class="text-sm text-sage-400">Caricamento...</div>
 
-    <form v-else class="max-w-2xl space-y-6" @submit.prevent="onSubmit">
+    <form v-else class="space-y-6" @submit.prevent="onSubmit">
       <!-- Type -->
       <div class="glass-card rounded-xl p-6 animate-in">
         <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Tipo cliente</h2>
@@ -294,5 +295,6 @@ async function onSubmit() {
         </button>
       </div>
     </form>
+    </div>
   </div>
 </template>

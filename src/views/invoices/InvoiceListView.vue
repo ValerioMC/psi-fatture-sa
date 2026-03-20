@@ -58,6 +58,7 @@ async function handleDelete() {
 
 <template>
   <div class="p-8">
+    <div class="max-w-5xl mx-auto">
     <PageHeader title="Fatture" subtitle="Gestisci tutte le tue fatture">
       <button
         type="button"
@@ -184,5 +185,6 @@ async function handleDelete() {
       @confirm="handleDelete"
       @cancel="invoiceToDelete = null"
     />
+    </div>
   </div>
 </template>

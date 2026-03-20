@@ -102,6 +102,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
 
 <template>
   <div class="p-8">
+    <div class="max-w-5xl mx-auto">
     <PageHeader title="Prestazioni" subtitle="Gestisci i servizi e le tariffe.">
       <button
         type="button"
@@ -286,5 +287,6 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
       @confirm="handleDelete"
       @cancel="serviceToDelete = null"
     />
+    </div>
   </div>
 </template>

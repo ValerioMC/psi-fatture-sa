@@ -185,6 +185,7 @@ async function onSubmit() {
 
 <template>
   <div class="p-8">
+    <div class="max-w-4xl mx-auto">
     <PageHeader
       :title="isEdit ? 'Modifica Fattura' : 'Nuova Fattura'"
       :subtitle="isEdit ? 'Aggiorna i dati della fattura.' : 'Crea una nuova fattura.'"
@@ -192,8 +193,7 @@ async function onSubmit() {
 
     <div v-if="loading" class="text-sm text-sage-400">Caricamento...</div>
 
-    <form v-else class="grid grid-cols-3 gap-6" @submit.prevent="onSubmit">
-      <div class="col-span-2 space-y-6">
+    <form v-else class="space-y-5" @submit.prevent="onSubmit">
         <!-- Header data -->
         <div class="glass-card rounded-xl p-6 animate-in">
           <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Dati fattura</h2>
@@ -371,61 +371,59 @@ async function onSubmit() {
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Totals panel -->
-      <div class="col-span-1 animate-in-d2">
-        <div class="glass-card rounded-xl p-5 sticky top-6">
-          <h2 class="text-sm font-semibold text-sage-800 mb-4">Riepilogo</h2>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between text-sage-600">
-              <span>Totale netto</span>
-              <span>{{ formatCurrency(totals.total_net) }}</span>
-            </div>
-            <div class="flex justify-between text-sage-600">
-              <span>IVA totale</span>
-              <span>{{ formatCurrency(totals.total_tax) }}</span>
-            </div>
-            <div v-if="form.apply_enpap" class="flex justify-between text-sage-600">
-              <span>Contributo ENPAP (2%)</span>
-              <span>+ {{ formatCurrency(totals.contributo_enpap) }}</span>
-            </div>
-            <div v-if="totals.ritenuta_acconto > 0" class="flex justify-between text-sage-600">
-              <span>Ritenuta d'acconto (20%)</span>
-              <span class="text-red-600">- {{ formatCurrency(totals.ritenuta_acconto) }}</span>
-            </div>
-            <div v-if="totals.marca_da_bollo > 0" class="flex justify-between text-sage-600">
-              <span>Marca da bollo</span>
-              <span>+ {{ formatCurrency(totals.marca_da_bollo) }}</span>
-            </div>
-            <div class="border-t border-sage-200 pt-2 mt-2 flex justify-between font-bold text-sage-900">
-              <span>Totale dovuto</span>
-              <span>{{ formatCurrency(totals.total_due) }}</span>
-            </div>
+      <!-- Riepilogo + azioni -->
+      <div class="glass-card rounded-2xl p-5 animate-in-d2">
+        <!-- Voci importo in riga -->
+        <div class="flex flex-wrap items-end gap-x-7 gap-y-3 pb-4 mb-4 border-b border-sage-100">
+          <div>
+            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">Netto</p>
+            <p class="text-sm font-semibold text-sage-700">{{ formatCurrency(totals.total_net) }}</p>
           </div>
+          <div>
+            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">IVA</p>
+            <p class="text-sm font-semibold text-sage-700">{{ formatCurrency(totals.total_tax) }}</p>
+          </div>
+          <div v-if="form.apply_enpap">
+            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">ENPAP 2%</p>
+            <p class="text-sm font-semibold text-sage-700">+ {{ formatCurrency(totals.contributo_enpap) }}</p>
+          </div>
+          <div v-if="totals.ritenuta_acconto > 0">
+            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">Ritenuta 20%</p>
+            <p class="text-sm font-semibold text-red-600">− {{ formatCurrency(totals.ritenuta_acconto) }}</p>
+          </div>
+          <div v-if="totals.marca_da_bollo > 0">
+            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">Bollo</p>
+            <p class="text-sm font-semibold text-sage-700">+ {{ formatCurrency(totals.marca_da_bollo) }}</p>
+          </div>
+          <div class="ml-auto text-right">
+            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">Totale dovuto</p>
+            <p class="text-2xl font-bold text-sage-900">{{ formatCurrency(totals.total_due) }}</p>
+          </div>
+        </div>
 
-          <div v-if="error" class="mt-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-            {{ error }}
-          </div>
+        <div v-if="error" class="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+          {{ error }}
+        </div>
 
-          <div class="mt-5 space-y-2">
-            <button
-              type="submit"
-              :disabled="saving"
-              class="w-full bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60"
-            >
-              {{ saving ? 'Salvataggio...' : isEdit ? 'Aggiorna fattura' : 'Crea fattura' }}
-            </button>
-            <button
-              type="button"
-              class="w-full border border-sage-200 text-sage-700 hover:bg-sage-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              @click="router.push('/invoices')"
-            >
-              Annulla
-            </button>
-          </div>
+        <div class="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            class="border border-sage-200 text-sage-700 hover:bg-sage-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            @click="router.push('/invoices')"
+          >
+            Annulla
+          </button>
+          <button
+            type="submit"
+            :disabled="saving"
+            class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-5 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60"
+          >
+            {{ saving ? 'Salvataggio...' : isEdit ? 'Aggiorna fattura' : 'Crea fattura' }}
+          </button>
         </div>
       </div>
     </form>
+    </div>
   </div>
 </template>
