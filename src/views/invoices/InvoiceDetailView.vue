@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Pencil, Trash2, CheckCircle, ArrowLeft } from 'lucide-vue-next'
+import { Pencil, Trash2, CheckCircle, ArrowLeft, Printer } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/stores/invoices'
 import type { Invoice } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -103,6 +103,14 @@ function canMarkAsPaid(): boolean {
         >
           <CheckCircle class="w-4 h-4" />
           Segna come Pagata
+        </button>
+        <button
+          type="button"
+          class="border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          @click="router.push(`/invoices/${invoiceId}/print`)"
+        >
+          <Printer class="w-4 h-4" />
+          Stampa PDF
         </button>
         <button
           type="button"

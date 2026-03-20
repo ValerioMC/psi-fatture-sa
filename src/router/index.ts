@@ -27,6 +27,11 @@ const router = createRouter({
       name: 'onboarding',
       component: () => import('@/views/OnboardingView.vue'),
     },
+    {
+      path: '/invoices/:id/print',
+      name: 'invoices.print',
+      component: () => import('@/views/invoices/InvoicePrintView.vue'),
+    },
   ],
 })
 

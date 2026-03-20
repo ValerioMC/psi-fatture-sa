@@ -7,9 +7,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
+
+# Environment variables (may contain secrets)
+.env
+.env.*
+!.env.example
+
+# Local config files
 *.local
 
 # Editor directories and files
@@ -22,6 +32,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code (IDE config personale)
+.claude/
 
 # Tauri / Rust
 src-tauri/target/
