@@ -60,7 +60,7 @@ function clientTypeLabel(type: string): string {
     </PageHeader>
 
     <!-- Search -->
-    <div class="relative mb-4 max-w-sm">
+    <div class="relative mb-4 max-w-sm animate-in">
       <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sage-400" />
       <input
         v-model="searchQuery"
@@ -72,7 +72,7 @@ function clientTypeLabel(type: string): string {
     </div>
 
     <!-- Table -->
-    <div class="glass-card rounded-xl">
+    <div class="glass-card rounded-xl animate-in-d1">
       <div v-if="clientsStore.loading" class="px-6 py-12 text-center text-sm text-sage-400">
         Caricamento...
       </div>

@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-defineProps<{
-  status: string
-  type: 'invoice' | 'appointment'
-}>()
-
 const INVOICE_CLASSES: Record<string, string> = {
   draft:     'bg-warm-100 text-warm-700',
   issued:    'bg-ocean-100 text-ocean-700',

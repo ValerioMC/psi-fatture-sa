@@ -121,7 +121,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
     </PageHeader>
 
     <!-- Table -->
-    <div class="glass-card rounded-xl">
+    <div class="glass-card rounded-xl animate-in">
       <div v-if="servicesStore.loading" class="px-6 py-12 text-center text-sm text-sage-400">
         Caricamento...
       </div>

@@ -156,7 +156,7 @@ onMounted(async () => {
 <template>
   <div class="p-8 flex gap-6 min-h-0">
     <!-- Calendar area -->
-    <div class="flex-1 min-w-0">
+    <div class="flex-1 min-w-0 animate-in">
       <PageHeader title="Agenda">
         <button
           type="button"
@@ -253,7 +253,7 @@ onMounted(async () => {
     </div>
 
     <!-- Side panel: selected day -->
-    <div class="w-72 shrink-0">
+    <div class="w-72 shrink-0 animate-in-d1">
       <div class="glass-card rounded-xl p-5 sticky top-6">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-semibold text-sage-900">

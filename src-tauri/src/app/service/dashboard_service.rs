@@ -10,9 +10,9 @@ const MONTH_NAMES: [&str; 12] = [
 
 /// Returns aggregated dashboard analytics for the given year.
 pub async fn get(db: &DatabaseConnection, year: i64) -> Result<DashboardData, String> {
-    let total_revenue = query_f64(db, "SELECT COALESCE(SUM(total_due),0) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
-    let paid_revenue = query_f64(db, "SELECT COALESCE(SUM(total_due),0) AS val FROM invoices WHERE year=? AND status='paid'", year).await?;
-    let unpaid_revenue = query_f64(db, "SELECT COALESCE(SUM(total_due),0) AS val FROM invoices WHERE year=? AND status IN ('issued','overdue')", year).await?;
+    let total_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
+    let paid_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status='paid'", year).await?;
+    let unpaid_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status IN ('issued','overdue')", year).await?;
     let total_invoices = query_i64(db, "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
     let paid_invoices = query_i64(db, "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='paid'", year).await?;
     let draft_invoices = query_i64(db, "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='draft'", year).await?;
@@ -81,7 +81,7 @@ async fn build_monthly_revenue(
     let rows = Row::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         "SELECT CAST(strftime('%m', issue_date) AS INTEGER) AS month,
-                COALESCE(SUM(total_due), 0) AS revenue,
+                CAST(COALESCE(SUM(total_due), 0) AS REAL) AS revenue,
                 COUNT(*) AS invoice_count
          FROM invoices WHERE year=? AND status='paid'
          GROUP BY month ORDER BY month",

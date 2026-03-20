@@ -80,7 +80,7 @@ function canMarkAsPaid(): boolean {
 
 <template>
   <div class="p-8">
-    <div class="flex items-center gap-3 mb-6">
+    <div class="flex items-center gap-3 mb-6 animate-in">
       <button
         type="button"
         class="p-1.5 text-sage-400 hover:text-sage-700 hover:bg-sage-100 rounded-lg transition-colors"
@@ -138,13 +138,13 @@ function canMarkAsPaid(): boolean {
       <div class="grid grid-cols-3 gap-6">
         <div class="col-span-2 space-y-6">
           <!-- Client info -->
-          <div class="glass-card rounded-xl p-6">
+          <div class="glass-card rounded-xl p-6 animate-in-d1">
             <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider mb-3">Cliente</h2>
             <p class="font-medium text-sage-900 text-base">{{ invoice.client_name }}</p>
           </div>
 
           <!-- Invoice details -->
-          <div class="glass-card rounded-xl p-6">
+          <div class="glass-card rounded-xl p-6 animate-in-d2">
             <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider mb-3">Dettagli</h2>
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
@@ -173,7 +173,7 @@ function canMarkAsPaid(): boolean {
           </div>
 
           <!-- Lines -->
-          <div class="glass-card rounded-xl">
+          <div class="glass-card rounded-xl animate-in-d3">
             <div class="px-6 py-4 border-b border-sage-100">
               <h2 class="text-sm font-semibold text-sage-800">Righe fattura</h2>
             </div>
@@ -203,7 +203,7 @@ function canMarkAsPaid(): boolean {
         </div>
 
         <!-- Tax summary -->
-        <div class="col-span-1">
+        <div class="col-span-1 animate-in-d2">
           <div class="glass-card rounded-xl p-5 sticky top-6">
             <h2 class="text-sm font-semibold text-sage-800 mb-4">Riepilogo importi</h2>
             <div class="space-y-2 text-sm">

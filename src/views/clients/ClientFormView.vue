@@ -95,7 +95,7 @@ async function onSubmit() {
 
     <form v-else class="max-w-2xl space-y-6" @submit.prevent="onSubmit">
       <!-- Type -->
-      <div class="glass-card rounded-xl p-6">
+      <div class="glass-card rounded-xl p-6 animate-in">
         <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Tipo cliente</h2>
         <div class="flex gap-6">
           <label class="flex items-center gap-2 cursor-pointer">
@@ -120,7 +120,7 @@ async function onSubmit() {
       </div>
 
       <!-- Anagrafica -->
-      <div class="glass-card rounded-xl p-6">
+      <div class="glass-card rounded-xl p-6 animate-in-d1">
         <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Dati anagrafici</h2>
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -188,7 +188,7 @@ async function onSubmit() {
       </div>
 
       <!-- Address -->
-      <div class="glass-card rounded-xl p-6">
+      <div class="glass-card rounded-xl p-6 animate-in-d2">
         <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Indirizzo</h2>
         <div class="space-y-4">
           <div>
@@ -233,7 +233,7 @@ async function onSubmit() {
       </div>
 
       <!-- Contacts -->
-      <div class="glass-card rounded-xl p-6">
+      <div class="glass-card rounded-xl p-6 animate-in-d3">
         <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Contatti</h2>
         <div class="grid grid-cols-2 gap-4">
           <div>

@@ -12,11 +12,16 @@ const currentYear = new Date().getFullYear()
 const selectedYear = ref(currentYear)
 const data = ref<DashboardData | null>(null)
 const loading = ref(false)
+const error = ref<string | null>(null)
 
 async function loadDashboard() {
   loading.value = true
+  error.value = null
   try {
     data.value = await getDashboard(selectedYear.value)
+  } catch (e) {
+    error.value = String(e)
+    data.value = null
   } finally {
     loading.value = false
   }
@@ -72,6 +77,20 @@ onMounted(loadDashboard)
           class="w-8 h-8 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin"
         />
         <p class="text-sm text-sage-400">Caricamento...</p>
+      </div>
+    </div>
+
+    <div v-else-if="error" class="flex items-center justify-center h-64">
+      <div class="glass-card rounded-2xl px-6 py-5 max-w-md text-center shadow-sm">
+        <p class="text-sm font-semibold text-red-700 mb-1">Errore nel caricamento</p>
+        <p class="text-xs text-red-500 font-mono break-all">{{ error }}</p>
+        <button
+          type="button"
+          class="mt-4 bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+          @click="loadDashboard"
+        >
+          Riprova
+        </button>
       </div>
     </div>
 
@@ -219,5 +238,18 @@ onMounted(loadDashboard)
         </table>
       </div>
     </template>
+
+    <div v-else class="flex items-center justify-center h-64">
+      <div class="text-center">
+        <p class="text-sm text-sage-400">Nessun dato disponibile.</p>
+        <button
+          type="button"
+          class="mt-3 text-sm font-medium text-sage-600 hover:text-sage-800 transition-colors"
+          @click="loadDashboard"
+        >
+          Ricarica
+        </button>
+      </div>
+    </div>
   </div>
 </template>

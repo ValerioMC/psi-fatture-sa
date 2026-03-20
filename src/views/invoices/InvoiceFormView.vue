@@ -195,7 +195,7 @@ async function onSubmit() {
     <form v-else class="grid grid-cols-3 gap-6" @submit.prevent="onSubmit">
       <div class="col-span-2 space-y-6">
         <!-- Header data -->
-        <div class="glass-card rounded-xl p-6">
+        <div class="glass-card rounded-xl p-6 animate-in">
           <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Dati fattura</h2>
           <div class="grid grid-cols-2 gap-4">
             <div class="col-span-2">
@@ -276,7 +276,7 @@ async function onSubmit() {
         </div>
 
         <!-- Invoice lines -->
-        <div class="glass-card rounded-xl p-6">
+        <div class="glass-card rounded-xl p-6 animate-in-d1">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider">Righe fattura</h2>
             <button
@@ -374,7 +374,7 @@ async function onSubmit() {
       </div>
 
       <!-- Totals panel -->
-      <div class="col-span-1">
+      <div class="col-span-1 animate-in-d2">
         <div class="glass-card rounded-xl p-5 sticky top-6">
           <h2 class="text-sm font-semibold text-sage-800 mb-4">Riepilogo</h2>
           <div class="space-y-2 text-sm">
