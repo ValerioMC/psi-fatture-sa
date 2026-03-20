@@ -197,24 +197,24 @@ function toggleRecurringDay(day: number) {
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" @click="emit('close')" />
-      <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+      <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="emit('close')" />
+      <div class="relative glass-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto animate-in">
         <div class="flex items-center justify-between mb-5">
-          <h3 class="text-base font-semibold text-gray-900">
+          <h3 class="text-base font-semibold text-sage-900">
             {{ isEdit ? 'Modifica Appuntamento' : 'Nuovo Appuntamento' }}
           </h3>
-          <button type="button" class="text-gray-400 hover:text-gray-600" @click="emit('close')">
+          <button type="button" class="text-sage-400 hover:text-sage-600 transition-colors" @click="emit('close')">
             <X class="w-5 h-5" />
           </button>
         </div>
 
         <form class="space-y-4" @submit.prevent="onSubmit">
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Cliente *</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Cliente *</label>
             <select
               v-model.number="form.client_id"
               required
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             >
               <option :value="0" disabled>— Seleziona cliente —</option>
               <option
@@ -228,10 +228,10 @@ function toggleRecurringDay(day: number) {
           </div>
 
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Prestazione</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Prestazione</label>
             <select
               v-model.number="form.service_id"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             >
               <option :value="undefined">— nessuna —</option>
               <option
@@ -246,39 +246,39 @@ function toggleRecurringDay(day: number) {
 
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Data *</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Data *</label>
               <input
                 v-model="form.date"
                 type="date"
                 required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               />
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Inizio</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Inizio</label>
               <input
                 v-model="form.start_time"
                 type="time"
                 required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               />
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Fine</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Fine</label>
               <input
                 v-model="form.end_time"
                 type="time"
                 required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               />
             </div>
           </div>
 
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Stato</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Stato</label>
             <select
               v-model="form.status"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             >
               <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">
                 {{ opt.label }}
@@ -287,29 +287,29 @@ function toggleRecurringDay(day: number) {
           </div>
 
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Note</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Note</label>
             <textarea
               v-model="form.notes"
               rows="2"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80 resize-none"
             />
           </div>
 
           <!-- Recurring section (only on create) -->
           <template v-if="!isEdit">
-            <div class="border-t border-gray-100 pt-4">
+            <div class="border-t border-sage-100 pt-4">
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
                   v-model="recurring"
                   type="checkbox"
-                  class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
                 />
-                <span class="text-sm font-medium text-gray-700">Appuntamento ricorrente</span>
+                <span class="text-sm font-medium text-sage-700">Appuntamento ricorrente</span>
               </label>
 
               <div v-if="recurring" class="mt-3 space-y-3">
                 <div>
-                  <label class="text-xs font-medium text-gray-500 block mb-2">Giorni della settimana</label>
+                  <label class="text-xs font-medium text-sage-500 block mb-2">Giorni della settimana</label>
                   <div class="flex gap-1.5">
                     <button
                       v-for="day in DAYS_OF_WEEK"
@@ -317,8 +317,8 @@ function toggleRecurringDay(day: number) {
                       type="button"
                       class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors"
                       :class="recurringDays.includes(day.value)
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
+                        ? 'bg-gradient-to-r from-sage-600 to-ocean-500 text-white border-transparent'
+                        : 'border-sage-200 text-sage-600 hover:bg-sage-50'"
                       @click="toggleRecurringDay(day.value)"
                     >
                       {{ day.label }}
@@ -326,13 +326,13 @@ function toggleRecurringDay(day: number) {
                   </div>
                 </div>
                 <div>
-                  <label class="text-xs font-medium text-gray-500 block mb-1">Numero di settimane</label>
+                  <label class="text-xs font-medium text-sage-500 block mb-1">Numero di settimane</label>
                   <input
                     v-model.number="recurringWeeks"
                     type="number"
                     min="1"
                     max="52"
-                    class="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="w-24 border border-sage-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                   />
                 </div>
               </div>
@@ -357,7 +357,7 @@ function toggleRecurringDay(day: number) {
             <div class="flex-1" />
             <button
               type="button"
-              class="border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              class="border border-sage-200 text-sage-700 hover:bg-sage-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               @click="emit('close')"
             >
               Annulla
@@ -365,7 +365,7 @@ function toggleRecurringDay(day: number) {
             <button
               type="submit"
               :disabled="saving"
-              class="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-60"
+              class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60"
             >
               {{ saving ? 'Salvataggio...' : 'Salva' }}
             </button>

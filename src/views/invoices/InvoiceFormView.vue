@@ -190,20 +190,20 @@ async function onSubmit() {
       :subtitle="isEdit ? 'Aggiorna i dati della fattura.' : 'Crea una nuova fattura.'"
     />
 
-    <div v-if="loading" class="text-sm text-gray-400">Caricamento...</div>
+    <div v-if="loading" class="text-sm text-sage-400">Caricamento...</div>
 
     <form v-else class="grid grid-cols-3 gap-6" @submit.prevent="onSubmit">
       <div class="col-span-2 space-y-6">
         <!-- Header data -->
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h2 class="text-base font-semibold text-gray-900 mb-4">Dati fattura</h2>
+        <div class="glass-card rounded-xl p-6">
+          <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Dati fattura</h2>
           <div class="grid grid-cols-2 gap-4">
             <div class="col-span-2">
-              <label class="text-sm font-medium text-gray-700 block mb-1">Cliente *</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Cliente *</label>
               <select
                 v-model.number="form.client_id"
                 required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               >
                 <option :value="0" disabled>— Seleziona cliente —</option>
                 <option
@@ -216,27 +216,27 @@ async function onSubmit() {
               </select>
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Data emissione *</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Data emissione *</label>
               <input
                 v-model="form.issue_date"
                 type="date"
                 required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               />
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Data scadenza</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Data scadenza</label>
               <input
                 v-model="form.due_date"
                 type="date"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               />
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Metodo di pagamento</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Metodo di pagamento</label>
               <select
                 v-model="form.payment_method"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               >
                 <option v-for="opt in PAYMENT_METHODS" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
@@ -244,10 +244,10 @@ async function onSubmit() {
               </select>
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Stato</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Stato</label>
               <select
                 v-model="form.status"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               >
                 <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
@@ -255,11 +255,11 @@ async function onSubmit() {
               </select>
             </div>
             <div class="col-span-2">
-              <label class="text-sm font-medium text-gray-700 block mb-1">Note</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Note</label>
               <textarea
                 v-model="form.notes"
                 rows="2"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80 resize-none"
               />
             </div>
             <div class="col-span-2">
@@ -267,21 +267,21 @@ async function onSubmit() {
                 <input
                   v-model="form.apply_enpap"
                   type="checkbox"
-                  class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
                 />
-                <span class="text-sm text-gray-700">Applica contributo ENPAP (2%)</span>
+                <span class="text-sm text-sage-700">Applica contributo ENPAP (2%)</span>
               </label>
             </div>
           </div>
         </div>
 
         <!-- Invoice lines -->
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <div class="glass-card rounded-xl p-6">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-base font-semibold text-gray-900">Righe fattura</h2>
+            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider">Righe fattura</h2>
             <button
               type="button"
-              class="border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+              class="border border-sage-200 text-sage-700 hover:bg-sage-50 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
               @click="addLine"
             >
               <Plus class="w-3.5 h-3.5" />
@@ -293,15 +293,15 @@ async function onSubmit() {
             <div
               v-for="(line, idx) in form.lines"
               :key="line._key"
-              class="grid gap-2 items-end pb-3 border-b border-gray-50 last:border-0"
+              class="grid gap-2 items-end pb-3 border-b border-sage-100/50 last:border-0"
               style="grid-template-columns: 2fr 3fr 1fr 1fr 1fr auto"
             >
               <!-- Servizio -->
               <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-gray-500 block mb-1">Servizio</label>
+                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">Servizio</label>
                 <select
                   v-model.number="line.service_id"
-                  class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                   @change="onServiceSelect(line)"
                 >
                   <option :value="undefined">— nessuno —</option>
@@ -312,48 +312,48 @@ async function onSubmit() {
               </div>
               <!-- Descrizione -->
               <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-gray-500 block mb-1">Descrizione *</label>
+                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">Descrizione *</label>
                 <input
                   v-model="line.description"
                   type="text"
                   required
-                  class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                 />
               </div>
               <!-- Quantità -->
               <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-gray-500 block mb-1">Qtà</label>
+                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">Qtà</label>
                 <input
                   v-model.number="line.quantity"
                   type="number"
                   min="1"
                   step="1"
                   required
-                  class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                 />
               </div>
               <!-- Prezzo unitario -->
               <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-gray-500 block mb-1">Prezzo (€)</label>
+                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">Prezzo (€)</label>
                 <input
                   v-model.number="line.unit_price"
                   type="number"
                   min="0"
                   step="0.01"
                   required
-                  class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                 />
               </div>
               <!-- IVA -->
               <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-gray-500 block mb-1">IVA %</label>
+                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">IVA %</label>
                 <input
                   v-model.number="line.vat_rate"
                   type="number"
                   min="0"
                   max="100"
                   step="1"
-                  class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                 />
               </div>
               <!-- Remove -->
@@ -361,7 +361,7 @@ async function onSubmit() {
                 <div v-if="idx === 0" class="h-5 mb-1" />
                 <button
                   type="button"
-                  class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  class="p-1.5 text-sage-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   :disabled="form.lines.length === 1"
                   @click="removeLine(line._key)"
                 >
@@ -375,30 +375,30 @@ async function onSubmit() {
 
       <!-- Totals panel -->
       <div class="col-span-1">
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sticky top-6">
-          <h2 class="text-sm font-semibold text-gray-900 mb-4">Riepilogo</h2>
+        <div class="glass-card rounded-xl p-5 sticky top-6">
+          <h2 class="text-sm font-semibold text-sage-800 mb-4">Riepilogo</h2>
           <div class="space-y-2 text-sm">
-            <div class="flex justify-between text-gray-500">
+            <div class="flex justify-between text-sage-600">
               <span>Totale netto</span>
               <span>{{ formatCurrency(totals.total_net) }}</span>
             </div>
-            <div class="flex justify-between text-gray-500">
+            <div class="flex justify-between text-sage-600">
               <span>IVA totale</span>
               <span>{{ formatCurrency(totals.total_tax) }}</span>
             </div>
-            <div v-if="form.apply_enpap" class="flex justify-between text-gray-500">
+            <div v-if="form.apply_enpap" class="flex justify-between text-sage-600">
               <span>Contributo ENPAP (2%)</span>
               <span>+ {{ formatCurrency(totals.contributo_enpap) }}</span>
             </div>
-            <div v-if="totals.ritenuta_acconto > 0" class="flex justify-between text-gray-500">
+            <div v-if="totals.ritenuta_acconto > 0" class="flex justify-between text-sage-600">
               <span>Ritenuta d'acconto (20%)</span>
               <span class="text-red-600">- {{ formatCurrency(totals.ritenuta_acconto) }}</span>
             </div>
-            <div v-if="totals.marca_da_bollo > 0" class="flex justify-between text-gray-500">
+            <div v-if="totals.marca_da_bollo > 0" class="flex justify-between text-sage-600">
               <span>Marca da bollo</span>
               <span>+ {{ formatCurrency(totals.marca_da_bollo) }}</span>
             </div>
-            <div class="border-t border-gray-100 pt-2 mt-2 flex justify-between font-semibold text-gray-900">
+            <div class="border-t border-sage-200 pt-2 mt-2 flex justify-between font-bold text-sage-900">
               <span>Totale dovuto</span>
               <span>{{ formatCurrency(totals.total_due) }}</span>
             </div>
@@ -412,13 +412,13 @@ async function onSubmit() {
             <button
               type="submit"
               :disabled="saving"
-              class="w-full bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-60"
+              class="w-full bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60"
             >
               {{ saving ? 'Salvataggio...' : isEdit ? 'Aggiorna fattura' : 'Crea fattura' }}
             </button>
             <button
               type="button"
-              class="w-full border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              class="w-full border border-sage-200 text-sage-700 hover:bg-sage-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               @click="router.push('/invoices')"
             >
               Annulla

@@ -8,17 +8,18 @@ import {
   FileText,
   Calendar,
   Settings,
+  Plus,
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const configStore = useConfigStore()
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/clients', label: 'Clienti', icon: Users },
-  { to: '/services', label: 'Prestazioni', icon: Briefcase },
-  { to: '/invoices', label: 'Fatture', icon: FileText },
-  { to: '/agenda', label: 'Agenda', icon: Calendar },
+  { to: '/dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
+  { to: '/clients',    label: 'Pazienti',     icon: Users },
+  { to: '/services',   label: 'Prestazioni',  icon: Briefcase },
+  { to: '/invoices',   label: 'Fatture',      icon: FileText },
+  { to: '/agenda',     label: 'Agenda',       icon: Calendar },
 ]
 
 const isActive = (path: string) =>
@@ -26,47 +27,93 @@ const isActive = (path: string) =>
 </script>
 
 <template>
-  <aside class="w-56 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
-    <!-- Logo / App name -->
-    <div class="px-5 py-5 border-b border-gray-100">
-      <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center">
-          <FileText class="w-4 h-4 text-white" />
-        </div>
-        <span class="font-semibold text-gray-900 text-sm">PSI Fatture</span>
+  <aside
+    class="w-60 flex flex-col h-full shrink-0 glass-card"
+    style="border-right: 1px solid rgba(163,186,163,0.25); border-radius: 0;"
+  >
+    <!-- ── Logo ── -->
+    <div class="px-6 py-6 flex items-center gap-3">
+      <div
+        class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+        style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 12px rgba(93,128,98,0.35);"
+      >
+        <FileText class="w-4.5 h-4.5 text-white" />
       </div>
-      <p v-if="configStore.fullName" class="text-xs text-gray-500 mt-1 truncate">
-        {{ configStore.fullName }}
-      </p>
+      <div>
+        <h1 class="text-base font-bold leading-none gradient-text heading-serif">PSI Fatture</h1>
+        <p v-if="configStore.fullName" class="text-[10px] text-sage-500 mt-1 font-medium tracking-wider uppercase truncate max-w-[7rem]">
+          {{ configStore.fullName }}
+        </p>
+      </div>
     </div>
 
-    <!-- Navigation -->
-    <nav class="flex-1 px-3 py-3 space-y-0.5">
+    <!-- ── Divider ── -->
+    <div class="mx-5 h-px" style="background: linear-gradient(to right, transparent, rgba(93,128,98,0.2), transparent)" />
+
+    <!-- ── Navigation ── -->
+    <nav class="flex-1 px-3 py-4 space-y-0.5">
       <RouterLink
         v-for="item in navItems"
         :key="item.to"
         :to="item.to"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
+        class="group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none"
         :class="isActive(item.to)
-          ? 'bg-primary-50 text-primary-700 font-medium'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+          ? 'bg-white/75 text-sage-800 shadow-sm'
+          : 'text-sage-600 hover:bg-white/45 hover:text-sage-800'"
       >
-        <component :is="item.icon" class="w-4 h-4 shrink-0" />
-        {{ item.label }}
+        <component
+          :is="item.icon"
+          class="w-4 h-4 shrink-0 transition-colors duration-200"
+          :class="isActive(item.to) ? 'text-sage-600' : 'text-sage-400 group-hover:text-sage-600'"
+        />
+        <span class="flex-1">{{ item.label }}</span>
+        <!-- active indicator -->
+        <span
+          v-if="isActive(item.to)"
+          class="w-1.5 h-4 rounded-full shrink-0"
+          style="background: linear-gradient(to bottom, #5d8062, #0c8aeb)"
+        />
       </RouterLink>
     </nav>
 
-    <!-- Settings at bottom -->
-    <div class="px-3 py-3 border-t border-gray-100">
+    <!-- ── Footer ── -->
+    <div class="px-3 pb-5 space-y-2.5">
+      <!-- CTA Nuova Fattura -->
+      <RouterLink
+        to="/invoices/new"
+        class="group w-full text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 focus:outline-none relative overflow-hidden"
+        style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.3);"
+      >
+        <!-- Shine effect -->
+        <div
+          class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"
+          aria-hidden="true"
+        />
+        <Plus class="w-4 h-4 relative z-10" />
+        <span class="text-sm relative z-10">Nuova Fattura</span>
+      </RouterLink>
+
+      <!-- Divider -->
+      <div class="h-px mx-1" style="background: rgba(93,128,98,0.15)" />
+
+      <!-- Settings -->
       <RouterLink
         to="/settings"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
+        class="group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none"
         :class="isActive('/settings')
-          ? 'bg-primary-50 text-primary-700 font-medium'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
+          ? 'bg-white/75 text-sage-800 shadow-sm'
+          : 'text-sage-500 hover:bg-white/45 hover:text-sage-700'"
       >
-        <Settings class="w-4 h-4 shrink-0" />
-        Impostazioni
+        <Settings
+          class="w-4 h-4 shrink-0 transition-colors"
+          :class="isActive('/settings') ? 'text-sage-600' : 'text-sage-400 group-hover:text-sage-600'"
+        />
+        <span class="flex-1">Impostazioni</span>
+        <span
+          v-if="isActive('/settings')"
+          class="w-1.5 h-4 rounded-full shrink-0"
+          style="background: linear-gradient(to bottom, #5d8062, #0c8aeb)"
+        />
       </RouterLink>
     </div>
   </aside>

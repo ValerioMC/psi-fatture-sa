@@ -1,21 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /* ── Sage (primary) ── */
+  --color-sage-50: #f6f8f6;
+  --color-sage-100: #e3ebe3;
+  --color-sage-200: #c7d7c8;
+  --color-sage-300: #a1baa3;
+  --color-sage-400: #7a9b7e;
+  --color-sage-500: #5d8062;
+  --color-sage-600: #48654c;
+  --color-sage-700: #3a513e;
+  --color-sage-800: #2f4233;
+  --color-sage-900: #28372b;
+
+  /* ── Ocean (accent) ── */
+  --color-ocean-50: #f0f7ff;
+  --color-ocean-100: #e0effe;
+  --color-ocean-200: #b9ddfe;
+  --color-ocean-300: #7cc2fd;
+  --color-ocean-400: #36a5fa;
+  --color-ocean-500: #0c8aeb;
+  --color-ocean-600: #0069c8;
+  --color-ocean-700: #0153a2;
+  --color-ocean-800: #064786;
+  --color-ocean-900: #0b3c6f;
+
+  /* ── Warm (background/neutral) ── */
+  --color-warm-50: #faf9f7;
+  --color-warm-100: #f5f1ec;
+  --color-warm-200: #e8dfd3;
+  --color-warm-300: #d9c7b1;
+  --color-warm-400: #c8a987;
+  --color-warm-500: #b88e67;
+  --color-warm-600: #a6764f;
+  --color-warm-700: #8a5f42;
+  --color-warm-800: #724f39;
+  --color-warm-900: #5e4231;
+
+  /* ── Gold (warning/highlight) ── */
+  --color-gold-50: #fefce8;
+  --color-gold-100: #fef9c3;
+  --color-gold-200: #fef08a;
+  --color-gold-300: #fde047;
+  --color-gold-400: #facc15;
+  --color-gold-500: #d4a017;
+  --color-gold-600: #ca8a04;
+  --color-gold-700: #a16207;
+  --color-gold-800: #854d0e;
+  --color-gold-900: #713f12;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body, #app {
   height: 100%;
@@ -24,6 +60,76 @@ html, body, #app {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Lexend', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Glass card ── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+
+/* ── Gradient text ── */
+.gradient-text {
+  background: linear-gradient(135deg, #5d8062 0%, #0c8aeb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Hover lift ── */
+.hover-lift {
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px -8px rgba(0, 0, 0, 0.13);
+}
+
+/* ── Animations ── */
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes shimmer {
+  0%   { background-position: -1000px 0; }
+  100% { background-position:  1000px 0; }
+}
+
+.animate-in {
+  animation: slideInUp 0.5s ease-out forwards;
+}
+.animate-in-d1 { animation: slideInUp 0.5s ease-out 0.08s both; }
+.animate-in-d2 { animation: slideInUp 0.5s ease-out 0.16s both; }
+.animate-in-d3 { animation: slideInUp 0.5s ease-out 0.24s both; }
+.animate-in-d4 { animation: slideInUp 0.5s ease-out 0.32s both; }
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c7d7c8; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #a1baa3; }
+
+/* ── Focus ring ── */
+:focus-visible {
+  outline: 2px solid rgba(93, 128, 98, 0.55);
+  outline-offset: 2px;
+}
+
+/* ── Form inputs consistent style ── */
+input, select, textarea {
+  font-family: inherit;
+}
+
+/* ── Heading serif ── */
+.heading-serif {
+  font-family: 'Crimson Pro', Georgia, serif;
 }

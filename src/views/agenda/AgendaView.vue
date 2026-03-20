@@ -134,11 +134,11 @@ function onModalSaved() {
 /** Status → pill color */
 function apptColor(status: string): string {
   const map: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-700',
-    completed: 'bg-green-100 text-green-700',
-    cancelled: 'bg-gray-100 text-gray-400 line-through',
+    scheduled: 'bg-ocean-100 text-ocean-700',
+    completed: 'bg-sage-100 text-sage-700',
+    cancelled: 'bg-warm-100 text-warm-500 line-through',
   }
-  return map[status] ?? 'bg-gray-100 text-gray-600'
+  return map[status] ?? 'bg-warm-100 text-warm-600'
 }
 
 const isToday = (dateStr: string) => dateStr === today.toISOString().slice(0, 10)
@@ -160,7 +160,7 @@ onMounted(async () => {
       <PageHeader title="Agenda">
         <button
           type="button"
-          class="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          class="relative overflow-hidden bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-sage-200"
           @click="openCreate(selectedDate)"
         >
           <Plus class="w-4 h-4" />
@@ -172,17 +172,17 @@ onMounted(async () => {
       <div class="flex items-center justify-between mb-4">
         <button
           type="button"
-          class="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+          class="p-1.5 text-sage-500 hover:bg-sage-100 rounded-lg transition-colors"
           @click="prevMonth"
         >
           <ChevronLeft class="w-5 h-5" />
         </button>
-        <h2 class="text-base font-semibold text-gray-900">
+        <h2 class="text-base font-semibold text-sage-900">
           {{ MONTH_NAMES[viewMonth] }} {{ viewYear }}
         </h2>
         <button
           type="button"
-          class="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+          class="p-1.5 text-sage-500 hover:bg-sage-100 rounded-lg transition-colors"
           @click="nextMonth"
         >
           <ChevronRight class="w-5 h-5" />
@@ -194,20 +194,20 @@ onMounted(async () => {
         <div
           v-for="dayName in DAY_NAMES"
           :key="dayName"
-          class="text-center text-xs font-medium text-gray-400 py-1"
+          class="text-center text-xs font-medium text-sage-400 py-1"
         >
           {{ dayName }}
         </div>
       </div>
 
       <!-- Grid days -->
-      <div class="grid grid-cols-7 gap-px bg-gray-100 rounded-xl overflow-hidden border border-gray-100">
+      <div class="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-sage-100" style="background: rgba(227,235,227,0.4)">
         <div
           v-for="cell in calendarDays"
           :key="cell.date"
-          class="bg-white min-h-[80px] p-1.5 cursor-pointer transition-colors"
+          class="bg-white/80 min-h-[80px] p-1.5 cursor-pointer transition-colors"
           :class="[
-            cell.date === selectedDate ? 'ring-2 ring-inset ring-blue-500' : 'hover:bg-gray-50',
+            cell.date === selectedDate ? 'ring-2 ring-inset ring-sage-500 bg-sage-50/60' : 'hover:bg-sage-50/40',
             !cell.currentMonth ? 'opacity-40' : '',
           ]"
           @click="selectedDate = cell.date"
@@ -217,14 +217,14 @@ onMounted(async () => {
             <span
               class="text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full"
               :class="isToday(cell.date)
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-700'"
+                ? 'bg-gradient-to-br from-sage-600 to-ocean-500 text-white'
+                : 'text-sage-700'"
             >
               {{ cell.day }}
             </span>
             <button
               type="button"
-              class="w-5 h-5 text-gray-300 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-colors"
+              class="w-5 h-5 text-sage-300 hover:text-sage-600 opacity-0 group-hover:opacity-100 transition-colors"
               @click.stop="openCreate(cell.date)"
             >
               <Plus class="w-3.5 h-3.5" />
@@ -243,7 +243,7 @@ onMounted(async () => {
             </div>
             <div
               v-if="(appointmentsByDate[cell.date] ?? []).length > 3"
-              class="text-xs text-gray-400 px-1"
+              class="text-xs text-sage-400 px-1"
             >
               + {{ (appointmentsByDate[cell.date] ?? []).length - 3 }} altri
             </div>
@@ -254,9 +254,9 @@ onMounted(async () => {
 
     <!-- Side panel: selected day -->
     <div class="w-72 shrink-0">
-      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sticky top-6">
+      <div class="glass-card rounded-xl p-5 sticky top-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-semibold text-gray-900">
+          <h3 class="text-sm font-semibold text-sage-900">
             {{ new Date(selectedDate + 'T00:00:00').toLocaleDateString('it-IT', {
               weekday: 'long',
               day: 'numeric',
@@ -265,7 +265,7 @@ onMounted(async () => {
           </h3>
           <button
             type="button"
-            class="w-7 h-7 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            class="w-7 h-7 flex items-center justify-center text-sage-600 hover:bg-sage-50 rounded-lg transition-colors"
             title="Aggiungi appuntamento"
             @click="openCreate(selectedDate)"
           >
@@ -273,7 +273,7 @@ onMounted(async () => {
           </button>
         </div>
 
-        <div v-if="selectedDayAppointments.length === 0" class="text-sm text-gray-400 text-center py-6">
+        <div v-if="selectedDayAppointments.length === 0" class="text-sm text-sage-400 text-center py-6">
           Nessun appuntamento
         </div>
 
@@ -281,18 +281,18 @@ onMounted(async () => {
           <div
             v-for="appt in selectedDayAppointments"
             :key="appt.id"
-            class="rounded-lg border border-gray-100 p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+            class="rounded-lg border border-sage-100 p-3 cursor-pointer hover:bg-sage-50/40 transition-colors"
             @click="openEdit(appt)"
           >
             <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-medium text-gray-500">
+              <span class="text-xs font-medium text-sage-500">
                 {{ appt.start_time.slice(0, 5) }} – {{ appt.end_time.slice(0, 5) }}
               </span>
               <StatusBadge :status="appt.status" type="appointment" />
             </div>
-            <p class="text-sm font-medium text-gray-900">{{ appt.client_name }}</p>
-            <p v-if="appt.service_name" class="text-xs text-gray-500 mt-0.5">{{ appt.service_name }}</p>
-            <p v-if="appt.notes" class="text-xs text-gray-400 mt-1 truncate">{{ appt.notes }}</p>
+            <p class="text-sm font-medium text-sage-900">{{ appt.client_name }}</p>
+            <p v-if="appt.service_name" class="text-xs text-sage-500 mt-0.5">{{ appt.service_name }}</p>
+            <p v-if="appt.notes" class="text-xs text-sage-400 mt-1 truncate">{{ appt.notes }}</p>
           </div>
         </div>
       </div>

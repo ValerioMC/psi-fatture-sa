@@ -83,7 +83,7 @@ function canMarkAsPaid(): boolean {
     <div class="flex items-center gap-3 mb-6">
       <button
         type="button"
-        class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        class="p-1.5 text-sage-400 hover:text-sage-700 hover:bg-sage-100 rounded-lg transition-colors"
         @click="router.push('/invoices')"
       >
         <ArrowLeft class="w-5 h-5" />
@@ -98,7 +98,7 @@ function canMarkAsPaid(): boolean {
           v-if="canMarkAsPaid()"
           type="button"
           :disabled="markingPaid"
-          class="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-60"
+          class="bg-sage-600 text-white hover:bg-sage-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-60"
           @click="markAsPaid"
         >
           <CheckCircle class="w-4 h-4" />
@@ -106,7 +106,7 @@ function canMarkAsPaid(): boolean {
         </button>
         <button
           type="button"
-          class="border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          class="border border-sage-200 text-sage-700 hover:bg-sage-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
           @click="router.push(`/invoices/${invoiceId}/print`)"
         >
           <Printer class="w-4 h-4" />
@@ -114,7 +114,7 @@ function canMarkAsPaid(): boolean {
         </button>
         <button
           type="button"
-          class="border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          class="border border-sage-200 text-sage-700 hover:bg-sage-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
           @click="router.push(`/invoices/${invoiceId}/edit`)"
         >
           <Pencil class="w-4 h-4" />
@@ -131,72 +131,69 @@ function canMarkAsPaid(): boolean {
       </PageHeader>
     </div>
 
-    <div v-if="loading" class="text-sm text-gray-400">Caricamento...</div>
+    <div v-if="loading" class="text-sm text-sage-400">Caricamento...</div>
     <div v-else-if="error" class="text-sm text-red-600">{{ error }}</div>
 
     <template v-else-if="invoice">
       <div class="grid grid-cols-3 gap-6">
         <div class="col-span-2 space-y-6">
           <!-- Client info -->
-          <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Cliente</h2>
-            <p class="font-medium text-gray-900 text-base">{{ invoice.client_name }}</p>
+          <div class="glass-card rounded-xl p-6">
+            <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider mb-3">Cliente</h2>
+            <p class="font-medium text-sage-900 text-base">{{ invoice.client_name }}</p>
           </div>
 
           <!-- Invoice details -->
-          <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Dettagli</h2>
+          <div class="glass-card rounded-xl p-6">
+            <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider mb-3">Dettagli</h2>
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span class="text-gray-500">Data emissione</span>
-                <p class="font-medium text-gray-900 mt-0.5">{{ formatDate(invoice.issue_date) }}</p>
+                <span class="text-sage-500">Data emissione</span>
+                <p class="font-medium text-sage-900 mt-0.5">{{ formatDate(invoice.issue_date) }}</p>
               </div>
               <div v-if="invoice.due_date">
-                <span class="text-gray-500">Data scadenza</span>
-                <p class="font-medium text-gray-900 mt-0.5">{{ formatDate(invoice.due_date) }}</p>
+                <span class="text-sage-500">Data scadenza</span>
+                <p class="font-medium text-sage-900 mt-0.5">{{ formatDate(invoice.due_date) }}</p>
               </div>
               <div v-if="invoice.paid_date">
-                <span class="text-gray-500">Data pagamento</span>
-                <p class="font-medium text-green-700 mt-0.5">{{ formatDate(invoice.paid_date) }}</p>
+                <span class="text-sage-500">Data pagamento</span>
+                <p class="font-medium text-sage-600 mt-0.5">{{ formatDate(invoice.paid_date) }}</p>
               </div>
               <div>
-                <span class="text-gray-500">Metodo di pagamento</span>
-                <p class="font-medium text-gray-900 mt-0.5">
+                <span class="text-sage-500">Metodo di pagamento</span>
+                <p class="font-medium text-sage-900 mt-0.5">
                   {{ PAYMENT_METHOD_LABELS[invoice.payment_method] ?? invoice.payment_method }}
                 </p>
               </div>
             </div>
-            <div v-if="invoice.notes" class="mt-4 pt-4 border-t border-gray-50">
-              <span class="text-sm text-gray-500">Note</span>
-              <p class="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap">{{ invoice.notes }}</p>
+            <div v-if="invoice.notes" class="mt-4 pt-4 border-t border-sage-100">
+              <span class="text-sm text-sage-500">Note</span>
+              <p class="text-sm text-sage-700 mt-0.5 whitespace-pre-wrap">{{ invoice.notes }}</p>
             </div>
           </div>
 
           <!-- Lines -->
-          <div class="bg-white rounded-xl border border-gray-100 shadow-sm">
-            <div class="px-6 py-4 border-b border-gray-100">
-              <h2 class="text-sm font-semibold text-gray-900">Righe fattura</h2>
+          <div class="glass-card rounded-xl">
+            <div class="px-6 py-4 border-b border-sage-100">
+              <h2 class="text-sm font-semibold text-sage-800">Righe fattura</h2>
             </div>
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-50">
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrizione</th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtà</th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Prezzo unitario</th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">IVA %</th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Totale</th>
+                <tr class="border-b border-sage-100">
+                  <th class="px-6 py-3 text-left text-xs font-medium text-sage-500 uppercase">Descrizione</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-sage-500 uppercase">Qtà</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-sage-500 uppercase">Prezzo unitario</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-sage-500 uppercase">IVA %</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-sage-500 uppercase">Totale</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-50">
-                <tr v-for="line in invoice.lines" :key="line.id" class="hover:bg-gray-50">
-                  <td class="px-6 py-3 text-gray-900">
-                    {{ line.description }}
-                    <span v-if="line.service_id" class="text-xs text-gray-400 ml-1">({{ line.service_id }})</span>
-                  </td>
-                  <td class="px-6 py-3 text-right text-gray-500">{{ line.quantity }}</td>
-                  <td class="px-6 py-3 text-right text-gray-500">{{ formatCurrency(line.unit_price) }}</td>
-                  <td class="px-6 py-3 text-right text-gray-500">{{ line.vat_rate }}%</td>
-                  <td class="px-6 py-3 text-right font-medium text-gray-900">
+              <tbody class="divide-y divide-sage-100/50">
+                <tr v-for="line in invoice.lines" :key="line.id" class="hover:bg-sage-50/40 transition-colors">
+                  <td class="px-6 py-3 text-sage-900">{{ line.description }}</td>
+                  <td class="px-6 py-3 text-right text-sage-500">{{ line.quantity }}</td>
+                  <td class="px-6 py-3 text-right text-sage-500">{{ formatCurrency(line.unit_price) }}</td>
+                  <td class="px-6 py-3 text-right text-sage-500">{{ line.vat_rate }}%</td>
+                  <td class="px-6 py-3 text-right font-medium text-sage-900">
                     {{ formatCurrency(line.line_total) }}
                   </td>
                 </tr>
@@ -207,34 +204,34 @@ function canMarkAsPaid(): boolean {
 
         <!-- Tax summary -->
         <div class="col-span-1">
-          <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sticky top-6">
-            <h2 class="text-sm font-semibold text-gray-900 mb-4">Riepilogo importi</h2>
+          <div class="glass-card rounded-xl p-5 sticky top-6">
+            <h2 class="text-sm font-semibold text-sage-800 mb-4">Riepilogo importi</h2>
             <div class="space-y-2 text-sm">
-              <div class="flex justify-between text-gray-500">
+              <div class="flex justify-between text-sage-600">
                 <span>Totale netto</span>
                 <span>{{ formatCurrency(invoice.total_net) }}</span>
               </div>
-              <div class="flex justify-between text-gray-500">
+              <div class="flex justify-between text-sage-600">
                 <span>IVA totale</span>
                 <span>{{ formatCurrency(invoice.total_tax) }}</span>
               </div>
-              <div class="flex justify-between text-gray-500">
+              <div class="flex justify-between text-sage-600">
                 <span>Totale lordo</span>
                 <span>{{ formatCurrency(invoice.total_gross) }}</span>
               </div>
-              <div v-if="invoice.apply_enpap && invoice.contributo_enpap > 0" class="flex justify-between text-gray-500">
+              <div v-if="invoice.apply_enpap && invoice.contributo_enpap > 0" class="flex justify-between text-sage-600">
                 <span>Contributo ENPAP (2%)</span>
                 <span>+ {{ formatCurrency(invoice.contributo_enpap) }}</span>
               </div>
-              <div v-if="invoice.ritenuta_acconto > 0" class="flex justify-between text-gray-500">
+              <div v-if="invoice.ritenuta_acconto > 0" class="flex justify-between text-sage-600">
                 <span>Ritenuta d'acconto (20%)</span>
                 <span class="text-red-600">- {{ formatCurrency(invoice.ritenuta_acconto) }}</span>
               </div>
-              <div v-if="invoice.marca_da_bollo" class="flex justify-between text-gray-500">
+              <div v-if="invoice.marca_da_bollo" class="flex justify-between text-sage-600">
                 <span>Marca da bollo</span>
                 <span>+ {{ formatCurrency(2) }}</span>
               </div>
-              <div class="border-t border-gray-100 pt-2 mt-2 flex justify-between font-semibold text-gray-900 text-base">
+              <div class="border-t border-sage-200 pt-2 mt-2 flex justify-between font-bold text-sage-900 text-base">
                 <span>Totale dovuto</span>
                 <span>{{ formatCurrency(invoice.total_due) }}</span>
               </div>

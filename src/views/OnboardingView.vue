@@ -54,240 +54,242 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 flex items-start justify-center py-12 px-4">
-    <div class="w-full max-w-2xl">
-      <!-- Welcome header -->
-      <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 mb-4">
-          <FileText class="w-7 h-7 text-white" />
-        </div>
-        <h1 class="text-3xl font-bold text-gray-900">Benvenuto in PSI Fatture</h1>
-        <p class="text-gray-500 mt-2">
-          Configura il tuo profilo professionale per iniziare a emettere fatture.
-        </p>
-      </div>
-
-      <form
-        class="bg-white rounded-xl border border-gray-100 shadow-sm p-8 space-y-6"
-        @submit.prevent="onSubmit"
-      >
-        <!-- Personal info -->
-        <div>
-          <h2 class="text-base font-semibold text-gray-900 mb-4">Dati personali</h2>
-          <div class="grid grid-cols-3 gap-4">
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Titolo</label>
-              <select
-                v-model="form.title"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option v-for="t in TITLE_OPTIONS" :key="t" :value="t">{{ t }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Nome</label>
-              <input
-                v-model="form.first_name"
-                type="text"
-                required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Cognome</label>
-              <input
-                v-model="form.last_name"
-                type="text"
-                required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+  <div class="min-h-screen" style="background: linear-gradient(135deg, #f6f8f6 0%, #e3ebe3 50%, #f0f7ff 100%)">
+    <div class="flex items-start justify-center py-12 px-4">
+      <div class="w-full max-w-2xl animate-in">
+        <!-- Welcome header -->
+        <div class="text-center mb-8">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+            style="background: linear-gradient(135deg, #5d8062, #0c8aeb)">
+            <FileText class="w-8 h-8 text-white" />
           </div>
-          <div class="grid grid-cols-2 gap-4 mt-4">
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Partita IVA</label>
-              <input
-                v-model="form.vat_number"
-                type="text"
-                required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Codice Fiscale</label>
-              <input
-                v-model="form.fiscal_code"
-                type="text"
-                required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+          <h1 class="text-3xl font-bold heading-serif gradient-text">Benvenuto in PSI Fatture</h1>
+          <p class="text-sage-600 mt-2 text-sm">
+            Configura il tuo profilo professionale per iniziare a emettere fatture.
+          </p>
         </div>
 
-        <!-- Tax regime -->
-        <div>
-          <h2 class="text-base font-semibold text-gray-900 mb-4">Regime fiscale</h2>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Regime</label>
-              <select
-                v-model="form.tax_regime"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option
-                  v-for="opt in TAX_REGIME_OPTIONS"
-                  :key="opt.value"
-                  :value="opt.value"
-                >
-                  {{ opt.label }}
-                </option>
-              </select>
-            </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">
-                Coefficiente (%)
-              </label>
-              <input
-                v-model.number="form.coefficient"
-                type="number"
-                min="1"
-                max="100"
-                required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          <div class="mt-3">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                v-model="form.is_psicoanalista"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span class="text-sm text-gray-700">Sono iscritto all'albo degli psicoanalisti (ENPAP non applicabile)</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Albo -->
-        <div>
-          <h2 class="text-base font-semibold text-gray-900 mb-4">Albo professionale</h2>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Numero iscrizione</label>
-              <input
-                v-model="form.albo_number"
-                type="text"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Regione albo</label>
-              <input
-                v-model="form.albo_region"
-                type="text"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- Address -->
-        <div>
-          <h2 class="text-base font-semibold text-gray-900 mb-4">Indirizzo studio</h2>
-          <div class="space-y-4">
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Indirizzo</label>
-              <input
-                v-model="form.address"
-                type="text"
-                required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+        <form class="glass-card rounded-2xl p-8 space-y-6 shadow-xl" @submit.prevent="onSubmit">
+          <!-- Personal info -->
+          <div>
+            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Dati personali</h2>
             <div class="grid grid-cols-3 gap-4">
-              <div class="col-span-1">
-                <label class="text-sm font-medium text-gray-700 block mb-1">Città</label>
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Titolo</label>
+                <select
+                  v-model="form.title"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                >
+                  <option v-for="t in TITLE_OPTIONS" :key="t" :value="t">{{ t }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Nome</label>
                 <input
-                  v-model="form.city"
+                  v-model="form.first_name"
                   type="text"
                   required
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                 />
               </div>
               <div>
-                <label class="text-sm font-medium text-gray-700 block mb-1">Provincia</label>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Cognome</label>
                 <input
-                  v-model="form.province"
+                  v-model="form.last_name"
                   type="text"
-                  maxlength="2"
                   required
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-                  @input="form.province = form.province.toUpperCase()"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Partita IVA</label>
+                <input
+                  v-model="form.vat_number"
+                  type="text"
+                  required
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                 />
               </div>
               <div>
-                <label class="text-sm font-medium text-gray-700 block mb-1">CAP</label>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Codice Fiscale</label>
                 <input
-                  v-model="form.zip_code"
+                  v-model="form.fiscal_code"
                   type="text"
-                  maxlength="5"
-                  pattern="\d{5}"
                   required
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
                 />
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Contacts -->
-        <div>
-          <h2 class="text-base font-semibold text-gray-900 mb-4">Contatti e pagamento</h2>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Telefono</label>
-              <input
-                v-model="form.phone"
-                type="tel"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          <hr class="border-sage-100" />
+
+          <!-- Tax regime -->
+          <div>
+            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Regime fiscale</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Regime</label>
+                <select
+                  v-model="form.tax_regime"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                >
+                  <option v-for="opt in TAX_REGIME_OPTIONS" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Coefficiente (%)</label>
+                <input
+                  v-model.number="form.coefficient"
+                  type="number"
+                  min="1"
+                  max="100"
+                  required
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                />
+              </div>
             </div>
-            <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">PEC</label>
-              <input
-                v-model="form.pec_email"
-                type="email"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div class="col-span-2">
-              <label class="text-sm font-medium text-gray-700 block mb-1">IBAN</label>
-              <input
-                v-model="form.iban"
-                type="text"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div class="mt-3">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  v-model="form.is_psicoanalista"
+                  type="checkbox"
+                  class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
+                />
+                <span class="text-sm text-sage-700">Sono iscritto all'albo degli psicoanalisti (ENPAP non applicabile)</span>
+              </label>
             </div>
           </div>
-        </div>
 
-        <!-- Error -->
-        <div v-if="error" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-          {{ error }}
-        </div>
+          <hr class="border-sage-100" />
 
-        <div class="flex justify-end pt-2">
-          <button
-            type="submit"
-            :disabled="saving"
-            class="bg-blue-600 text-white hover:bg-blue-700 px-6 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-60"
-          >
-            {{ saving ? 'Salvataggio...' : 'Inizia a usare PSI Fatture' }}
-          </button>
-        </div>
-      </form>
+          <!-- Albo -->
+          <div>
+            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Albo professionale</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Numero iscrizione</label>
+                <input
+                  v-model="form.albo_number"
+                  type="text"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                />
+              </div>
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Regione albo</label>
+                <input
+                  v-model="form.albo_region"
+                  type="text"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                />
+              </div>
+            </div>
+          </div>
+
+          <hr class="border-sage-100" />
+
+          <!-- Address -->
+          <div>
+            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Indirizzo studio</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Indirizzo</label>
+                <input
+                  v-model="form.address"
+                  type="text"
+                  required
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                />
+              </div>
+              <div class="grid grid-cols-3 gap-4">
+                <div class="col-span-1">
+                  <label class="text-sm font-medium text-sage-700 block mb-1">Città</label>
+                  <input
+                    v-model="form.city"
+                    type="text"
+                    required
+                    class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                  />
+                </div>
+                <div>
+                  <label class="text-sm font-medium text-sage-700 block mb-1">Provincia</label>
+                  <input
+                    v-model="form.province"
+                    type="text"
+                    maxlength="2"
+                    required
+                    class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80 uppercase"
+                    @input="form.province = form.province.toUpperCase()"
+                  />
+                </div>
+                <div>
+                  <label class="text-sm font-medium text-sage-700 block mb-1">CAP</label>
+                  <input
+                    v-model="form.zip_code"
+                    type="text"
+                    maxlength="5"
+                    pattern="\d{5}"
+                    required
+                    class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr class="border-sage-100" />
+
+          <!-- Contacts -->
+          <div>
+            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Contatti e pagamento</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Telefono</label>
+                <input
+                  v-model="form.phone"
+                  type="tel"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                />
+              </div>
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">PEC</label>
+                <input
+                  v-model="form.pec_email"
+                  type="email"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                />
+              </div>
+              <div class="col-span-2">
+                <label class="text-sm font-medium text-sage-700 block mb-1">IBAN</label>
+                <input
+                  v-model="form.iban"
+                  type="text"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Error -->
+          <div v-if="error" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            {{ error }}
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button
+              type="submit"
+              :disabled="saving"
+              class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-6 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 shadow-lg"
+            >
+              {{ saving ? 'Salvataggio...' : 'Inizia a usare PSI Fatture →' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </template>

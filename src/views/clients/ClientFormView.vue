@@ -91,73 +91,73 @@ async function onSubmit() {
       :subtitle="isEdit ? 'Aggiorna i dati del cliente.' : 'Aggiungi un nuovo paziente o cliente.'"
     />
 
-    <div v-if="loading" class="text-sm text-gray-400">Caricamento...</div>
+    <div v-if="loading" class="text-sm text-sage-400">Caricamento...</div>
 
     <form v-else class="max-w-2xl space-y-6" @submit.prevent="onSubmit">
       <!-- Type -->
-      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">Tipo cliente</h2>
+      <div class="glass-card rounded-xl p-6">
+        <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Tipo cliente</h2>
         <div class="flex gap-6">
           <label class="flex items-center gap-2 cursor-pointer">
             <input
               v-model="form.client_type"
               type="radio"
               value="persona_fisica"
-              class="text-blue-600 focus:ring-blue-500"
+              class="text-sage-600 focus:ring-sage-400"
             />
-            <span class="text-sm text-gray-700">Persona Fisica</span>
+            <span class="text-sm text-sage-700">Persona Fisica</span>
           </label>
           <label class="flex items-center gap-2 cursor-pointer">
             <input
               v-model="form.client_type"
               type="radio"
               value="azienda"
-              class="text-blue-600 focus:ring-blue-500"
+              class="text-sage-600 focus:ring-sage-400"
             />
-            <span class="text-sm text-gray-700">Azienda</span>
+            <span class="text-sm text-sage-700">Azienda</span>
           </label>
         </div>
       </div>
 
       <!-- Anagrafica -->
-      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">Dati anagrafici</h2>
+      <div class="glass-card rounded-xl p-6">
+        <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Dati anagrafici</h2>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">
+            <label class="text-sm font-medium text-sage-700 block mb-1">
               {{ form.client_type === 'azienda' ? 'Ragione Sociale' : 'Nome' }}
             </label>
             <input
               v-model="form.first_name"
               type="text"
               :required="form.client_type === 'persona_fisica'"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             />
           </div>
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Cognome</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Cognome</label>
             <input
               v-model="form.last_name"
               type="text"
               required
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             />
           </div>
 
           <template v-if="form.client_type === 'persona_fisica'">
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Data di nascita</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Data di nascita</label>
               <input
                 v-model="form.birth_date"
                 type="date"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               />
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Sesso</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Sesso</label>
               <select
                 v-model="form.gender"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               >
                 <option value="">— Seleziona —</option>
                 <option value="M">Maschio</option>
@@ -167,65 +167,65 @@ async function onSubmit() {
           </template>
 
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Codice Fiscale</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Codice Fiscale</label>
             <input
               v-model="form.fiscal_code"
               type="text"
               required
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80 uppercase"
               @input="form.fiscal_code = form.fiscal_code.toUpperCase()"
             />
           </div>
           <div v-if="form.client_type === 'azienda'">
-            <label class="text-sm font-medium text-gray-700 block mb-1">Partita IVA</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Partita IVA</label>
             <input
               v-model="form.vat_number"
               type="text"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             />
           </div>
         </div>
       </div>
 
       <!-- Address -->
-      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">Indirizzo</h2>
+      <div class="glass-card rounded-xl p-6">
+        <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Indirizzo</h2>
         <div class="space-y-4">
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Via / Indirizzo</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Via / Indirizzo</label>
             <input
               v-model="form.address"
               type="text"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             />
           </div>
           <div class="grid grid-cols-3 gap-4">
             <div class="col-span-1">
-              <label class="text-sm font-medium text-gray-700 block mb-1">Città</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Città</label>
               <input
                 v-model="form.city"
                 type="text"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               />
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">Provincia</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">Provincia</label>
               <input
                 v-model="form.province"
                 type="text"
                 maxlength="2"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80 uppercase"
                 @input="form.province = form.province.toUpperCase()"
               />
             </div>
             <div>
-              <label class="text-sm font-medium text-gray-700 block mb-1">CAP</label>
+              <label class="text-sm font-medium text-sage-700 block mb-1">CAP</label>
               <input
                 v-model="form.zip_code"
                 type="text"
                 maxlength="5"
                 pattern="\d{5}"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
               />
             </div>
           </div>
@@ -233,32 +233,32 @@ async function onSubmit() {
       </div>
 
       <!-- Contacts -->
-      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">Contatti</h2>
+      <div class="glass-card rounded-xl p-6">
+        <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Contatti</h2>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Email</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Email</label>
             <input
               v-model="form.email"
               type="email"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             />
           </div>
           <div>
-            <label class="text-sm font-medium text-gray-700 block mb-1">Telefono</label>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Telefono</label>
             <input
               v-model="form.phone"
               type="tel"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
             />
           </div>
         </div>
         <div class="mt-4">
-          <label class="text-sm font-medium text-gray-700 block mb-1">Note</label>
+          <label class="text-sm font-medium text-sage-700 block mb-1">Note</label>
           <textarea
             v-model="form.notes"
             rows="3"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80 resize-none"
           />
         </div>
         <div class="mt-3">
@@ -266,9 +266,9 @@ async function onSubmit() {
             <input
               v-model="form.sts_authorization"
               type="checkbox"
-              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
             />
-            <span class="text-sm text-gray-700">Autorizzazione STS (invio dati al sistema TS)</span>
+            <span class="text-sm text-sage-700">Autorizzazione STS (invio dati al sistema TS)</span>
           </label>
         </div>
       </div>
@@ -280,7 +280,7 @@ async function onSubmit() {
       <div class="flex justify-end gap-3 pb-4">
         <button
           type="button"
-          class="border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          class="border border-sage-200 text-sage-700 hover:bg-sage-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           @click="router.push('/clients')"
         >
           Annulla
@@ -288,7 +288,7 @@ async function onSubmit() {
         <button
           type="submit"
           :disabled="saving"
-          class="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-60"
+          class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60"
         >
           {{ saving ? 'Salvataggio...' : isEdit ? 'Aggiorna cliente' : 'Crea cliente' }}
         </button>
