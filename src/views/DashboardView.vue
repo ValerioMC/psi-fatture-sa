@@ -185,21 +185,21 @@ onMounted(loadDashboard)
       <!-- Bar chart + Tax summary -->
       <div class="grid grid-cols-5 gap-4 mb-6">
         <!-- Bar chart -->
-        <div class="col-span-3 glass-card rounded-2xl p-6 shadow-sm animate-in-d2">
-          <h2 class="text-sm font-semibold text-sage-800 mb-5">Andamento mensile</h2>
-          <div class="flex items-end gap-1.5" style="height: 140px">
+        <div class="col-span-3 glass-card rounded-2xl p-6 shadow-sm animate-in-d2 flex flex-col">
+          <h2 class="text-sm font-semibold text-sage-800 mb-4">Andamento mensile</h2>
+          <div class="flex items-end gap-1.5 flex-1 min-h-0">
             <div
               v-for="month in data.monthly_revenue"
               :key="month.month"
-              class="flex-1 flex flex-col items-center gap-1.5"
+              class="flex-1 flex flex-col items-center gap-1 h-full"
             >
               <span
-                class="text-[10px] text-sage-400 whitespace-nowrap transition-opacity duration-300"
+                class="text-[10px] text-sage-400 whitespace-nowrap transition-opacity duration-300 shrink-0"
                 :style="{ opacity: month.revenue > 0 ? 1 : 0 }"
               >
                 {{ month.revenue > 0 ? formatCurrency(month.revenue) : '' }}
               </span>
-              <div class="w-full flex items-end justify-center" style="height: 90px">
+              <div class="w-full flex items-end justify-center flex-1 min-h-0">
                 <div
                   class="w-full rounded-t-lg transition-all duration-500"
                   :style="{
@@ -212,7 +212,7 @@ onMounted(loadDashboard)
                   :title="`${month.month_name}: ${formatCurrency(month.revenue)}`"
                 />
               </div>
-              <span class="text-[10px] text-sage-400 truncate w-full text-center">
+              <span class="text-[10px] text-sage-400 truncate w-full text-center shrink-0">
                 {{ month.month_name.slice(0, 3) }}
               </span>
             </div>
