@@ -47,6 +47,7 @@ fn build_active_model(input: &UpsertConfigInput) -> ActiveModel {
         iban: Set(input.iban.clone()),
         coefficient: Set(input.coefficient),
         is_psicoanalista: Set(input.is_psicoanalista as i32),
+        initial_invoice_number: Set(input.initial_invoice_number),
         updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
         ..Default::default()
     }
@@ -73,6 +74,7 @@ fn into_domain(m: professional_config::Model) -> ProfessionalConfig {
         iban: m.iban,
         coefficient: m.coefficient,
         is_psicoanalista: m.is_psicoanalista != 0,
+        initial_invoice_number: m.initial_invoice_number,
         created_at: m.created_at,
         updated_at: m.updated_at,
     }

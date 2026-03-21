@@ -13,6 +13,7 @@ pub struct Appointment {
     pub status: AppointmentStatus,
     pub notes: String,
     pub recurrence_group_id: Option<i64>,
+    pub invoice_id: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
 }

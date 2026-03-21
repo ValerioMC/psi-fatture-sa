@@ -21,6 +21,7 @@ pub struct ProfessionalConfig {
     pub iban: String,
     pub coefficient: f64,
     pub is_psicoanalista: bool,
+    pub initial_invoice_number: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -45,6 +46,7 @@ pub struct UpsertConfigInput {
     pub iban: String,
     pub coefficient: f64,
     pub is_psicoanalista: bool,
+    pub initial_invoice_number: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

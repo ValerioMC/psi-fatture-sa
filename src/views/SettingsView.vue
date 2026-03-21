@@ -30,6 +30,7 @@ const form = reactive<UpsertConfigInput>({
   iban: '',
   coefficient: 78,
   is_psicoanalista: false,
+  initial_invoice_number: 1,
 })
 
 const TITLE_OPTIONS = ['Dott.', 'Dott.ssa', 'Dr.', 'Dr.ssa', 'Prof.', 'Prof.ssa']
@@ -164,6 +165,24 @@ async function onSubmit() {
             />
             <span class="text-sm text-sage-700">Iscritto all'albo degli psicoanalisti (ENPAP non applicabile)</span>
           </label>
+        </div>
+      </div>
+
+      <!-- Invoice numbering -->
+      <div class="glass-card rounded-xl p-6 animate-in-d1">
+        <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Numerazione fatture</h2>
+        <div class="max-w-xs">
+          <label class="text-sm font-medium text-sage-700 block mb-1">Numero iniziale</label>
+          <input
+            v-model.number="form.initial_invoice_number"
+            type="number"
+            min="1"
+            required
+            class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+          />
+          <p class="text-xs text-sage-400 mt-1.5">
+            Le nuove fatture partiranno da questo numero se non ne esistono di superiori nell'anno corrente.
+          </p>
         </div>
       </div>
 

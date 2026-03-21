@@ -1,7 +1,8 @@
 use tauri::State;
 
 use crate::app::model::invoice::{
-    CreateInvoiceInput, Invoice, InvoiceFilters, UpdateInvoiceInput,
+    CreateInvoiceInput, GenerateMonthlyInput, Invoice, InvoiceFilters,
+    MonthlyInvoicePreview, UpdateInvoiceInput,
 };
 use crate::app::service::invoice_service;
 use crate::AppState;
@@ -52,4 +53,23 @@ pub async fn get_next_invoice_number(
     year: i64,
 ) -> Result<String, String> {
     invoice_service::next_number(&state.db, year).await
+}
+
+/// Returns a preview of invoices that would be generated for the given month.
+#[tauri::command]
+pub async fn preview_monthly_invoices(
+    state: State<'_, AppState>,
+    year: i64,
+    month: i64,
+) -> Result<Vec<MonthlyInvoicePreview>, String> {
+    invoice_service::preview_monthly(&state.db, year, month).await
+}
+
+/// Creates invoices from completed appointments for selected clients.
+#[tauri::command]
+pub async fn generate_monthly_invoices(
+    state: State<'_, AppState>,
+    input: GenerateMonthlyInput,
+) -> Result<Vec<Invoice>, String> {
+    invoice_service::generate_monthly(&state.db, input).await
 }

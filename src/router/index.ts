@@ -15,6 +15,7 @@ const router = createRouter({
         { path: 'clients/:id/edit', name: 'clients.edit', component: () => import('@/views/clients/ClientFormView.vue') },
         { path: 'services', name: 'services', component: () => import('@/views/services/ServiceListView.vue') },
         { path: 'invoices', name: 'invoices', component: () => import('@/views/invoices/InvoiceListView.vue') },
+        { path: 'invoices/monthly', name: 'invoices.monthly', component: () => import('@/views/invoices/MonthlyInvoiceView.vue') },
         { path: 'invoices/new', name: 'invoices.new', component: () => import('@/views/invoices/InvoiceFormView.vue') },
         { path: 'invoices/:id/edit', name: 'invoices.edit', component: () => import('@/views/invoices/InvoiceFormView.vue') },
         { path: 'invoices/:id', name: 'invoices.detail', component: () => import('@/views/invoices/InvoiceDetailView.vue') },

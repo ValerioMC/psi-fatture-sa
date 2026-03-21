@@ -26,6 +26,7 @@ export interface ProfessionalConfig {
   iban: string
   coefficient: number
   is_psicoanalista: boolean
+  initial_invoice_number: number
   created_at: string
   updated_at: string
 }
@@ -161,8 +162,26 @@ export interface Appointment {
   status: AppointmentStatus
   notes: string
   recurrence_group_id?: number
+  invoice_id?: number
   created_at: string
   updated_at: string
+}
+
+export interface MonthlyInvoicePreview {
+  client_id: number
+  client_name: string
+  appointment_count: number
+  lines: InvoiceLineInput[]
+  estimated_net: number
+  estimated_due: number
+}
+
+export interface GenerateMonthlyInput {
+  year: number
+  month: number
+  client_ids: number[]
+  payment_method: PaymentMethod
+  apply_enpap: boolean
 }
 
 export interface MonthlyRevenue {

@@ -53,6 +53,8 @@ pub fn run() {
             update_invoice,
             delete_invoice,
             get_next_invoice_number,
+            preview_monthly_invoices,
+            generate_monthly_invoices,
             list_appointments,
             get_appointment,
             create_appointment,

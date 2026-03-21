@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Eye, Pencil, Trash2, FileText } from 'lucide-vue-next'
+import { Plus, Search, Eye, Pencil, Trash2, FileText, CalendarRange } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/stores/invoices'
 import type { Invoice } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -60,6 +60,14 @@ async function handleDelete() {
   <div class="p-8">
     <div class="max-w-5xl mx-auto">
     <PageHeader title="Fatture" subtitle="Gestisci tutte le tue fatture">
+      <button
+        type="button"
+        class="flex items-center gap-2 border border-sage-200 text-sage-600 hover:text-sage-800 hover:bg-sage-50 font-medium px-4 py-2 rounded-xl text-sm transition-all"
+        @click="router.push('/invoices/monthly')"
+      >
+        <CalendarRange class="w-4 h-4" />
+        <span>Genera mensili</span>
+      </button>
       <button
         type="button"
         class="group relative overflow-hidden text-white font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 focus:outline-none"

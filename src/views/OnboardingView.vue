@@ -30,6 +30,7 @@ const form = reactive<UpsertConfigInput>({
   iban: '',
   coefficient: 78,
   is_psicoanalista: false,
+  initial_invoice_number: 1,
 })
 
 const TITLE_OPTIONS = ['Dott.', 'Dott.ssa', 'Dr.', 'Dr.ssa', 'Prof.', 'Prof.ssa']

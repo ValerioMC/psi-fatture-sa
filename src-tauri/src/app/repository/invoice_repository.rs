@@ -186,27 +186,34 @@ pub async fn delete_lines(
 }
 
 /// Returns the next invoice number string for the given year.
+///
+/// Uses `initial_invoice_number` from config as a floor so numbering
+/// never starts below the configured value.
 pub async fn next_invoice_number(
     db: &impl sea_orm::ConnectionTrait,
     year: i64,
 ) -> Result<String, String> {
     #[derive(FromQueryResult)]
-    struct MaxRow {
+    struct Row {
         max_num: i64,
+        initial: i64,
     }
 
-    let row = MaxRow::find_by_statement(Statement::from_sql_and_values(
+    let row = Row::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
-        "SELECT COALESCE(MAX(CAST(invoice_number AS INTEGER)), 0) AS max_num
-         FROM invoices WHERE year = ?",
+        "SELECT
+           COALESCE(MAX(CAST(i.invoice_number AS INTEGER)), 0) AS max_num,
+           COALESCE((SELECT initial_invoice_number FROM professional_config WHERE id = 1), 1) AS initial
+         FROM invoices i WHERE i.year = ?",
         [year.into()],
     ))
     .one(db)
     .await
     .map_err(|e| e.to_string())?;
 
-    let max = row.map(|r| r.max_num).unwrap_or(0);
-    Ok(format!("{:03}", max + 1))
+    let (max_num, initial) = row.map(|r| (r.max_num, r.initial)).unwrap_or((0, 1));
+    let next = std::cmp::max(max_num, initial - 1) + 1;
+    Ok(format!("{:03}", next))
 }
 
 /// Returns the tax_regime from professional_config (defaults to "forfettario").

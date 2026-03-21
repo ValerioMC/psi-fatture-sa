@@ -9,8 +9,10 @@ import type {
   CreateRecurringAppointmentsInput,
   CreateServiceInput,
   DashboardData,
+  GenerateMonthlyInput,
   Invoice,
   InvoiceFilters,
+  MonthlyInvoicePreview,
   ProfessionalConfig,
   Service,
   UpdateAppointmentInput,
@@ -60,6 +62,10 @@ export const updateInvoice = (input: UpdateInvoiceInput) =>
 export const deleteInvoice = (id: number) => invoke<void>('delete_invoice', { id })
 export const getNextInvoiceNumber = (year: number) =>
   invoke<string>('get_next_invoice_number', { year })
+export const previewMonthlyInvoices = (year: number, month: number) =>
+  invoke<MonthlyInvoicePreview[]>('preview_monthly_invoices', { year, month })
+export const generateMonthlyInvoices = (input: GenerateMonthlyInput) =>
+  invoke<Invoice[]>('generate_monthly_invoices', { input })
 
 // ─── Appointments ────────────────────────────────────────────────────────────
 

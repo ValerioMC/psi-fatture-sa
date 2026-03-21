@@ -138,6 +138,27 @@ impl From<String> for PaymentMethod {
     }
 }
 
+/// Preview for monthly batch invoice generation, one per client.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonthlyInvoicePreview {
+    pub client_id: i64,
+    pub client_name: String,
+    pub appointment_count: i64,
+    pub lines: Vec<InvoiceLineInput>,
+    pub estimated_net: f64,
+    pub estimated_due: f64,
+}
+
+/// Input for generating monthly invoices.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerateMonthlyInput {
+    pub year: i64,
+    pub month: i64,
+    pub client_ids: Vec<i64>,
+    pub payment_method: PaymentMethod,
+    pub apply_enpap: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InvoiceFilters {
     pub year: Option<i64>,
