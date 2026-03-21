@@ -11,6 +11,7 @@ const MONTH_NAMES: [&str; 12] = [
 /// Returns aggregated dashboard analytics for the given year.
 pub async fn get(db: &DatabaseConnection, year: i64) -> Result<DashboardData, String> {
     let total_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
+    let total_net_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_net),0) AS REAL) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
     let paid_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status='paid'", year).await?;
     let unpaid_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status IN ('issued','overdue')", year).await?;
     let total_invoices = query_i64(db, "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
@@ -23,6 +24,7 @@ pub async fn get(db: &DatabaseConnection, year: i64) -> Result<DashboardData, St
     Ok(DashboardData {
         year,
         total_revenue,
+        total_net_revenue,
         paid_revenue,
         unpaid_revenue,
         total_invoices,

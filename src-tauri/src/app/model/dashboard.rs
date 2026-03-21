@@ -6,6 +6,7 @@ use crate::app::model::invoice::Invoice;
 pub struct DashboardData {
     pub year: i64,
     pub total_revenue: f64,
+    pub total_net_revenue: f64,
     pub paid_revenue: f64,
     pub unpaid_revenue: f64,
     pub total_invoices: i64,

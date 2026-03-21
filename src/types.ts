@@ -194,6 +194,7 @@ export interface MonthlyRevenue {
 export interface DashboardData {
   year: number
   total_revenue: number
+  total_net_revenue: number
   paid_revenue: number
   unpaid_revenue: number
   total_invoices: number

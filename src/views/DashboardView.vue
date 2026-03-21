@@ -5,14 +5,18 @@ import { TrendingUp, Euro, Clock, FileText, ChevronLeft, ChevronRight } from 'lu
 import { getDashboard } from '@/api'
 import type { DashboardData } from '@/types'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
+import { useConfigStore } from '@/stores/config'
 import { formatCurrency, formatDate } from '@/utils/format'
+import { estimateForfettarioTax, estimateOrdinarioTax } from '@/utils/tax'
 
 const router = useRouter()
+const configStore = useConfigStore()
 const currentYear = new Date().getFullYear()
 const selectedYear = ref(currentYear)
 const data = ref<DashboardData | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const firstFiveYears = ref(false)
 
 async function loadDashboard() {
   loading.value = true
@@ -38,6 +42,25 @@ const maxRevenue = computed(() => {
 function barHeight(revenue: number): string {
   return `${Math.max((revenue / maxRevenue.value) * 100, 2)}%`
 }
+
+const isForfettario = computed(() => configStore.config?.tax_regime === 'forfettario')
+
+const taxEstimate = computed(() => {
+  if (!data.value || !configStore.config) return null
+  const revenue = data.value.total_net_revenue
+  if (revenue <= 0) return null
+  const coefficient = configStore.config.coefficient
+
+  if (isForfettario.value) {
+    return { type: 'forfettario' as const, ...estimateForfettarioTax(revenue, coefficient, firstFiveYears.value) }
+  }
+  return { type: 'ordinario' as const, ...estimateOrdinarioTax(revenue, coefficient) }
+})
+
+const netPercentage = computed(() => {
+  if (!taxEstimate.value || taxEstimate.value.annualRevenue === 0) return 100
+  return Math.round((taxEstimate.value.netIncome / taxEstimate.value.annualRevenue) * 100)
+})
 
 onMounted(loadDashboard)
 </script>
@@ -159,37 +182,160 @@ onMounted(loadDashboard)
         </div>
       </div>
 
-      <!-- Bar chart -->
-      <div class="glass-card rounded-2xl p-6 shadow-sm mb-6 animate-in-d2">
-        <h2 class="text-sm font-semibold text-sage-800 mb-5">Andamento mensile</h2>
-        <div class="flex items-end gap-1.5" style="height: 140px">
-          <div
-            v-for="month in data.monthly_revenue"
-            :key="month.month"
-            class="flex-1 flex flex-col items-center gap-1.5"
-          >
-            <span
-              class="text-[10px] text-sage-400 whitespace-nowrap transition-opacity duration-300"
-              :style="{ opacity: month.revenue > 0 ? 1 : 0 }"
+      <!-- Bar chart + Tax summary -->
+      <div class="grid grid-cols-5 gap-4 mb-6">
+        <!-- Bar chart -->
+        <div class="col-span-3 glass-card rounded-2xl p-6 shadow-sm animate-in-d2">
+          <h2 class="text-sm font-semibold text-sage-800 mb-5">Andamento mensile</h2>
+          <div class="flex items-end gap-1.5" style="height: 140px">
+            <div
+              v-for="month in data.monthly_revenue"
+              :key="month.month"
+              class="flex-1 flex flex-col items-center gap-1.5"
             >
-              {{ month.revenue > 0 ? formatCurrency(month.revenue) : '' }}
-            </span>
-            <div class="w-full flex items-end justify-center" style="height: 90px">
-              <div
-                class="w-full rounded-t-lg transition-all duration-500"
-                :style="{
-                  height: month.revenue > 0 ? barHeight(month.revenue) : '3px',
-                  background: month.revenue > 0
-                    ? 'linear-gradient(to top, #48654c, #5d8062, #0c8aeb)'
-                    : 'rgba(163,186,163,0.25)',
-                  minHeight: '3px',
-                }"
-                :title="`${month.month_name}: ${formatCurrency(month.revenue)}`"
-              />
+              <span
+                class="text-[10px] text-sage-400 whitespace-nowrap transition-opacity duration-300"
+                :style="{ opacity: month.revenue > 0 ? 1 : 0 }"
+              >
+                {{ month.revenue > 0 ? formatCurrency(month.revenue) : '' }}
+              </span>
+              <div class="w-full flex items-end justify-center" style="height: 90px">
+                <div
+                  class="w-full rounded-t-lg transition-all duration-500"
+                  :style="{
+                    height: month.revenue > 0 ? barHeight(month.revenue) : '3px',
+                    background: month.revenue > 0
+                      ? 'linear-gradient(to top, #48654c, #5d8062, #0c8aeb)'
+                      : 'rgba(163,186,163,0.25)',
+                    minHeight: '3px',
+                  }"
+                  :title="`${month.month_name}: ${formatCurrency(month.revenue)}`"
+                />
+              </div>
+              <span class="text-[10px] text-sage-400 truncate w-full text-center">
+                {{ month.month_name.slice(0, 3) }}
+              </span>
             </div>
-            <span class="text-[10px] text-sage-400 truncate w-full text-center">
-              {{ month.month_name.slice(0, 3) }}
+          </div>
+        </div>
+
+        <!-- Tax summary -->
+        <div class="col-span-2 glass-card rounded-2xl p-6 shadow-sm animate-in-d2 flex flex-col">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold text-sage-800">Stima Fiscale</h2>
+            <span
+              class="text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider"
+              :class="isForfettario
+                ? 'bg-sage-100/80 text-sage-600'
+                : 'bg-blue-50 text-blue-600'"
+            >
+              {{ isForfettario ? 'Forfettario' : 'Ordinario' }}
             </span>
+          </div>
+
+          <template v-if="taxEstimate">
+            <!-- Compensi -->
+            <div class="mb-3">
+              <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">Compensi</p>
+              <p class="text-xl font-bold text-sage-900 tracking-tight">
+                {{ formatCurrency(data.total_net_revenue) }}
+              </p>
+            </div>
+
+            <!-- Proportion bar -->
+            <div class="mb-4">
+              <div class="h-1.5 rounded-full overflow-hidden flex bg-sage-50">
+                <div
+                  class="rounded-l-full transition-all duration-700"
+                  :style="{ width: netPercentage + '%', background: 'linear-gradient(90deg, #48654c, #5d8062)' }"
+                />
+                <div
+                  class="rounded-r-full transition-all duration-700"
+                  :style="{ width: (100 - netPercentage) + '%', background: 'linear-gradient(90deg, #d4a017, #a16207)' }"
+                />
+              </div>
+              <div class="flex justify-between mt-1">
+                <span class="text-[9px] text-sage-400">{{ netPercentage }}% netto</span>
+                <span class="text-[9px] text-amber-500/80">{{ 100 - netPercentage }}% imposte</span>
+              </div>
+            </div>
+
+            <!-- Breakdown -->
+            <div class="space-y-2 flex-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-sage-500">
+                  Redd. imponibile
+                  <span class="text-sage-300">({{ configStore.config?.coefficient }}%)</span>
+                </span>
+                <span class="text-sage-600 font-medium">{{ formatCurrency(taxEstimate.taxableIncome) }}</span>
+              </div>
+              <div class="flex justify-between text-xs">
+                <span class="text-sage-500">Contributi prev.</span>
+                <span class="text-amber-600 font-medium">&minus;{{ formatCurrency(taxEstimate.inpsContribution) }}</span>
+              </div>
+
+              <!-- Forfettario -->
+              <template v-if="taxEstimate.type === 'forfettario'">
+                <div class="flex justify-between text-xs">
+                  <span class="text-sage-500">
+                    Imp. sostitutiva
+                    <span class="text-sage-300">({{ taxEstimate.substituteTaxRate }}%)</span>
+                  </span>
+                  <span class="text-amber-600 font-medium">&minus;{{ formatCurrency(taxEstimate.substituteTax) }}</span>
+                </div>
+              </template>
+
+              <!-- Ordinario -->
+              <template v-else>
+                <div class="flex justify-between text-xs">
+                  <span class="text-sage-500">IRPEF</span>
+                  <span class="text-amber-600 font-medium">&minus;{{ formatCurrency(taxEstimate.irpef) }}</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                  <span class="text-sage-500">Addizionali</span>
+                  <span class="text-amber-600 font-medium">
+                    &minus;{{ formatCurrency(taxEstimate.addizionaleRegionale + taxEstimate.addizionaleComunale) }}
+                  </span>
+                </div>
+              </template>
+            </div>
+
+            <!-- Net result -->
+            <div class="border-t border-sage-100/60 pt-3 mt-3">
+              <div class="flex justify-between items-baseline">
+                <span class="text-xs font-semibold text-sage-700">Netto stimato</span>
+                <span class="text-base font-bold text-sage-900">{{ formatCurrency(taxEstimate.netIncome) }}</span>
+              </div>
+            </div>
+
+            <!-- Tax rate toggle (forfettario only) -->
+            <div v-if="isForfettario" class="flex items-center gap-1.5 mt-3 pt-3 border-t border-sage-50">
+              <span class="text-[10px] text-sage-400 mr-1">Aliquota</span>
+              <button
+                type="button"
+                class="text-[10px] px-2 py-0.5 rounded-full transition-all"
+                :class="firstFiveYears ? 'bg-sage-600 text-white' : 'bg-sage-50 text-sage-400 hover:text-sage-600'"
+                @click="firstFiveYears = true"
+              >
+                5%
+              </button>
+              <button
+                type="button"
+                class="text-[10px] px-2 py-0.5 rounded-full transition-all"
+                :class="!firstFiveYears ? 'bg-sage-600 text-white' : 'bg-sage-50 text-sage-400 hover:text-sage-600'"
+                @click="firstFiveYears = false"
+              >
+                15%
+              </button>
+            </div>
+          </template>
+
+          <!-- Empty state -->
+          <div v-else class="flex-1 flex items-center justify-center">
+            <div class="text-center py-4">
+              <Euro class="w-8 h-8 text-sage-200 mx-auto mb-1.5" />
+              <p class="text-xs text-sage-400">Nessun compenso registrato</p>
+            </div>
           </div>
         </div>
       </div>
