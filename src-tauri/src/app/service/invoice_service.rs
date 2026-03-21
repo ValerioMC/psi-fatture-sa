@@ -4,7 +4,7 @@ use sea_orm::{ActiveValue::Set, DatabaseConnection, TransactionTrait};
 
 use crate::app::entity::invoice as invoices;
 use crate::app::model::invoice::{
-    CreateInvoiceInput, GenerateMonthlyInput, Invoice, InvoiceFilters,
+    BulkUpdateStatusInput, CreateInvoiceInput, GenerateMonthlyInput, Invoice, InvoiceFilters,
     InvoiceLineInput, InvoiceStatus, MonthlyInvoicePreview, PaymentMethod,
     UpdateInvoiceInput,
 };
@@ -214,6 +214,25 @@ pub async fn generate_monthly(
     }
 
     Ok(created)
+}
+
+/// Updates the status of multiple invoices at once.
+///
+/// When the target status is "paid", sets `paid_date` to today.
+/// For any other status, clears `paid_date`.
+pub async fn bulk_update_status(
+    db: &DatabaseConnection,
+    input: BulkUpdateStatusInput,
+) -> Result<u64, String> {
+    let count = input.ids.len() as u64;
+    invoice_repository::bulk_update_status(
+        db,
+        &input.ids,
+        input.status.as_str(),
+        &input.paid_date,
+    )
+    .await?;
+    Ok(count)
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────

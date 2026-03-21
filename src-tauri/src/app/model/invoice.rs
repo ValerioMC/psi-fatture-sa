@@ -159,6 +159,14 @@ pub struct GenerateMonthlyInput {
     pub apply_enpap: bool,
 }
 
+/// Input for bulk-updating the status of multiple invoices.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BulkUpdateStatusInput {
+    pub ids: Vec<i64>,
+    pub status: InvoiceStatus,
+    pub paid_date: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InvoiceFilters {
     pub year: Option<i64>,

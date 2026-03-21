@@ -7,10 +7,12 @@ import {
   updateInvoice,
   deleteInvoice,
   getNextInvoiceNumber,
+  bulkUpdateInvoiceStatus,
 } from '@/api'
 import type {
   Invoice,
   InvoiceFilters,
+  InvoiceStatus,
   CreateInvoiceInput,
   UpdateInvoiceInput,
 } from '@/types'
@@ -54,6 +56,17 @@ export const useInvoicesStore = defineStore('invoices', () => {
     invoices.value = invoices.value.filter((i) => i.id !== id)
   }
 
+  /** Updates the status of multiple invoices and refreshes local state. */
+  async function bulkUpdateStatus(ids: number[], status: InvoiceStatus, paidDate?: string) {
+    await bulkUpdateInvoiceStatus({ ids, status, paid_date: paidDate })
+    for (const inv of invoices.value) {
+      if (ids.includes(inv.id)) {
+        inv.status = status
+        inv.paid_date = paidDate
+      }
+    }
+  }
+
   async function nextNumber(year: number) {
     return getNextInvoiceNumber(year)
   }
@@ -67,6 +80,7 @@ export const useInvoicesStore = defineStore('invoices', () => {
     addInvoice,
     editInvoice,
     removeInvoice,
+    bulkUpdateStatus,
     nextNumber,
   }
 })

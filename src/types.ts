@@ -204,6 +204,12 @@ export interface DashboardData {
   recent_invoices: Invoice[]
 }
 
+export interface BulkUpdateStatusInput {
+  ids: number[]
+  status: InvoiceStatus
+  paid_date?: string
+}
+
 export interface InvoiceFilters {
   year?: number
   status?: string

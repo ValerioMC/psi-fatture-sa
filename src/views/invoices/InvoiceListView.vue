@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Search, Eye, Pencil, Trash2, FileText, CalendarRange } from 'lucide-vue-next'
+import { Plus, Search, Eye, Pencil, Trash2, FileText, CalendarRange, CheckSquare, X } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/stores/invoices'
-import type { Invoice } from '@/types'
+import type { Invoice, InvoiceStatus } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import ConfirmModal from '@/components/ui/ConfirmModal.vue'
@@ -23,12 +23,85 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Annullata' },
 ]
 
+const TARGET_STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
+  { value: 'draft', label: 'Bozza' },
+  { value: 'issued', label: 'Emessa' },
+  { value: 'paid', label: 'Pagata' },
+  { value: 'overdue', label: 'Scaduta' },
+  { value: 'cancelled', label: 'Annullata' },
+]
+
 const YEAR_OPTIONS = [currentYear, currentYear - 1, currentYear - 2]
 
 const filters = reactive({ year: currentYear, status: '', search: '' })
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
+// ─── Selection state ─────────────────────────────────────────────────────────
+
+const selectedIds = ref<Set<number>>(new Set())
+const bulkTargetStatus = ref<InvoiceStatus>('paid')
+const bulkUpdating = ref(false)
+const showBulkConfirm = ref(false)
+
+const selectedCount = computed(() => selectedIds.value.size)
+const allSelected = computed(
+  () => invoicesStore.invoices.length > 0 && selectedIds.value.size === invoicesStore.invoices.length,
+)
+
+function toggleSelectAll() {
+  if (allSelected.value) {
+    selectedIds.value = new Set()
+  } else {
+    selectedIds.value = new Set(invoicesStore.invoices.map((i) => i.id))
+  }
+}
+
+function toggleSelect(id: number) {
+  const next = new Set(selectedIds.value)
+  if (next.has(id)) {
+    next.delete(id)
+  } else {
+    next.add(id)
+  }
+  selectedIds.value = next
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+
+function requestBulkUpdate() {
+  showBulkConfirm.value = true
+}
+
+async function executeBulkUpdate() {
+  showBulkConfirm.value = false
+  bulkUpdating.value = true
+  try {
+    const ids = [...selectedIds.value]
+    const paidDate = bulkTargetStatus.value === 'paid'
+      ? new Date().toISOString().slice(0, 10)
+      : undefined
+    console.log('[bulk] ids:', ids, 'status:', bulkTargetStatus.value, 'paidDate:', paidDate)
+    await invoicesStore.bulkUpdateStatus(ids, bulkTargetStatus.value, paidDate)
+    console.log('[bulk] success')
+    clearSelection()
+  } catch (e) {
+    console.error('[bulk] FAILED:', e)
+  } finally {
+    bulkUpdating.value = false
+  }
+}
+
+function bulkConfirmMessage(): string {
+  const label = TARGET_STATUS_OPTIONS.find((o) => o.value === bulkTargetStatus.value)?.label ?? bulkTargetStatus.value
+  return `Vuoi cambiare lo stato di ${selectedCount.value} fattura/e in "${label}"?`
+}
+
+// ─── Data loading ────────────────────────────────────────────────────────────
+
 function loadInvoices() {
+  clearSelection()
   invoicesStore.fetchInvoices({
     year: filters.year,
     status: filters.status || undefined,
@@ -110,6 +183,60 @@ async function handleDelete() {
       </div>
     </div>
 
+    <!-- Bulk action bar -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      enter-from-class="opacity-0 -translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-2"
+    >
+      <div
+        v-if="selectedCount > 0"
+        class="glass-card rounded-2xl px-5 py-3 shadow-sm mb-5 flex items-center gap-4 border border-ocean-200/60 bg-ocean-50/30 animate-in"
+      >
+        <div class="flex items-center gap-2">
+          <CheckSquare class="w-4 h-4 text-ocean-600" />
+          <span class="text-sm font-semibold text-ocean-700">
+            {{ selectedCount }} selezionat{{ selectedCount === 1 ? 'a' : 'e' }}
+          </span>
+        </div>
+
+        <div class="h-5 w-px bg-ocean-200/60" />
+
+        <div class="flex items-center gap-2 flex-1">
+          <label class="text-sm text-sage-600 whitespace-nowrap">Cambia stato in:</label>
+          <select
+            v-model="bulkTargetStatus"
+            class="bg-white/80 border border-sage-200/70 rounded-xl px-3 py-1.5 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-ocean-400/40 transition-all"
+          >
+            <option v-for="opt in TARGET_STATUS_OPTIONS" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
+          <button
+            type="button"
+            class="text-white font-medium px-4 py-1.5 rounded-xl text-sm transition-all duration-200 focus:outline-none disabled:opacity-50"
+            style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 2px 8px rgba(93,128,98,0.25);"
+            :disabled="bulkUpdating"
+            @click="requestBulkUpdate"
+          >
+            {{ bulkUpdating ? 'Aggiornamento...' : 'Applica' }}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="p-1.5 text-sage-400 hover:text-sage-600 hover:bg-sage-100 rounded-lg transition-all"
+          title="Deseleziona tutto"
+          @click="clearSelection"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+    </Transition>
+
     <!-- Table -->
     <div class="glass-card rounded-2xl shadow-sm animate-in-d1">
       <!-- Loading -->
@@ -134,26 +261,43 @@ async function handleDelete() {
       <table v-else class="w-full text-sm">
         <thead>
           <tr class="border-b border-sage-100/60">
-            <th class="px-6 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Numero</th>
-            <th class="px-6 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Data</th>
-            <th class="px-6 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Cliente</th>
-            <th class="px-6 py-3.5 text-right text-xs font-semibold text-sage-400 uppercase tracking-wider">Totale</th>
-            <th class="px-6 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Stato</th>
-            <th class="px-6 py-3.5 text-right text-xs font-semibold text-sage-400 uppercase tracking-wider">Azioni</th>
+            <th class="px-4 py-3.5 text-left w-10">
+              <input
+                type="checkbox"
+                :checked="allSelected"
+                class="w-4 h-4 rounded border-sage-300 text-ocean-600 focus:ring-ocean-400/40 cursor-pointer accent-ocean-600"
+                @change="toggleSelectAll"
+              />
+            </th>
+            <th class="px-4 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Numero</th>
+            <th class="px-4 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Data</th>
+            <th class="px-4 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Cliente</th>
+            <th class="px-4 py-3.5 text-right text-xs font-semibold text-sage-400 uppercase tracking-wider">Totale</th>
+            <th class="px-4 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Stato</th>
+            <th class="px-4 py-3.5 text-right text-xs font-semibold text-sage-400 uppercase tracking-wider">Azioni</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="invoice in invoicesStore.invoices"
             :key="invoice.id"
-            class="border-b border-sage-50/70 hover:bg-sage-50/40 transition-colors"
+            class="border-b border-sage-50/70 transition-colors"
+            :class="selectedIds.has(invoice.id) ? 'bg-ocean-50/40' : 'hover:bg-sage-50/40'"
           >
-            <td class="px-6 py-3.5 font-semibold text-sage-800">{{ invoice.invoice_number }}</td>
-            <td class="px-6 py-3.5 text-sage-400">{{ formatDate(invoice.issue_date) }}</td>
-            <td class="px-6 py-3.5 text-sage-600">{{ invoice.client_name }}</td>
-            <td class="px-6 py-3.5 text-right font-semibold text-sage-800">{{ formatCurrency(invoice.total_due) }}</td>
-            <td class="px-6 py-3.5"><StatusBadge :status="invoice.status" type="invoice" /></td>
-            <td class="px-6 py-3.5">
+            <td class="px-4 py-3.5">
+              <input
+                type="checkbox"
+                :checked="selectedIds.has(invoice.id)"
+                class="w-4 h-4 rounded border-sage-300 text-ocean-600 focus:ring-ocean-400/40 cursor-pointer accent-ocean-600"
+                @change="toggleSelect(invoice.id)"
+              />
+            </td>
+            <td class="px-4 py-3.5 font-semibold text-sage-800">{{ invoice.invoice_number }}</td>
+            <td class="px-4 py-3.5 text-sage-400">{{ formatDate(invoice.issue_date) }}</td>
+            <td class="px-4 py-3.5 text-sage-600">{{ invoice.client_name }}</td>
+            <td class="px-4 py-3.5 text-right font-semibold text-sage-800">{{ formatCurrency(invoice.total_due) }}</td>
+            <td class="px-4 py-3.5"><StatusBadge :status="invoice.status" type="invoice" /></td>
+            <td class="px-4 py-3.5">
               <div class="flex items-center justify-end gap-1">
                 <button
                   type="button"
@@ -192,6 +336,16 @@ async function handleDelete() {
       :message="`Sei sicuro di voler eliminare la fattura ${invoiceToDelete?.invoice_number}?`"
       @confirm="handleDelete"
       @cancel="invoiceToDelete = null"
+    />
+
+    <ConfirmModal
+      :open="showBulkConfirm"
+      title="Aggiornamento stato in blocco"
+      :message="bulkConfirmMessage()"
+      confirm-label="Conferma"
+      variant="primary"
+      @confirm="executeBulkUpdate"
+      @cancel="showBulkConfirm = false"
     />
     </div>
   </div>

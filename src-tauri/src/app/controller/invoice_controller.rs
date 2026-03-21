@@ -1,8 +1,8 @@
 use tauri::State;
 
 use crate::app::model::invoice::{
-    CreateInvoiceInput, GenerateMonthlyInput, Invoice, InvoiceFilters,
-    MonthlyInvoicePreview, UpdateInvoiceInput,
+    BulkUpdateStatusInput, CreateInvoiceInput, GenerateMonthlyInput, Invoice,
+    InvoiceFilters, MonthlyInvoicePreview, UpdateInvoiceInput,
 };
 use crate::app::service::invoice_service;
 use crate::AppState;
@@ -63,6 +63,15 @@ pub async fn preview_monthly_invoices(
     month: i64,
 ) -> Result<Vec<MonthlyInvoicePreview>, String> {
     invoice_service::preview_monthly(&state.db, year, month).await
+}
+
+/// Updates the status of multiple invoices in bulk.
+#[tauri::command]
+pub async fn bulk_update_invoice_status(
+    state: State<'_, AppState>,
+    input: BulkUpdateStatusInput,
+) -> Result<u64, String> {
+    invoice_service::bulk_update_status(&state.db, input).await
 }
 
 /// Creates invoices from completed appointments for selected clients.

@@ -2,6 +2,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
   Appointment,
+  BulkUpdateStatusInput,
   Client,
   CreateAppointmentInput,
   CreateClientInput,
@@ -66,6 +67,8 @@ export const previewMonthlyInvoices = (year: number, month: number) =>
   invoke<MonthlyInvoicePreview[]>('preview_monthly_invoices', { year, month })
 export const generateMonthlyInvoices = (input: GenerateMonthlyInput) =>
   invoke<Invoice[]>('generate_monthly_invoices', { input })
+export const bulkUpdateInvoiceStatus = (input: BulkUpdateStatusInput) =>
+  invoke<number>('bulk_update_invoice_status', { input })
 
 // ─── Appointments ────────────────────────────────────────────────────────────
 

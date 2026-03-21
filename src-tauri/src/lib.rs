@@ -55,6 +55,7 @@ pub fn run() {
             get_next_invoice_number,
             preview_monthly_invoices,
             generate_monthly_invoices,
+            bulk_update_invoice_status,
             list_appointments,
             get_appointment,
             create_appointment,
