@@ -17,6 +17,12 @@ pub struct AppState {
     pub db: DatabaseConnection,
 }
 
+/// Triggers the native OS print dialog for the current webview.
+#[tauri::command]
+fn print_current_page(webview: tauri::Webview) -> Result<(), String> {
+    webview.print().map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let db = tauri::async_runtime::block_on(app::db::connection::init_db())
@@ -28,6 +34,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
+            print_current_page,
             get_config,
             upsert_config,
             list_clients,

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Printer } from 'lucide-vue-next'
+import { invoke } from '@tauri-apps/api/core'
 import { getInvoice, getClient, getConfig } from '@/api'
 import type { Invoice, Client, ProfessionalConfig } from '@/types'
 import { formatCurrency, formatDateLong } from '@/utils/format'
@@ -84,8 +85,9 @@ const legalNotes = computed((): string[] => {
   return lines
 })
 
-function handlePrint() {
-  window.print()
+/** Opens the native OS print dialog via Tauri. On macOS use PDF → "Save as PDF" to export. */
+async function handlePrint(): Promise<void> {
+  await invoke('print_current_page')
 }
 </script>
 
@@ -105,12 +107,13 @@ function handlePrint() {
       <button
         v-if="!loading && invoice"
         type="button"
-        class="flex items-center gap-2 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-sm transition-all hover:opacity-90"
+        class="group relative overflow-hidden flex items-center gap-2 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-sm transition-all"
         style="background: linear-gradient(135deg, #3d6142, #0c8aeb);"
         @click="handlePrint"
       >
-        <Printer class="w-4 h-4" />
-        Stampa / Salva PDF
+        <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+        <Printer class="w-4 h-4 relative z-10" />
+        <span class="relative z-10">Stampa PDF</span>
       </button>
     </div>
 
@@ -869,6 +872,20 @@ function handlePrint() {
     margin: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .invoice-doc * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .info-card,
+  .items-table-wrap,
+  .totals-outer,
+  .footer-section {
+    page-break-inside: avoid;
   }
 
   @page {
