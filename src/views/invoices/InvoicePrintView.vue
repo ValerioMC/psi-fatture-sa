@@ -61,14 +61,6 @@ const PAYMENT_CONDITIONS: Record<string, string> = {
   pos: 'Contestuale alla prestazione',
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Bozza',
-  issued: 'Emessa',
-  paid: 'Pagata',
-  overdue: 'Scaduta',
-  cancelled: 'Annullata',
-}
-
 const legalNotes = computed((): string[] => {
   const lines: string[] = []
   if (!invoice.value || !config.value) return lines
@@ -188,12 +180,8 @@ async function handlePrint(): Promise<void> {
                 <span class="meta-value">{{ formatDateLong(invoice.due_date) }}</span>
               </div>
             </div>
-            <span :class="`status-badge status-${invoice.status}`">{{ STATUS_LABELS[invoice.status] }}</span>
           </div>
         </div>
-
-        <hr class="doc-divider">
-
         <!-- ══════════════════════════════
              INFO CARD: Client + Payment
         ══════════════════════════════ -->
@@ -493,23 +481,6 @@ async function handlePrint(): Promise<void> {
   font-weight: 600;
   color: #1a2b1d;
 }
-
-/* Status badges */
-.status-badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 7pt;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  margin-top: 8px;
-}
-.status-paid     { background: #dcfce7; color: #166534; }
-.status-issued   { background: #dbeafe; color: #1e40af; }
-.status-draft    { background: #f3f4f6; color: #4b5563; }
-.status-overdue  { background: #fee2e2; color: #991b1b; }
-.status-cancelled { background: #fef9c3; color: #854d0e; }
 
 /* ── Divider ── */
 .doc-divider {
