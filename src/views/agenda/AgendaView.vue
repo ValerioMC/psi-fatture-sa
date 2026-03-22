@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { ChevronLeft, ChevronRight, Plus, CalendarDays, CheckCircle2, Clock } from 'lucide-vue-next'
 import { listAppointments } from '@/api'
 import { useClientsStore } from '@/stores/clients'
@@ -22,6 +22,7 @@ const selectedDate = ref(todayStr)
 const showModal = ref(false)
 const modalDate = ref<string | undefined>(undefined)
 const editingAppointment = ref<Appointment | null>(null)
+const dayPanelRef = ref<HTMLElement | null>(null)
 
 const MONTH_NAMES = [
   'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -91,6 +92,14 @@ const selectedDayStats = computed(() => {
   }
 })
 
+const selectedDayLabel = computed(() =>
+  new Date(selectedDate.value + 'T00:00:00').toLocaleDateString('it-IT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }),
+)
+
 function prevMonth() {
   if (viewMonth.value === 0) { viewMonth.value = 11; viewYear.value-- }
   else viewMonth.value--
@@ -112,6 +121,13 @@ async function loadAppointments() {
   } finally {
     loading.value = false
   }
+}
+
+function selectDate(date: string) {
+  selectedDate.value = date
+  nextTick(() => {
+    dayPanelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 function openCreate(date: string) {
@@ -139,15 +155,6 @@ function statusDotClass(status: string): string {
   return map[status] ?? 'bg-sage-300'
 }
 
-function statusLineClass(status: string): string {
-  const map: Record<string, string> = {
-    scheduled: 'bg-ocean-100',
-    completed: 'bg-sage-100',
-    cancelled: 'bg-warm-100',
-  }
-  return map[status] ?? 'bg-sage-100'
-}
-
 function statusPillClass(status: string): string {
   const map: Record<string, string> = {
     scheduled: 'bg-ocean-50 text-ocean-700 border border-ocean-100',
@@ -164,6 +171,15 @@ function statusAccentClass(status: string): string {
     cancelled: 'bg-warm-300',
   }
   return map[status] ?? 'bg-sage-300'
+}
+
+function statusBorderClass(status: string): string {
+  const map: Record<string, string> = {
+    scheduled: 'border-ocean-100',
+    completed: 'border-sage-100',
+    cancelled: 'border-warm-100',
+  }
+  return map[status] ?? 'border-sage-100'
 }
 
 function statusLabel(status: string): string {
@@ -213,7 +229,7 @@ onMounted(async () => {
       <PageHeader title="Agenda" subtitle="Gestisci i tuoi appuntamenti.">
         <button
           type="button"
-          class="relative overflow-hidden bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-sage-200"
+          class="relative overflow-hidden bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-sage-200 cursor-pointer"
           @click="openCreate(selectedDate)"
         >
           <Plus class="w-4 h-4" />
@@ -252,234 +268,225 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Two-column layout: calendar + day panel -->
-      <div class="grid grid-cols-[1fr_340px] gap-5 items-start animate-in-d1">
+      <!-- Calendar (full width) -->
+      <div class="glass-card rounded-2xl shadow-sm overflow-hidden animate-in-d1">
+        <!-- Month nav -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-sage-100/60">
+          <button
+            type="button"
+            class="p-1.5 text-sage-500 hover:bg-sage-100 rounded-lg transition-colors cursor-pointer"
+            @click="prevMonth"
+          >
+            <ChevronLeft class="w-4 h-4" />
+          </button>
+          <h2 class="text-sm font-semibold text-sage-900">
+            {{ MONTH_NAMES[viewMonth] }} {{ viewYear }}
+          </h2>
+          <button
+            type="button"
+            class="p-1.5 text-sage-500 hover:bg-sage-100 rounded-lg transition-colors cursor-pointer"
+            @click="nextMonth"
+          >
+            <ChevronRight class="w-4 h-4" />
+          </button>
+        </div>
 
-        <!-- Calendar column -->
-        <div class="glass-card rounded-2xl shadow-sm overflow-hidden">
-          <!-- Month nav -->
-          <div class="flex items-center justify-between px-5 py-4 border-b border-sage-100/60">
-            <button
-              type="button"
-              class="p-1.5 text-sage-500 hover:bg-sage-100 rounded-lg transition-colors"
-              @click="prevMonth"
-            >
-              <ChevronLeft class="w-4 h-4" />
-            </button>
-            <h2 class="text-sm font-semibold text-sage-900">
-              {{ MONTH_NAMES[viewMonth] }} {{ viewYear }}
-            </h2>
-            <button
-              type="button"
-              class="p-1.5 text-sage-500 hover:bg-sage-100 rounded-lg transition-colors"
-              @click="nextMonth"
-            >
-              <ChevronRight class="w-4 h-4" />
-            </button>
+        <!-- Day name headers -->
+        <div class="grid grid-cols-7 border-b border-sage-100/60">
+          <div
+            v-for="dayName in DAY_NAMES"
+            :key="dayName"
+            class="text-center text-[10px] font-semibold text-sage-400 uppercase tracking-wider py-2"
+          >
+            {{ dayName }}
           </div>
+        </div>
 
-          <!-- Day name headers -->
-          <div class="grid grid-cols-7 border-b border-sage-100/60">
-            <div
-              v-for="dayName in DAY_NAMES"
-              :key="dayName"
-              class="text-center text-[10px] font-semibold text-sage-400 uppercase tracking-wider py-2"
-            >
-              {{ dayName }}
-            </div>
-          </div>
+        <!-- Loading overlay -->
+        <div v-if="loading" class="flex items-center justify-center py-16">
+          <div class="w-6 h-6 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
+        </div>
 
-          <!-- Loading overlay -->
-          <div v-if="loading" class="flex items-center justify-center py-16">
-            <div class="w-6 h-6 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
-          </div>
-
-          <!-- Calendar grid -->
-          <div v-else class="grid grid-cols-7 divide-x divide-y divide-sage-100/40">
-            <div
-              v-for="cell in calendarDays"
-              :key="cell.date"
-              class="min-h-[88px] p-2 cursor-pointer transition-colors relative"
-              :class="[
-                cell.date === selectedDate
-                  ? 'bg-sage-50/80 ring-2 ring-inset ring-sage-400/50'
-                  : 'hover:bg-sage-50/40',
-                !cell.currentMonth ? 'opacity-35' : '',
-              ]"
-              @click="selectedDate = cell.date"
-            >
-              <!-- Day number -->
-              <div class="flex items-start justify-between mb-1.5">
-                <span
-                  class="text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full leading-none"
-                  :class="isToday(cell.date)
-                    ? 'bg-gradient-to-br from-sage-600 to-ocean-500 text-white'
-                    : cell.date === selectedDate
-                      ? 'text-sage-800'
-                      : 'text-sage-600'"
-                >
-                  {{ cell.day }}
-                </span>
-                <!-- Count badge when many appointments -->
-                <span
-                  v-if="calendarCellAppts(cell.date).length > 0"
-                  class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                  :class="calendarCellAppts(cell.date).length >= 6
-                    ? 'bg-ocean-100 text-ocean-700'
-                    : 'bg-sage-100 text-sage-600'"
-                >
-                  {{ calendarCellAppts(cell.date).length }}
-                </span>
-              </div>
-
-              <!-- Status dot row -->
-              <div v-if="calendarCellAppts(cell.date).length > 0" class="flex flex-wrap gap-0.5 mb-1">
-                <div
-                  v-for="appt in calendarCellAppts(cell.date).slice(0, 6)"
-                  :key="appt.id"
-                  class="w-1.5 h-1.5 rounded-full"
-                  :class="cellDotColor(appt.status)"
-                />
-                <div
-                  v-if="calendarCellAppts(cell.date).length > 6"
-                  class="text-[8px] text-sage-400 leading-none mt-px"
-                >
-                  +{{ calendarCellAppts(cell.date).length - 6 }}
-                </div>
-              </div>
-
-              <!-- First appointment preview -->
-              <div
+        <!-- Calendar grid -->
+        <div v-else class="grid grid-cols-7 divide-x divide-y divide-sage-100/40">
+          <div
+            v-for="cell in calendarDays"
+            :key="cell.date"
+            class="min-h-[80px] p-2 cursor-pointer transition-all duration-200 active:scale-95 relative"
+            :class="[
+              cell.date === selectedDate
+                ? 'bg-sage-50/80 ring-2 ring-inset ring-sage-400/50'
+                : 'hover:bg-sage-50/40',
+              !cell.currentMonth ? 'opacity-35' : '',
+            ]"
+            @click="selectDate(cell.date)"
+          >
+            <!-- Day number -->
+            <div class="flex items-start justify-between mb-1.5">
+              <span
+                class="text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full leading-none"
+                :class="isToday(cell.date)
+                  ? 'bg-gradient-to-br from-sage-600 to-ocean-500 text-white'
+                  : cell.date === selectedDate
+                    ? 'text-sage-800'
+                    : 'text-sage-600'"
+              >
+                {{ cell.day }}
+              </span>
+              <!-- Count badge -->
+              <span
                 v-if="calendarCellAppts(cell.date).length > 0"
-                class="text-[9px] text-sage-500 truncate leading-tight"
+                class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                :class="calendarCellAppts(cell.date).length >= 6
+                  ? 'bg-ocean-100 text-ocean-700'
+                  : 'bg-sage-100 text-sage-600'"
               >
-                {{ calendarCellAppts(cell.date)[0].start_time.slice(0, 5) }}
-                {{ calendarCellAppts(cell.date)[0].client_name.split(' ')[0] }}
+                {{ calendarCellAppts(cell.date).length }}
+              </span>
+            </div>
+
+            <!-- Status dot row -->
+            <div v-if="calendarCellAppts(cell.date).length > 0" class="flex flex-wrap gap-0.5 mb-1">
+              <div
+                v-for="appt in calendarCellAppts(cell.date).slice(0, 6)"
+                :key="appt.id"
+                class="w-1.5 h-1.5 rounded-full"
+                :class="cellDotColor(appt.status)"
+              />
+              <div
+                v-if="calendarCellAppts(cell.date).length > 6"
+                class="text-[8px] text-sage-400 leading-none mt-px"
+              >
+                +{{ calendarCellAppts(cell.date).length - 6 }}
               </div>
+            </div>
+
+            <!-- First appointment preview -->
+            <div
+              v-if="calendarCellAppts(cell.date).length > 0"
+              class="text-[9px] text-sage-500 truncate leading-tight"
+            >
+              {{ calendarCellAppts(cell.date)[0].start_time.slice(0, 5) }}
+              {{ calendarCellAppts(cell.date)[0].client_name.split(' ')[0] }}
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Day panel -->
-        <div class="glass-card rounded-2xl shadow-sm overflow-hidden sticky top-6">
-          <!-- Day panel header -->
-          <div class="px-5 py-4 border-b border-sage-100/60">
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <p class="text-xs text-sage-400 uppercase tracking-wider mb-0.5">Giornata</p>
-                <h3 class="text-sm font-semibold text-sage-900 capitalize leading-tight">
-                  {{ new Date(selectedDate + 'T00:00:00').toLocaleDateString('it-IT', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                  }) }}
-                </h3>
-              </div>
-              <button
-                type="button"
-                class="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-sage-50 hover:bg-sage-100 text-sage-500 hover:text-sage-700 transition-colors"
-                title="Aggiungi appuntamento"
-                @click="openCreate(selectedDate)"
-              >
-                <Plus class="w-4 h-4" />
-              </button>
-            </div>
-
-            <!-- Day stats pills -->
-            <div v-if="selectedDayStats.total > 0" class="flex gap-2 mt-3">
-              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-100 text-sage-600">
-                {{ selectedDayStats.total }} appunt.
-              </span>
-              <span v-if="selectedDayStats.completed > 0" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-50 text-sage-500">
-                {{ selectedDayStats.completed }} completati
-              </span>
-              <span v-if="selectedDayStats.scheduled > 0" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-ocean-50 text-ocean-600">
-                {{ selectedDayStats.scheduled }} da fare
-              </span>
-            </div>
-          </div>
-
-          <!-- Empty state -->
-          <div v-if="selectedDayAppointments.length === 0" class="flex flex-col items-center justify-center py-12 text-center px-5">
-            <div class="w-10 h-10 rounded-xl bg-sage-50 flex items-center justify-center mb-3">
-              <CalendarDays class="w-5 h-5 text-sage-300" />
-            </div>
-            <p class="text-sm font-medium text-sage-500">Nessun appuntamento</p>
-            <p class="text-xs text-sage-400 mt-1">Clicca + per aggiungerne uno.</p>
-          </div>
-
-          <!-- Timeline -->
-          <div v-else class="py-3 max-h-[calc(100vh-320px)] overflow-y-auto">
-            <div
-              v-for="(appt, idx) in selectedDayAppointments"
-              :key="appt.id"
-              class="flex gap-0 group cursor-pointer"
-              @click="openEdit(appt)"
-            >
-              <!-- Time column -->
-              <div class="w-14 shrink-0 flex flex-col items-end pr-3 pt-3.5">
-                <span class="text-[10px] font-mono font-semibold text-sage-500 tabular-nums">
-                  {{ appt.start_time.slice(0, 5) }}
-                </span>
-              </div>
-
-              <!-- Dot + line -->
-              <div class="flex flex-col items-center shrink-0 w-4">
-                <div
-                  class="w-2.5 h-2.5 rounded-full border-2 mt-[15px] shrink-0 transition-transform group-hover:scale-125"
-                  :class="statusDotClass(appt.status)"
-                />
-                <div
-                  v-if="idx < selectedDayAppointments.length - 1"
-                  class="w-0.5 flex-1 mt-1 mb-0 min-h-[16px]"
-                  :class="statusLineClass(appt.status)"
-                />
-              </div>
-
-              <!-- Content card -->
-              <div
-                class="flex-1 min-w-0 ml-2 mb-2 rounded-xl border bg-white/80 shadow-sm overflow-hidden transition-all"
-                :class="[
-                  appt.status === 'cancelled' ? 'opacity-50' : 'group-hover:shadow-md group-hover:bg-white',
-                  appt.status === 'scheduled' ? 'border-ocean-100' : appt.status === 'completed' ? 'border-sage-100' : 'border-warm-100',
-                ]"
-              >
-                <div class="flex">
-                  <!-- Left accent strip -->
-                  <div class="w-[3px] shrink-0 self-stretch" :class="statusAccentClass(appt.status)" />
-
-                  <div class="flex-1 min-w-0 px-3 py-2.5">
-                    <!-- Header: client name + status badge sempre a destra -->
-                    <div class="flex items-start justify-between gap-2 min-w-0">
-                      <p class="text-sm font-semibold text-sage-900 truncate leading-tight flex-1 min-w-0">{{ appt.client_name }}</p>
-                      <span
-                        class="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
-                        :class="statusPillClass(appt.status)"
-                      >
-                        {{ statusLabel(appt.status) }}
-                      </span>
-                    </div>
-
-                    <!-- Service name -->
-                    <p v-if="appt.service_name" class="text-xs text-sage-500 truncate mt-0.5 leading-tight">{{ appt.service_name }}</p>
-
-                    <!-- Time range + duration -->
-                    <div class="flex items-center gap-1.5 mt-1.5">
-                      <span class="text-[10px] text-sage-400 tabular-nums">{{ appt.start_time.slice(0,5) }} – {{ appt.end_time.slice(0,5) }}</span>
-                      <span v-if="apptDuration(appt)" class="text-[10px] text-sage-300">·</span>
-                      <span v-if="apptDuration(appt)" class="text-[10px] text-sage-400">{{ apptDuration(appt) }}</span>
-                    </div>
-
-                    <!-- Notes -->
-                    <p v-if="appt.notes" class="text-[10px] text-sage-400 mt-1 italic truncate">{{ appt.notes }}</p>
-                  </div>
+      <!-- Day panel (below calendar, full width) -->
+      <div ref="dayPanelRef" class="glass-card rounded-2xl shadow-sm overflow-hidden mt-5 animate-in-d2 scroll-mt-6">
+        <!-- Day panel header -->
+        <div class="px-5 py-4 border-b border-sage-100/60">
+          <div class="flex items-center justify-between gap-4">
+            <Transition name="header-fade" mode="out-in">
+              <div :key="selectedDate" class="flex items-center gap-4">
+                <div>
+                  <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">Giornata</p>
+                  <h3 class="text-sm font-semibold text-sage-900 capitalize leading-tight">
+                    {{ selectedDayLabel }}
+                  </h3>
+                </div>
+                <!-- Day stats pills -->
+                <div v-if="selectedDayStats.total > 0" class="flex gap-2">
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-100 text-sage-600">
+                    {{ selectedDayStats.total }} appunt.
+                  </span>
+                  <span v-if="selectedDayStats.completed > 0" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-50 text-sage-500">
+                    {{ selectedDayStats.completed }} completati
+                  </span>
+                  <span v-if="selectedDayStats.scheduled > 0" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-ocean-50 text-ocean-600">
+                    {{ selectedDayStats.scheduled }} da fare
+                  </span>
                 </div>
               </div>
+            </Transition>
+            <button
+              type="button"
+              class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sage-50 hover:bg-sage-100 text-sage-600 hover:text-sage-800 text-xs font-medium transition-colors cursor-pointer"
+              title="Aggiungi appuntamento"
+              @click="openCreate(selectedDate)"
+            >
+              <Plus class="w-3.5 h-3.5" />
+              Aggiungi
+            </button>
+          </div>
+        </div>
+
+        <!-- Body: transitions on date change -->
+        <Transition name="day-content" mode="out-in">
+          <div :key="selectedDate">
+
+        <!-- Empty state -->
+        <div v-if="selectedDayAppointments.length === 0" class="flex flex-col items-center justify-center py-14 text-center px-5">
+          <div class="w-12 h-12 rounded-2xl bg-sage-50 flex items-center justify-center mb-3">
+            <CalendarDays class="w-6 h-6 text-sage-300" />
+          </div>
+          <p class="text-sm font-medium text-sage-500">Nessun appuntamento</p>
+          <p class="text-xs text-sage-400 mt-1">Clicca Aggiungi per inserirne uno.</p>
+        </div>
+
+        <!-- Appointments grid -->
+        <div v-else class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div
+            v-for="(appt, idx) in selectedDayAppointments"
+            :key="appt.id"
+            :style="{ '--i': idx }"
+            class="appt-card rounded-xl border bg-white/80 shadow-sm overflow-hidden cursor-pointer transition-all hover:shadow-md hover:bg-white group"
+            :class="[
+              appt.status === 'cancelled' ? 'opacity-50' : '',
+              statusBorderClass(appt.status),
+            ]"
+            @click="openEdit(appt)"
+          >
+            <div class="flex h-full">
+              <!-- Left accent strip -->
+              <div class="w-[3px] shrink-0 self-stretch" :class="statusAccentClass(appt.status)" />
+
+              <div class="flex-1 min-w-0 px-3 py-3">
+                <!-- Time + status badge -->
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-1.5">
+                    <div
+                      class="w-2 h-2 rounded-full shrink-0 border-2 transition-transform group-hover:scale-125"
+                      :class="statusDotClass(appt.status)"
+                    />
+                    <span class="text-[11px] font-mono font-semibold text-sage-600 tabular-nums">
+                      {{ appt.start_time.slice(0, 5) }}
+                    </span>
+                  </div>
+                  <span
+                    class="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                    :class="statusPillClass(appt.status)"
+                  >
+                    {{ statusLabel(appt.status) }}
+                  </span>
+                </div>
+
+                <!-- Client name -->
+                <p class="text-sm font-semibold text-sage-900 truncate leading-tight">{{ appt.client_name }}</p>
+
+                <!-- Service name -->
+                <p v-if="appt.service_name" class="text-xs text-sage-500 truncate mt-0.5 leading-tight">{{ appt.service_name }}</p>
+
+                <!-- Time range + duration -->
+                <div class="flex items-center gap-1.5 mt-2">
+                  <Clock class="w-3 h-3 text-sage-300 shrink-0" />
+                  <span class="text-[10px] text-sage-400 tabular-nums">{{ appt.start_time.slice(0, 5) }} – {{ appt.end_time.slice(0, 5) }}</span>
+                  <span v-if="apptDuration(appt)" class="text-[10px] text-sage-300">·</span>
+                  <span v-if="apptDuration(appt)" class="text-[10px] text-sage-400">{{ apptDuration(appt) }}</span>
+                </div>
+
+                <!-- Notes -->
+                <p v-if="appt.notes" class="text-[10px] text-sage-400 mt-1.5 italic truncate">{{ appt.notes }}</p>
+              </div>
             </div>
           </div>
         </div>
 
+          </div>
+        </Transition>
       </div>
+
     </div>
   </div>
 
@@ -491,3 +498,40 @@ onMounted(async () => {
     @saved="onModalSaved"
   />
 </template>
+
+<style scoped>
+/* Header date label: fade + tiny slide */
+.header-fade-enter-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.header-fade-leave-active  { transition: opacity 0.1s ease,  transform 0.1s ease;  }
+.header-fade-enter-from    { opacity: 0; transform: translateY(4px);  }
+.header-fade-leave-to      { opacity: 0; transform: translateY(-4px); }
+
+/* Day panel body: fade + slide up */
+.day-content-enter-active { transition: opacity 0.22s ease, transform 0.22s ease; }
+.day-content-leave-active { transition: opacity 0.12s ease, transform 0.12s ease; }
+.day-content-enter-from   { opacity: 0; transform: translateY(10px); }
+.day-content-leave-to     { opacity: 0; transform: translateY(-6px); }
+
+/* Appointment cards: staggered slide-up on enter */
+.appt-card {
+  animation: appt-in 0.32s ease both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes appt-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-fade-enter-active,
+  .header-fade-leave-active,
+  .day-content-enter-active,
+  .day-content-leave-active { transition: opacity 0.1s ease; }
+  .header-fade-enter-from,
+  .header-fade-leave-to,
+  .day-content-enter-from,
+  .day-content-leave-to { transform: none; }
+  .appt-card { animation: none; }
+}
+</style>
