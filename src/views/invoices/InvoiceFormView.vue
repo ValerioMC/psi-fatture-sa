@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Plus, Trash2 } from 'lucide-vue-next'
+import { Plus, Trash2, FileText, User, Calendar, CreditCard, List, Check, X, ChevronLeft } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/stores/invoices'
 import { useClientsStore } from '@/stores/clients'
 import { useServicesStore } from '@/stores/services'
@@ -69,11 +69,11 @@ const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
   { value: 'altro', label: 'Altro' },
 ]
 
-const STATUS_OPTIONS: Array<{ value: InvoiceStatus; label: string }> = [
-  { value: 'draft', label: 'Bozza' },
-  { value: 'issued', label: 'Emessa' },
-  { value: 'paid', label: 'Pagata' },
-  { value: 'cancelled', label: 'Annullata' },
+const STATUS_OPTIONS: Array<{ value: InvoiceStatus; label: string; dot: string }> = [
+  { value: 'draft',     label: 'Bozza',     dot: 'bg-warm-400' },
+  { value: 'issued',    label: 'Emessa',    dot: 'bg-ocean-500' },
+  { value: 'paid',      label: 'Pagata',    dot: 'bg-sage-500' },
+  { value: 'cancelled', label: 'Annullata', dot: 'bg-sage-300' },
 ]
 
 const taxRegime = computed(() => configStore.config?.tax_regime ?? 'forfettario')
@@ -186,26 +186,52 @@ async function onSubmit() {
 <template>
   <div class="p-8">
     <div class="max-w-4xl mx-auto">
-    <PageHeader
-      :title="isEdit ? 'Modifica Fattura' : 'Nuova Fattura'"
-      :subtitle="isEdit ? 'Aggiorna i dati della fattura.' : 'Crea una nuova fattura.'"
-    />
+      <PageHeader
+        :title="isEdit ? 'Modifica Fattura' : 'Nuova Fattura'"
+        :subtitle="isEdit ? 'Aggiorna i dati della fattura.' : 'Crea una nuova fattura.'"
+      >
+        <button
+          type="button"
+          class="flex items-center gap-1.5 text-sm text-sage-500 hover:text-sage-700 transition-colors cursor-pointer"
+          @click="router.push('/invoices')"
+        >
+          <ChevronLeft class="w-4 h-4" />
+          Torna alla lista
+        </button>
+      </PageHeader>
 
-    <div v-if="loading" class="text-sm text-sage-400">Caricamento...</div>
+      <!-- Loading -->
+      <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3">
+        <div class="w-8 h-8 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
+        <p class="text-sm text-sage-400">Caricamento fattura…</p>
+      </div>
 
-    <form v-else class="space-y-5" @submit.prevent="onSubmit">
-        <!-- Header data -->
-        <div class="glass-card rounded-xl p-6 animate-in">
-          <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Dati fattura</h2>
+      <form v-else class="space-y-5" @submit.prevent="onSubmit">
+
+        <!-- Dati fattura -->
+        <div class="glass-card rounded-2xl p-5 animate-in">
+          <div class="flex items-center gap-2.5 mb-5">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+              <FileText class="w-3.5 h-3.5 text-white" />
+            </div>
+            <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Dati fattura</h2>
+          </div>
+
           <div class="grid grid-cols-2 gap-4">
+            <!-- Cliente -->
             <div class="col-span-2">
-              <label class="text-sm font-medium text-sage-700 block mb-1">Cliente *</label>
+              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">
+                <span class="flex items-center gap-1.5">
+                  <User class="w-3 h-3" />
+                  Cliente *
+                </span>
+              </label>
               <select
                 v-model.number="form.client_id"
                 required
-                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow cursor-pointer appearance-none"
               >
-                <option :value="0" disabled>— Seleziona cliente —</option>
+                <option :value="0" disabled>— Seleziona paziente —</option>
                 <option
                   v-for="client in clientsStore.clients"
                   :key="client.id"
@@ -215,73 +241,114 @@ async function onSubmit() {
                 </option>
               </select>
             </div>
+
+            <!-- Date -->
             <div>
-              <label class="text-sm font-medium text-sage-700 block mb-1">Data emissione *</label>
+              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">
+                <span class="flex items-center gap-1.5">
+                  <Calendar class="w-3 h-3" />
+                  Data emissione *
+                </span>
+              </label>
               <input
                 v-model="form.issue_date"
                 type="date"
                 required
-                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
               />
             </div>
             <div>
-              <label class="text-sm font-medium text-sage-700 block mb-1">Data scadenza</label>
+              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Data scadenza</label>
               <input
                 v-model="form.due_date"
                 type="date"
-                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
               />
             </div>
+
+            <!-- Payment method -->
             <div>
-              <label class="text-sm font-medium text-sage-700 block mb-1">Metodo di pagamento</label>
+              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">
+                <span class="flex items-center gap-1.5">
+                  <CreditCard class="w-3 h-3" />
+                  Metodo di pagamento
+                </span>
+              </label>
               <select
                 v-model="form.payment_method"
-                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow cursor-pointer appearance-none"
               >
                 <option v-for="opt in PAYMENT_METHODS" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
                 </option>
               </select>
             </div>
+
+            <!-- Status -->
             <div>
-              <label class="text-sm font-medium text-sage-700 block mb-1">Stato</label>
-              <select
-                v-model="form.status"
-                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
-              >
-                <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">
+              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Stato</label>
+              <div class="flex rounded-xl border border-sage-200 p-1 bg-sage-50/50 gap-1">
+                <button
+                  v-for="opt in STATUS_OPTIONS"
+                  :key="opt.value"
+                  type="button"
+                  class="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 cursor-pointer"
+                  :class="form.status === opt.value
+                    ? 'bg-white shadow-sm text-sage-900'
+                    : 'text-sage-400 hover:text-sage-600'"
+                  @click="form.status = opt.value"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="opt.dot" />
                   {{ opt.label }}
-                </option>
-              </select>
+                </button>
+              </div>
             </div>
+
+            <!-- Notes -->
             <div class="col-span-2">
-              <label class="text-sm font-medium text-sage-700 block mb-1">Note</label>
+              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Note</label>
               <textarea
                 v-model="form.notes"
                 rows="2"
-                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80 resize-none"
+                placeholder="Note aggiuntive sulla fattura…"
+                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow resize-none"
               />
             </div>
+
+            <!-- ENPAP toggle -->
             <div class="col-span-2">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input
-                  v-model="form.apply_enpap"
-                  type="checkbox"
-                  class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
-                />
-                <span class="text-sm text-sage-700">Applica contributo ENPAP (2%)</span>
+              <label class="flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border border-sage-100/60 hover:bg-sage-50/60 transition-colors">
+                <div
+                  class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0"
+                  :class="form.apply_enpap ? 'bg-sage-500' : 'bg-sage-200'"
+                >
+                  <div
+                    class="absolute top-[3px] w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                    :class="form.apply_enpap ? 'translate-x-[17px]' : 'translate-x-[3px]'"
+                  />
+                </div>
+                <input v-model="form.apply_enpap" type="checkbox" class="sr-only" />
+                <div>
+                  <p class="text-sm font-medium text-sage-800">Applica contributo ENPAP (2%)</p>
+                  <p class="text-xs text-sage-400">Contributo previdenziale sulla quota netta</p>
+                </div>
               </label>
             </div>
           </div>
         </div>
 
-        <!-- Invoice lines -->
-        <div class="glass-card rounded-xl p-6 animate-in-d1">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider">Righe fattura</h2>
+        <!-- Righe fattura -->
+        <div class="glass-card rounded-2xl p-5 animate-in-d1">
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
+                <List class="w-3.5 h-3.5 text-white" />
+              </div>
+              <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Righe fattura</h2>
+            </div>
             <button
               type="button"
-              class="border border-sage-200 text-sage-700 hover:bg-sage-50 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+              class="flex items-center gap-1.5 text-xs font-medium text-sage-600 hover:text-sage-800 border border-sage-200 hover:bg-sage-50 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
               @click="addLine"
             >
               <Plus class="w-3.5 h-3.5" />
@@ -289,141 +356,165 @@ async function onSubmit() {
             </button>
           </div>
 
-          <div class="space-y-3">
+          <!-- Column headers -->
+          <div
+            class="grid gap-2 mb-2 px-3"
+            style="grid-template-columns: 2fr 3fr 1fr 1fr 1fr auto"
+          >
+            <p class="text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Servizio</p>
+            <p class="text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Descrizione *</p>
+            <p class="text-[10px] font-semibold text-sage-400 uppercase tracking-wider text-center">Qtà</p>
+            <p class="text-[10px] font-semibold text-sage-400 uppercase tracking-wider text-right">Prezzo (€)</p>
+            <p class="text-[10px] font-semibold text-sage-400 uppercase tracking-wider text-right">IVA %</p>
+            <p class="w-7" />
+          </div>
+
+          <TransitionGroup name="line" tag="div" class="space-y-2">
             <div
-              v-for="(line, idx) in form.lines"
+              v-for="line in form.lines"
               :key="line._key"
-              class="grid gap-2 items-end pb-3 border-b border-sage-100/50 last:border-0"
+              class="grid gap-2 items-center rounded-xl border border-sage-100 bg-white/50 px-3 py-2.5"
               style="grid-template-columns: 2fr 3fr 1fr 1fr 1fr auto"
             >
               <!-- Servizio -->
-              <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">Servizio</label>
-                <select
-                  v-model.number="line.service_id"
-                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
-                  @change="onServiceSelect(line)"
-                >
-                  <option :value="undefined">— nessuno —</option>
-                  <option v-for="s in servicesStore.services" :key="s.id" :value="s.id">
-                    {{ s.name }}
-                  </option>
-                </select>
-              </div>
+              <select
+                v-model.number="line.service_id"
+                class="w-full border border-sage-200 rounded-lg px-2.5 py-1.5 text-xs text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40 bg-white/80 cursor-pointer appearance-none"
+                @change="onServiceSelect(line)"
+              >
+                <option :value="undefined">— nessuno —</option>
+                <option v-for="s in servicesStore.services" :key="s.id" :value="s.id">
+                  {{ s.name }}
+                </option>
+              </select>
+
               <!-- Descrizione -->
-              <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">Descrizione *</label>
-                <input
-                  v-model="line.description"
-                  type="text"
-                  required
-                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
-                />
-              </div>
+              <input
+                v-model="line.description"
+                type="text"
+                required
+                placeholder="Descrizione prestazione"
+                class="w-full border border-sage-200 rounded-lg px-2.5 py-1.5 text-xs text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 bg-white/80"
+              />
+
               <!-- Quantità -->
-              <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">Qtà</label>
-                <input
-                  v-model.number="line.quantity"
-                  type="number"
-                  min="1"
-                  step="1"
-                  required
-                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
-                />
-              </div>
-              <!-- Prezzo unitario -->
-              <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">Prezzo (€)</label>
-                <input
-                  v-model.number="line.unit_price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  required
-                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
-                />
-              </div>
+              <input
+                v-model.number="line.quantity"
+                type="number"
+                min="1"
+                step="1"
+                required
+                class="w-full border border-sage-200 rounded-lg px-2.5 py-1.5 text-xs text-sage-900 text-center focus:outline-none focus:ring-2 focus:ring-sage-400/40 bg-white/80 tabular-nums"
+              />
+
+              <!-- Prezzo -->
+              <input
+                v-model.number="line.unit_price"
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                class="w-full border border-sage-200 rounded-lg px-2.5 py-1.5 text-xs text-sage-900 text-right focus:outline-none focus:ring-2 focus:ring-sage-400/40 bg-white/80 tabular-nums"
+              />
+
               <!-- IVA -->
-              <div>
-                <label v-if="idx === 0" class="text-xs font-medium text-sage-500 block mb-1">IVA %</label>
-                <input
-                  v-model.number="line.vat_rate"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  class="w-full border border-sage-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
-                />
-              </div>
+              <input
+                v-model.number="line.vat_rate"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                class="w-full border border-sage-200 rounded-lg px-2.5 py-1.5 text-xs text-sage-900 text-right focus:outline-none focus:ring-2 focus:ring-sage-400/40 bg-white/80 tabular-nums"
+              />
+
               <!-- Remove -->
-              <div>
-                <div v-if="idx === 0" class="h-5 mb-1" />
-                <button
-                  type="button"
-                  class="p-1.5 text-sage-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  :disabled="form.lines.length === 1"
-                  @click="removeLine(line._key)"
-                >
-                  <Trash2 class="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                class="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 cursor-pointer"
+                :class="form.lines.length === 1
+                  ? 'text-sage-200 cursor-not-allowed'
+                  : 'text-sage-300 hover:text-red-500 hover:bg-red-50'"
+                :disabled="form.lines.length === 1"
+                @click="removeLine(line._key)"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </TransitionGroup>
+        </div>
+
+        <!-- Riepilogo + azioni -->
+        <div class="glass-card rounded-2xl p-5 animate-in-d2">
+          <!-- Totali in riga -->
+          <div class="flex flex-wrap items-end gap-x-6 gap-y-3 pb-4 mb-4 border-b border-sage-100">
+            <div>
+              <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">Netto</p>
+              <p class="text-sm font-semibold text-sage-800 tabular-nums">{{ formatCurrency(totals.total_net) }}</p>
+            </div>
+            <div>
+              <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">IVA</p>
+              <p class="text-sm font-semibold text-sage-800 tabular-nums">{{ formatCurrency(totals.total_tax) }}</p>
+            </div>
+            <div v-if="form.apply_enpap">
+              <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">ENPAP 2%</p>
+              <p class="text-sm font-semibold text-sage-800 tabular-nums">+ {{ formatCurrency(totals.contributo_enpap) }}</p>
+            </div>
+            <div v-if="totals.ritenuta_acconto > 0">
+              <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">Ritenuta 20%</p>
+              <p class="text-sm font-semibold text-red-500 tabular-nums">− {{ formatCurrency(totals.ritenuta_acconto) }}</p>
+            </div>
+            <div v-if="totals.marca_da_bollo > 0">
+              <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">Bollo</p>
+              <p class="text-sm font-semibold text-sage-800 tabular-nums">+ {{ formatCurrency(totals.marca_da_bollo) }}</p>
+            </div>
+            <div class="ml-auto text-right">
+              <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">Totale dovuto</p>
+              <p class="text-2xl font-bold text-sage-900 tabular-nums">{{ formatCurrency(totals.total_due) }}</p>
             </div>
           </div>
-        </div>
 
-      <!-- Riepilogo + azioni -->
-      <div class="glass-card rounded-2xl p-5 animate-in-d2">
-        <!-- Voci importo in riga -->
-        <div class="flex flex-wrap items-end gap-x-7 gap-y-3 pb-4 mb-4 border-b border-sage-100">
-          <div>
-            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">Netto</p>
-            <p class="text-sm font-semibold text-sage-700">{{ formatCurrency(totals.total_net) }}</p>
+          <!-- Error -->
+          <div v-if="error" class="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+            <X class="w-4 h-4 shrink-0 text-red-400" />
+            {{ error }}
           </div>
-          <div>
-            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">IVA</p>
-            <p class="text-sm font-semibold text-sage-700">{{ formatCurrency(totals.total_tax) }}</p>
-          </div>
-          <div v-if="form.apply_enpap">
-            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">ENPAP 2%</p>
-            <p class="text-sm font-semibold text-sage-700">+ {{ formatCurrency(totals.contributo_enpap) }}</p>
-          </div>
-          <div v-if="totals.ritenuta_acconto > 0">
-            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">Ritenuta 20%</p>
-            <p class="text-sm font-semibold text-red-600">− {{ formatCurrency(totals.ritenuta_acconto) }}</p>
-          </div>
-          <div v-if="totals.marca_da_bollo > 0">
-            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">Bollo</p>
-            <p class="text-sm font-semibold text-sage-700">+ {{ formatCurrency(totals.marca_da_bollo) }}</p>
-          </div>
-          <div class="ml-auto text-right">
-            <p class="text-xs text-sage-400 uppercase tracking-wide mb-0.5">Totale dovuto</p>
-            <p class="text-2xl font-bold text-sage-900">{{ formatCurrency(totals.total_due) }}</p>
-          </div>
-        </div>
 
-        <div v-if="error" class="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-          {{ error }}
+          <!-- Submit -->
+          <div class="flex items-center justify-between">
+            <button
+              type="button"
+              class="flex items-center gap-1.5 text-sm text-sage-500 hover:text-sage-700 transition-colors cursor-pointer"
+              @click="router.push('/invoices')"
+            >
+              <ChevronLeft class="w-4 h-4" />
+              Annulla
+            </button>
+            <button
+              type="submit"
+              :disabled="saving"
+              class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 flex items-center gap-2 hover:shadow-lg hover:shadow-sage-200 cursor-pointer"
+            >
+              <Check class="w-4 h-4" />
+              {{ saving ? 'Salvataggio…' : isEdit ? 'Aggiorna fattura' : 'Crea fattura' }}
+            </button>
+          </div>
         </div>
-
-        <div class="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            class="border border-sage-200 text-sage-700 hover:bg-sage-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            @click="router.push('/invoices')"
-          >
-            Annulla
-          </button>
-          <button
-            type="submit"
-            :disabled="saving"
-            class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-5 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-60"
-          >
-            {{ saving ? 'Salvataggio...' : isEdit ? 'Aggiorna fattura' : 'Crea fattura' }}
-          </button>
-        </div>
-      </div>
-    </form>
+      </form>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Line item add/remove animation */
+.line-enter-active { transition: all 0.25s ease; }
+.line-leave-active { transition: all 0.2s ease; }
+.line-enter-from   { opacity: 0; transform: translateY(-8px); }
+.line-leave-to     { opacity: 0; transform: translateY(-4px); height: 0; margin: 0; padding: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .line-enter-active,
+  .line-leave-active { transition: opacity 0.1s ease; }
+  .line-enter-from,
+  .line-leave-to { transform: none; }
+}
+</style>

@@ -117,6 +117,11 @@ function onSearchInput() {
   debounceTimer = setTimeout(loadInvoices, 300)
 }
 
+function clearSearch() {
+  filters.search = ''
+  loadInvoices()
+}
+
 watch(() => [filters.year, filters.status], loadInvoices)
 onMounted(loadInvoices)
 
@@ -130,6 +135,10 @@ async function handleDelete() {
     invoiceToDelete.value = null
   }
 }
+
+function rowDelay(idx: number): number {
+  return Math.min(idx, 12)
+}
 </script>
 
 <template>
@@ -138,7 +147,7 @@ async function handleDelete() {
       <PageHeader title="Fatture" subtitle="Gestisci tutte le tue fatture">
         <button
           type="button"
-          class="flex items-center gap-2 border border-sage-200 text-sage-600 hover:text-sage-800 hover:bg-sage-50 font-medium px-4 py-2 rounded-xl text-sm transition-all"
+          class="flex items-center gap-2 border border-sage-200 text-sage-600 hover:text-sage-800 hover:bg-sage-50 font-medium px-4 py-2 rounded-xl text-sm transition-all cursor-pointer"
           @click="router.push('/invoices/monthly')"
         >
           <CalendarRange class="w-4 h-4" />
@@ -146,7 +155,7 @@ async function handleDelete() {
         </button>
         <button
           type="button"
-          class="group relative overflow-hidden text-white font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 focus:outline-none"
+          class="group relative overflow-hidden text-white font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 cursor-pointer focus:outline-none"
           style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.3);"
           @click="router.push('/invoices/new')"
         >
@@ -187,32 +196,44 @@ async function handleDelete() {
         </div>
       </div>
 
-      <!-- Filters -->
-      <div class="glass-card rounded-2xl px-5 py-4 shadow-sm mb-4 flex items-center gap-3 animate-in">
+      <!-- Filters bar -->
+      <div class="glass-card rounded-2xl px-4 py-3 shadow-sm mb-4 flex items-center gap-3 animate-in">
         <select
           v-model="filters.year"
-          class="bg-white/60 border border-sage-200/70 rounded-xl px-3 py-2 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all"
+          class="bg-white/70 border border-sage-200/70 rounded-xl px-3 py-2 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all cursor-pointer"
         >
           <option v-for="opt in YEAR_OPTIONS" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>
         </select>
 
         <select
           v-model="filters.status"
-          class="bg-white/60 border border-sage-200/70 rounded-xl px-3 py-2 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all"
+          class="bg-white/70 border border-sage-200/70 rounded-xl px-3 py-2 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all cursor-pointer"
         >
           <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
 
-        <div class="relative flex-1 max-w-sm">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sage-400" />
+        <div class="relative flex-1">
+          <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-sage-400 pointer-events-none" />
           <input
             v-model="filters.search"
             type="text"
-            placeholder="Cerca per numero, cliente..."
-            class="w-full bg-white/60 border border-sage-200/70 rounded-xl pl-9 pr-3 py-2 text-sm text-sage-800 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all"
+            placeholder="Cerca per numero, cliente…"
+            class="w-full bg-white/70 border border-sage-200/70 rounded-xl pl-10 pr-9 py-2 text-sm text-sage-800 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all"
             @input="onSearchInput"
           />
+          <button
+            v-if="filters.search"
+            type="button"
+            class="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-sage-400 hover:text-sage-600 transition-colors cursor-pointer rounded"
+            @click="clearSearch"
+          >
+            <X class="w-3.5 h-3.5" />
+          </button>
         </div>
+
+        <span class="text-xs text-sage-400 whitespace-nowrap shrink-0">
+          {{ invoicesStore.invoices.length }} {{ invoicesStore.invoices.length === 1 ? 'fattura' : 'fatture' }}
+        </span>
       </div>
 
       <!-- Bulk action bar -->
@@ -239,23 +260,23 @@ async function handleDelete() {
             <label class="text-sm text-sage-600 whitespace-nowrap">Cambia stato in:</label>
             <select
               v-model="bulkTargetStatus"
-              class="bg-white/80 border border-sage-200/70 rounded-xl px-3 py-1.5 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-ocean-400/40 transition-all"
+              class="bg-white/80 border border-sage-200/70 rounded-xl px-3 py-1.5 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-ocean-400/40 transition-all cursor-pointer"
             >
               <option v-for="opt in TARGET_STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
             <button
               type="button"
-              class="text-white font-medium px-4 py-1.5 rounded-xl text-sm transition-all duration-200 disabled:opacity-50"
+              class="text-white font-medium px-4 py-1.5 rounded-xl text-sm transition-all duration-200 disabled:opacity-50 cursor-pointer"
               style="background: linear-gradient(135deg, #5d8062, #0c8aeb);"
               :disabled="bulkUpdating"
               @click="requestBulkUpdate"
             >
-              {{ bulkUpdating ? 'Aggiornamento...' : 'Applica' }}
+              {{ bulkUpdating ? 'Aggiornamento…' : 'Applica' }}
             </button>
           </div>
           <button
             type="button"
-            class="p-1.5 text-sage-400 hover:text-sage-600 hover:bg-sage-100 rounded-lg transition-all"
+            class="p-1.5 text-sage-400 hover:text-sage-600 hover:bg-sage-100 rounded-lg transition-all cursor-pointer"
             @click="clearSelection"
           >
             <X class="w-4 h-4" />
@@ -263,28 +284,39 @@ async function handleDelete() {
         </div>
       </Transition>
 
-      <!-- Table -->
-      <div class="glass-card rounded-2xl shadow-sm animate-in-d1">
+      <!-- Table card -->
+      <div class="glass-card rounded-2xl shadow-sm overflow-hidden animate-in-d1">
+        <!-- Loading -->
         <div v-if="invoicesStore.loading" class="flex flex-col items-center justify-center py-16 gap-3">
           <div class="w-8 h-8 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
-          <p class="text-sm text-sage-400">Caricamento...</p>
+          <p class="text-sm text-sage-400">Caricamento fatture…</p>
         </div>
 
+        <!-- Empty state -->
         <div
           v-else-if="invoicesStore.invoices.length === 0"
-          class="flex flex-col items-center justify-center py-16 text-center"
+          class="flex flex-col items-center justify-center py-16 text-center px-6"
         >
           <div class="w-14 h-14 rounded-2xl bg-sage-50 flex items-center justify-center mb-3">
             <FileText class="w-7 h-7 text-sage-300" />
           </div>
           <p class="text-sm font-semibold text-sage-600">Nessuna fattura trovata</p>
           <p class="text-xs text-sage-400 mt-1">Modifica i filtri o crea una nuova fattura.</p>
+          <button
+            type="button"
+            class="mt-4 flex items-center gap-1.5 text-sm font-medium text-sage-600 hover:text-sage-800 transition-colors cursor-pointer"
+            @click="router.push('/invoices/new')"
+          >
+            <Plus class="w-4 h-4" />
+            Nuova fattura
+          </button>
         </div>
 
+        <!-- Table -->
         <table v-else class="w-full text-sm">
           <thead>
-            <tr class="border-b border-sage-100/60">
-              <th class="px-4 py-3.5 text-left w-10">
+            <tr class="border-b border-sage-100/60 bg-sage-50/30">
+              <th class="px-4 py-3 text-left w-10">
                 <input
                   type="checkbox"
                   :checked="allSelected"
@@ -292,22 +324,25 @@ async function handleDelete() {
                   @change="toggleSelectAll"
                 />
               </th>
-              <th class="px-4 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Numero</th>
-              <th class="px-4 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Data</th>
-              <th class="px-4 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Cliente</th>
-              <th class="px-4 py-3.5 text-right text-xs font-semibold text-sage-400 uppercase tracking-wider">Totale</th>
-              <th class="px-4 py-3.5 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Stato</th>
-              <th class="px-4 py-3.5 text-right text-xs font-semibold text-sage-400 uppercase tracking-wider">Azioni</th>
+              <th class="px-4 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Numero</th>
+              <th class="px-4 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Data</th>
+              <th class="px-4 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Cliente</th>
+              <th class="px-4 py-3 text-right text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Totale</th>
+              <th class="px-4 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Stato</th>
+              <th class="px-4 py-3 text-right text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Azioni</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="invoice in invoicesStore.invoices"
+              v-for="(invoice, idx) in invoicesStore.invoices"
               :key="invoice.id"
-              class="border-b border-sage-50/70 transition-colors group"
-              :class="selectedIds.has(invoice.id) ? 'bg-ocean-50/40' : 'hover:bg-sage-50/40'"
+              :style="{ '--i': rowDelay(idx) }"
+              class="invoice-row border-b border-sage-50/70 transition-all duration-150 cursor-pointer group"
+              :class="selectedIds.has(invoice.id) ? 'bg-ocean-50/40 hover:bg-ocean-50/60' : 'hover:bg-sage-50/50'"
+              @click="router.push(`/invoices/${invoice.id}`)"
             >
-              <td class="px-4 py-3.5">
+              <!-- Checkbox -->
+              <td class="px-4 py-3.5" @click.stop>
                 <input
                   type="checkbox"
                   :checked="selectedIds.has(invoice.id)"
@@ -315,40 +350,58 @@ async function handleDelete() {
                   @change="toggleSelect(invoice.id)"
                 />
               </td>
+
+              <!-- Number -->
               <td class="px-4 py-3.5">
-                <span class="font-mono text-sm font-semibold text-sage-800 bg-sage-50 px-2 py-0.5 rounded-md">
+                <span class="font-mono text-xs font-semibold text-sage-800 bg-sage-50 border border-sage-100 px-2 py-1 rounded-lg">
                   {{ invoice.invoice_number }}
                 </span>
               </td>
-              <td class="px-4 py-3.5 text-sage-400 text-xs">{{ formatDate(invoice.issue_date) }}</td>
-              <td class="px-4 py-3.5 font-medium text-sage-700">{{ invoice.client_name }}</td>
-              <td class="px-4 py-3.5 text-right font-bold text-sage-900">{{ formatCurrency(invoice.total_due) }}</td>
-              <td class="px-4 py-3.5"><StatusBadge :status="invoice.status" type="invoice" /></td>
+
+              <!-- Date -->
+              <td class="px-4 py-3.5 text-sage-500 text-xs">{{ formatDate(invoice.issue_date) }}</td>
+
+              <!-- Client -->
               <td class="px-4 py-3.5">
-                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span class="font-medium text-sage-800 truncate">{{ invoice.client_name }}</span>
+              </td>
+
+              <!-- Total -->
+              <td class="px-4 py-3.5 text-right font-bold text-sage-900 tabular-nums">
+                {{ formatCurrency(invoice.total_due) }}
+              </td>
+
+              <!-- Status -->
+              <td class="px-4 py-3.5">
+                <StatusBadge :status="invoice.status" type="invoice" />
+              </td>
+
+              <!-- Actions: always visible, subtle -->
+              <td class="px-4 py-3.5" @click.stop>
+                <div class="flex items-center justify-end gap-1">
                   <button
                     type="button"
-                    class="p-1.5 text-sage-300 hover:text-ocean-600 hover:bg-ocean-50 rounded-lg transition-all"
+                    class="p-1.5 text-sage-300 hover:text-ocean-600 hover:bg-ocean-50 rounded-lg transition-all duration-150 cursor-pointer"
                     title="Visualizza"
                     @click="router.push(`/invoices/${invoice.id}`)"
                   >
-                    <Eye class="w-4 h-4" />
+                    <Eye class="w-3.5 h-3.5" />
                   </button>
                   <button
                     type="button"
-                    class="p-1.5 text-sage-300 hover:text-sage-600 hover:bg-sage-50 rounded-lg transition-all"
+                    class="p-1.5 text-sage-300 hover:text-sage-600 hover:bg-sage-50 rounded-lg transition-all duration-150 cursor-pointer"
                     title="Modifica"
                     @click="router.push(`/invoices/${invoice.id}/edit`)"
                   >
-                    <Pencil class="w-4 h-4" />
+                    <Pencil class="w-3.5 h-3.5" />
                   </button>
                   <button
                     type="button"
-                    class="p-1.5 text-sage-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    class="p-1.5 text-sage-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-150 cursor-pointer"
                     title="Elimina"
                     @click="confirmDelete(invoice)"
                   >
-                    <Trash2 class="w-4 h-4" />
+                    <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </td>
@@ -376,3 +429,19 @@ async function handleDelete() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.invoice-row {
+  animation: row-in 0.28s ease both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateX(-5px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invoice-row { animation: none; }
+}
+</style>
