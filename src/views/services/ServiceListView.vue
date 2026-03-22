@@ -37,12 +37,12 @@ const stats = computed(() => {
 })
 
 const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg, #5d8062, #48654c)',
-  'linear-gradient(135deg, #0c8aeb, #0153a2)',
-  'linear-gradient(135deg, #b88e67, #8a5f42)',
-  'linear-gradient(135deg, #7a9b7e, #5d8062)',
-  'linear-gradient(135deg, #d4a017, #a16207)',
-  'linear-gradient(135deg, #36a5fa, #0153a2)',
+  'linear-gradient(135deg, #059669, #047857)',
+  'linear-gradient(135deg, #4f46e5, #4338ca)',
+  'linear-gradient(135deg, #78716c, #57534e)',
+  'linear-gradient(135deg, #10b981, #059669)',
+  'linear-gradient(135deg, #d97706, #b45309)',
+  'linear-gradient(135deg, #6366f1, #4f46e5)',
 ]
 
 function avatarGradient(id: number): string {
@@ -126,7 +126,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
         <button
           type="button"
           class="group relative overflow-hidden text-white font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 cursor-pointer focus:outline-none"
-          style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.3);"
+          style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
           @click="openCreate"
         >
           <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
@@ -138,7 +138,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
       <!-- Stats strip -->
       <div class="grid grid-cols-3 gap-4 mb-5 animate-in">
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
             <Briefcase class="w-4 h-4 text-white" />
           </div>
           <div>
@@ -147,7 +147,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
           </div>
         </div>
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
             <Tag class="w-4 h-4 text-white" />
           </div>
           <div>
@@ -156,7 +156,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
           </div>
         </div>
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #b88e67, #8a5f42)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d97706, #b45309)">
             <TrendingUp class="w-4 h-4 text-white" />
           </div>
           <div>
@@ -293,12 +293,12 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
                 <span
                   class="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full"
                   :class="service.is_active
-                    ? 'bg-sage-50 text-sage-600 border border-sage-100'
-                    : 'bg-warm-50 text-warm-500 border border-warm-100'"
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                    : 'bg-warm-100 text-warm-600 border border-warm-200'"
                 >
                   <span
                     class="w-1.5 h-1.5 rounded-full shrink-0"
-                    :class="service.is_active ? 'bg-sage-500' : 'bg-warm-400'"
+                    :class="service.is_active ? 'bg-emerald-500' : 'bg-warm-400'"
                   />
                   {{ service.is_active ? 'Attiva' : 'Inattiva' }}
                 </span>
@@ -340,7 +340,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
               <!-- Modal header -->
               <div class="flex items-center justify-between mb-5">
                 <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+                  <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
                     <Briefcase class="w-4 h-4 text-white" />
                   </div>
                   <h3 class="text-base font-semibold text-sage-900">
@@ -417,7 +417,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
                 <label class="flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border border-sage-100/60 hover:bg-sage-50/60 transition-colors">
                   <div
                     class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0"
-                    :class="form.is_active ? 'bg-sage-500' : 'bg-sage-200'"
+                    :class="form.is_active ? 'bg-emerald-500' : 'bg-sage-200'"
                   >
                     <div
                       class="absolute top-[3px] w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform duration-200"
@@ -431,7 +431,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
                   </div>
                   <span
                     v-if="form.is_active"
-                    class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-50 text-sage-600 border border-sage-100 shrink-0"
+                    class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0"
                   >
                     Attiva
                   </span>
@@ -456,7 +456,7 @@ onMounted(() => servicesStore.fetchServices(activeOnly.value))
                     type="submit"
                     :disabled="saving"
                     class="group relative overflow-hidden text-white font-semibold px-5 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 disabled:opacity-60 cursor-pointer focus:outline-none"
-                    style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.25);"
+                    style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
                   >
                     <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
                     <Check class="w-4 h-4 relative z-10" />

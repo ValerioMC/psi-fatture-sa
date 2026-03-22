@@ -120,7 +120,7 @@ async function onSubmit() {
         <!-- Tipo cliente: segment control -->
         <div class="glass-card rounded-2xl p-5 animate-in">
           <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
               <User class="w-3.5 h-3.5 text-white" />
             </div>
             <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Tipo cliente</h2>
@@ -155,7 +155,7 @@ async function onSubmit() {
         <!-- Dati anagrafici -->
         <div class="glass-card rounded-2xl p-5 animate-in-d1">
           <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
               <User class="w-3.5 h-3.5 text-white" />
             </div>
             <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Dati anagrafici</h2>
@@ -233,7 +233,7 @@ async function onSubmit() {
         <!-- Indirizzo -->
         <div class="glass-card rounded-2xl p-5 animate-in-d2">
           <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #b88e67, #8a5f42)">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #78716c, #57534e)">
               <MapPin class="w-3.5 h-3.5 text-white" />
             </div>
             <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Indirizzo</h2>
@@ -288,7 +288,7 @@ async function onSubmit() {
         <!-- Contatti -->
         <div class="glass-card rounded-2xl p-5 animate-in-d3">
           <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d4a017, #a16207)">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d97706, #b45309)">
               <Phone class="w-3.5 h-3.5 text-white" />
             </div>
             <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Contatti</h2>
@@ -375,7 +375,7 @@ async function onSubmit() {
               type="submit"
               :disabled="saving"
               class="group relative overflow-hidden text-white font-semibold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 disabled:opacity-60 cursor-pointer focus:outline-none"
-              style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.3);"
+              style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
             >
               <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
               <Check class="w-4 h-4 relative z-10" />

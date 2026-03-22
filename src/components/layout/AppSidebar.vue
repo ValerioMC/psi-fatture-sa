@@ -29,13 +29,13 @@ const isActive = (path: string) =>
 <template>
   <aside
     class="w-60 flex flex-col h-full shrink-0 glass-card"
-    style="border-right: 1px solid rgba(163,186,163,0.25); border-radius: 0;"
+    style="border-right: 1px solid rgba(203,213,225,0.4); border-radius: 0;"
   >
     <!-- ── Logo ── -->
     <div class="px-6 py-6 flex items-center gap-3">
       <div
         class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 12px rgba(93,128,98,0.35);"
+        style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 14px rgba(67, 56, 202, 0.35);"
       >
         <FileText class="w-4.5 h-4.5 text-white" />
       </div>
@@ -48,7 +48,7 @@ const isActive = (path: string) =>
     </div>
 
     <!-- ── Divider ── -->
-    <div class="mx-5 h-px" style="background: linear-gradient(to right, transparent, rgba(93,128,98,0.2), transparent)" />
+    <div class="mx-5 h-px" style="background: linear-gradient(to right, transparent, rgba(99,102,241,0.15), transparent)" />
 
     <!-- ── Navigation ── -->
     <nav class="flex-1 px-3 py-4 space-y-0.5">
@@ -71,7 +71,7 @@ const isActive = (path: string) =>
         <span
           v-if="isActive(item.to)"
           class="w-1.5 h-4 rounded-full shrink-0"
-          style="background: linear-gradient(to bottom, #5d8062, #0c8aeb)"
+          style="background: linear-gradient(to bottom, #1e1b4b, #4338ca)"
         />
       </RouterLink>
     </nav>
@@ -82,7 +82,7 @@ const isActive = (path: string) =>
       <RouterLink
         to="/invoices/new"
         class="group w-full text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 focus:outline-none relative overflow-hidden"
-        style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.3);"
+        style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
       >
         <!-- Shine effect -->
         <div
@@ -94,7 +94,7 @@ const isActive = (path: string) =>
       </RouterLink>
 
       <!-- Divider -->
-      <div class="h-px mx-1" style="background: rgba(93,128,98,0.15)" />
+      <div class="h-px mx-1" style="background: rgba(99,102,241,0.12)" />
 
       <!-- Settings -->
       <RouterLink
@@ -112,7 +112,7 @@ const isActive = (path: string) =>
         <span
           v-if="isActive('/settings')"
           class="w-1.5 h-4 rounded-full shrink-0"
-          style="background: linear-gradient(to bottom, #5d8062, #0c8aeb)"
+          style="background: linear-gradient(to bottom, #1e1b4b, #4338ca)"
         />
       </RouterLink>
     </div>

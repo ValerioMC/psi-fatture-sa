@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 
 const INVOICE_CLASSES: Record<string, string> = {
-  draft:     'bg-warm-100 text-warm-700',
+  draft:     'bg-warm-100 text-warm-600',
   issued:    'bg-ocean-100 text-ocean-700',
-  paid:      'bg-sage-100 text-sage-700',
+  paid:      'bg-emerald-100 text-emerald-700',
   overdue:   'bg-red-100 text-red-700',
   cancelled: 'bg-warm-100/60 text-warm-500',
 }
@@ -19,7 +19,7 @@ const INVOICE_LABELS: Record<string, string> = {
 
 const APPOINTMENT_CLASSES: Record<string, string> = {
   scheduled: 'bg-ocean-100 text-ocean-700',
-  completed: 'bg-sage-100 text-sage-700',
+  completed: 'bg-emerald-100 text-emerald-700',
   cancelled: 'bg-warm-100/60 text-warm-500',
 }
 

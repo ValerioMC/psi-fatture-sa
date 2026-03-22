@@ -6,7 +6,7 @@ import AppSidebar from './AppSidebar.vue'
 <template>
   <div
     class="flex h-screen overflow-hidden"
-    style="background: linear-gradient(135deg, #f6f8f6 0%, #e8dfd3 100%)"
+    style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)"
   >
     <AppSidebar />
     <main class="flex-1 overflow-y-auto">

@@ -149,7 +149,7 @@ function onModalSaved() {
 function statusDotClass(status: string): string {
   const map: Record<string, string> = {
     scheduled: 'bg-ocean-400 border-ocean-300',
-    completed: 'bg-sage-500 border-sage-300',
+    completed: 'bg-emerald-500 border-emerald-300',
     cancelled: 'bg-warm-300 border-warm-200',
   }
   return map[status] ?? 'bg-sage-300'
@@ -158,7 +158,7 @@ function statusDotClass(status: string): string {
 function statusPillClass(status: string): string {
   const map: Record<string, string> = {
     scheduled: 'bg-ocean-50 text-ocean-700 border border-ocean-100',
-    completed: 'bg-sage-50 text-sage-700 border border-sage-100',
+    completed: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
     cancelled: 'bg-warm-50 text-warm-500 border border-warm-100 line-through',
   }
   return map[status] ?? 'bg-sage-50 text-sage-500'
@@ -167,7 +167,7 @@ function statusPillClass(status: string): string {
 function statusAccentClass(status: string): string {
   const map: Record<string, string> = {
     scheduled: 'bg-ocean-400',
-    completed: 'bg-sage-500',
+    completed: 'bg-emerald-500',
     cancelled: 'bg-warm-300',
   }
   return map[status] ?? 'bg-sage-300'
@@ -176,7 +176,7 @@ function statusAccentClass(status: string): string {
 function statusBorderClass(status: string): string {
   const map: Record<string, string> = {
     scheduled: 'border-ocean-100',
-    completed: 'border-sage-100',
+    completed: 'border-emerald-100',
     cancelled: 'border-warm-100',
   }
   return map[status] ?? 'border-sage-100'
@@ -205,7 +205,7 @@ function calendarCellAppts(date: string): Appointment[] {
 function cellDotColor(status: string): string {
   const map: Record<string, string> = {
     scheduled: 'bg-ocean-400',
-    completed: 'bg-sage-500',
+    completed: 'bg-emerald-500',
     cancelled: 'bg-warm-300',
   }
   return map[status] ?? 'bg-sage-300'
@@ -229,18 +229,20 @@ onMounted(async () => {
       <PageHeader title="Agenda" subtitle="Gestisci i tuoi appuntamenti.">
         <button
           type="button"
-          class="relative overflow-hidden bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-sage-200 cursor-pointer"
+          class="group relative overflow-hidden text-white font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 cursor-pointer focus:outline-none"
+          style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
           @click="openCreate(selectedDate)"
         >
-          <Plus class="w-4 h-4" />
-          Nuovo Appuntamento
+          <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
+          <Plus class="w-4 h-4 relative z-10" />
+          <span class="relative z-10">Nuovo Appuntamento</span>
         </button>
       </PageHeader>
 
       <!-- Stats strip -->
       <div class="grid grid-cols-3 gap-4 mb-6 animate-in">
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
             <CalendarDays class="w-4 h-4 text-white" />
           </div>
           <div>
@@ -249,7 +251,7 @@ onMounted(async () => {
           </div>
         </div>
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #6366f1, #4f46e5)">
             <Clock class="w-4 h-4 text-white" />
           </div>
           <div>
@@ -258,7 +260,7 @@ onMounted(async () => {
           </div>
         </div>
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #b88e67, #8a5f42)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
             <CheckCircle2 class="w-4 h-4 text-white" />
           </div>
           <div>

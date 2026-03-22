@@ -89,7 +89,7 @@ async function handlePrint(): Promise<void> {
     <!-- ── Toolbar (screen only) ── -->
     <div class="print:hidden fixed top-5 right-5 z-50 flex items-center gap-2">
       <button
-        type="button"
+        type="button"gh
         class="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-slate-200 text-slate-600 hover:text-slate-900 px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all"
         @click="router.push(`/invoices/${invoiceId}`)"
       >
@@ -100,7 +100,7 @@ async function handlePrint(): Promise<void> {
         v-if="!loading && invoice"
         type="button"
         class="group relative overflow-hidden flex items-center gap-2 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-sm transition-all"
-        style="background: linear-gradient(135deg, #3d6142, #0c8aeb);"
+        style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
         @click="handlePrint"
       >
         <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
@@ -350,7 +350,7 @@ async function handlePrint(): Promise<void> {
 /* ── Root: screen background ── */
 .print-root {
   min-height: 100vh;
-  background: linear-gradient(135deg, #eef2ee 0%, #e4dbd2 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   padding-top: 60px;
   padding-bottom: 80px;
 }
@@ -365,14 +365,14 @@ async function handlePrint(): Promise<void> {
   overflow: hidden;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-size: 9pt;
-  color: #1e2d22;
+  color: #0f172a;
   line-height: 1.55;
 }
 
 /* ── Gradient top bar ── */
 .header-band {
   height: 6px;
-  background: linear-gradient(90deg, #3d6142 0%, #5d8062 45%, #2b7ab3 100%);
+  background: #0f172a;
 }
 
 /* ── Body padding ── */
@@ -398,7 +398,7 @@ async function handlePrint(): Promise<void> {
   font-family: Georgia, 'Times New Roman', 'Book Antiqua', serif;
   font-size: 19pt;
   font-weight: 700;
-  color: #1a2b1d;
+  color: #0f172a;
   letter-spacing: -0.5px;
   line-height: 1.15;
   margin-bottom: 4px;
@@ -406,7 +406,7 @@ async function handlePrint(): Promise<void> {
 
 .company-profession {
   font-size: 7.5pt;
-  color: #5d8062;
+  color: #4f46e5;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.4px;
@@ -415,16 +415,16 @@ async function handlePrint(): Promise<void> {
 
 .albo-info {
   font-size: 7.5pt;
-  color: #6b8f70;
+  color: #64748b;
   margin-bottom: 2px;
   line-height: 1.45;
 }
-.albo-info strong { color: #3d6142; font-weight: 600; }
+.albo-info strong { color: #4338ca; font-weight: 600; }
 
 .company-details {
   margin-top: 8px;
   font-size: 7.5pt;
-  color: #7a9580;
+  color: #64748b;
   line-height: 1.7;
 }
 
@@ -434,7 +434,7 @@ async function handlePrint(): Promise<void> {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: #5d8062;
+  color: #4f46e5;
   margin-bottom: 4px;
 }
 
@@ -442,7 +442,7 @@ async function handlePrint(): Promise<void> {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 30pt;
   font-weight: 700;
-  color: #1a2b1d;
+  color: #0f172a;
   letter-spacing: -1px;
   line-height: 1;
   margin-bottom: 10px;
@@ -451,12 +451,12 @@ async function handlePrint(): Promise<void> {
 .invoice-prefix {
   font-size: 15pt;
   font-weight: 400;
-  color: #9cb8a0;
+  color: #94a3b8;
   margin-right: 2px;
 }
 
 .invoice-meta {
-  border-top: 1px solid #e0ebe1;
+  border-top: 1px solid #e2e8f0;
   padding-top: 8px;
 }
 
@@ -473,19 +473,19 @@ async function handlePrint(): Promise<void> {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #9cb8a0;
+  color: #94a3b8;
 }
 
 .meta-value {
   font-size: 8pt;
   font-weight: 600;
-  color: #1a2b1d;
+  color: #0f172a;
 }
 
 /* ── Divider ── */
 .doc-divider {
   border: none;
-  border-top: 1px solid #e0ebe1;
+  border-top: 1px solid #e2e8f0;
   margin: 0 0 20px;
 }
 
@@ -495,7 +495,7 @@ async function handlePrint(): Promise<void> {
 .info-card {
   display: flex;
   margin-bottom: 20px;
-  border: 1px solid #dde8dd;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -504,8 +504,8 @@ async function handlePrint(): Promise<void> {
 
 .info-col-left {
   flex: 0 0 48%;
-  background: #f7faf7;
-  border-right: 1px solid #dde8dd;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
 }
 
 .info-col-right { flex: 1; background: #ffffff; }
@@ -514,7 +514,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #5d8062;
+  color: #4f46e5;
   font-weight: 700;
   margin-bottom: 8px;
 }
@@ -523,7 +523,7 @@ async function handlePrint(): Promise<void> {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 13pt;
   font-weight: 700;
-  color: #1a2b1d;
+  color: #0f172a;
   margin-bottom: 5px;
   letter-spacing: -0.2px;
   line-height: 1.2;
@@ -531,7 +531,7 @@ async function handlePrint(): Promise<void> {
 
 .client-details {
   font-size: 7.5pt;
-  color: #6b8f70;
+  color: #64748b;
   line-height: 1.65;
 }
 
@@ -539,20 +539,20 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #5d8062;
+  color: #4f46e5;
   text-transform: uppercase;
   margin-right: 3px;
 }
 
 .payment-tag {
   display: inline-block;
-  background: #f0f7f1;
-  border: 1px solid #ccdece;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
   border-radius: 4px;
   padding: 3px 10px;
   font-size: 8pt;
   font-weight: 600;
-  color: #3d6142;
+  color: #4338ca;
   margin-bottom: 9px;
 }
 
@@ -562,7 +562,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  color: #9cb8a0;
+  color: #94a3b8;
   font-weight: 600;
   display: block;
   margin-bottom: 1px;
@@ -571,14 +571,14 @@ async function handlePrint(): Promise<void> {
 .pay-value {
   font-size: 8pt;
   font-weight: 600;
-  color: #1a2b1d;
+  color: #0f172a;
 }
 
 .iban-value {
   font-family: 'Courier New', 'Courier', monospace;
   font-size: 7.5pt;
   letter-spacing: 0.8px;
-  color: #1a2b1d;
+  color: #0f172a;
   font-weight: 600;
   word-break: break-all;
 }
@@ -590,13 +590,13 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #5d8062;
+  color: #4f46e5;
   font-weight: 700;
   margin-bottom: 7px;
 }
 
 .items-table-wrap {
-  border: 1px solid #dde8dd;
+  border: 1px solid #e2e8f0;
   border-radius: 7px;
   overflow: hidden;
 }
@@ -607,8 +607,8 @@ async function handlePrint(): Promise<void> {
 }
 
 .items-table thead tr {
-  background: #f0f5f0;
-  border-bottom: 1.5px solid #d0dfd0;
+  background: #f1f5f9;
+  border-bottom: 1.5px solid #e2e8f0;
 }
 
 .items-table thead th {
@@ -617,7 +617,7 @@ async function handlePrint(): Promise<void> {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #3d6142;
+  color: #4338ca;
   border: none;
 }
 
@@ -630,28 +630,28 @@ async function handlePrint(): Promise<void> {
   padding: 9px 12px;
   font-size: 8.5pt;
   border: none;
-  border-bottom: 1px solid #f0f5f0;
+  border-bottom: 1px solid #f1f5f9;
   vertical-align: top;
 }
 .items-table tbody td:first-child { padding-left: 15px; }
 .items-table tbody td:last-child  { padding-right: 15px; }
 .items-table tbody tr:last-child td { border-bottom: none; }
-.tr-alt { background: #fafcfa; }
+.tr-alt { background: #f8fafc; }
 
-.td-desc      { font-weight: 500; color: #1a2b1d; }
+.td-desc      { font-weight: 500; color: #0f172a; }
 .td-center    { text-align: center; }
 .td-right     { text-align: right; }
-.td-secondary { color: #5e7862; font-size: 8pt; }
-.td-amount    { font-weight: 700; color: #1a2b1d; text-align: right; }
+.td-secondary { color: #64748b; font-size: 8pt; }
+.td-amount    { font-weight: 700; color: #0f172a; text-align: right; }
 
 .vat-exempt {
   display: inline-block;
-  background: #f0f5f0;
+  background: #f1f5f9;
   border-radius: 3px;
   padding: 1px 5px;
   font-size: 7pt;
   font-weight: 600;
-  color: #5d8062;
+  color: #4f46e5;
 }
 
 /* ══════════════════════════════
@@ -665,7 +665,7 @@ async function handlePrint(): Promise<void> {
 
 .totals-table-wrap {
   width: 295px;
-  border: 1px solid #dde8dd;
+  border: 1px solid #e2e8f0;
   border-radius: 7px;
   overflow: hidden;
 }
@@ -679,22 +679,22 @@ async function handlePrint(): Promise<void> {
   padding: 7px 16px;
   font-size: 8.5pt;
   border: none;
-  border-bottom: 1px solid #f0f5f0;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.totals-label { color: #7a9580; font-weight: 400; }
-.totals-value { text-align: right; font-weight: 600; color: #1a2b1d; }
+.totals-label { color: #64748b; font-weight: 400; }
+.totals-value { text-align: right; font-weight: 600; color: #0f172a; }
 
 .totals-deduct .totals-label { color: #c53030; }
 .totals-deduct .totals-value { color: #c53030; }
 
-.totals-separator td { padding: 0; border-bottom: 2px solid #dde8dd; }
+.totals-separator td { padding: 0; border-bottom: 2px solid #e2e8f0; }
 
-.totals-grand { background: #1a2b1d !important; }
+.totals-grand { background: #0f172a !important; }
 .totals-grand td { border-bottom: none !important; }
 .totals-grand-label {
   padding: 12px 16px !important;
-  color: #c8deca;
+  color: #cbd5e1;
   font-size: 8pt;
   font-weight: 600;
 }
@@ -715,8 +715,8 @@ async function handlePrint(): Promise<void> {
 
 /* Legal notes */
 .legal-notes {
-  background: #fffbf0;
-  border: 1px solid #f0d890;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
   border-radius: 6px;
   padding: 11px 15px;
   margin-bottom: 10px;
@@ -726,14 +726,14 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  color: #9a7210;
+  color: #b45309;
   font-weight: 700;
   margin-bottom: 6px;
 }
 
 .legal-notes p {
   font-size: 7pt;
-  color: #6b4f0a;
+  color: #78350f;
   margin: 3px 0;
   line-height: 1.55;
 }
@@ -751,14 +751,14 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #888;
+  color: #94a3b8;
   font-weight: 700;
   margin-bottom: 7px;
 }
 
 .sts-box p {
   font-size: 7.5pt;
-  color: #333;
+  color: #334155;
   margin: 0;
   line-height: 1.65;
 }
@@ -771,14 +771,14 @@ async function handlePrint(): Promise<void> {
 
 .sts-selected {
   font-weight: 700;
-  color: #1a2b1d;
+  color: #0f172a;
 }
 
 .sts-checkbox {
   display: inline-block;
   width: 11px;
   height: 11px;
-  border: 1.5px solid #7a7a7a;
+  border: 1.5px solid #94a3b8;
   margin-right: 4px;
   vertical-align: middle;
   border-radius: 2px;
@@ -786,13 +786,13 @@ async function handlePrint(): Promise<void> {
   line-height: 10px;
   font-size: 8pt;
   font-weight: 700;
-  color: #3d6142;
+  color: #4338ca;
 }
 
 /* Invoice notes */
 .user-notes-box {
-  background: #f7faf7;
-  border: 1px solid #dde8dd;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
   padding: 10px 15px;
   margin-bottom: 10px;
@@ -802,14 +802,14 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #5d8062;
+  color: #4f46e5;
   font-weight: 700;
   margin-bottom: 5px;
 }
 
 .user-notes-box p {
   font-size: 8pt;
-  color: #1a2b1d;
+  color: #0f172a;
   margin: 0;
   line-height: 1.65;
 }
@@ -818,15 +818,15 @@ async function handlePrint(): Promise<void> {
 .bottom-bar {
   margin-top: 20px;
   padding-top: 12px;
-  border-top: 1px solid #e0ebe1;
+  border-top: 1px solid #e2e8f0;
   text-align: center;
   font-size: 7pt;
-  color: #9cb8a0;
+  color: #94a3b8;
   line-height: 1.7;
 }
 
-.bar-name { color: #3d6142; font-weight: 600; }
-.bar-dot  { color: #c8deca; margin: 0 4px; }
+.bar-name { color: #4338ca; font-weight: 600; }
+.bar-dot  { color: #cbd5e1; margin: 0 4px; }
 
 /* ══════════════════════════════
    PRINT MEDIA QUERY

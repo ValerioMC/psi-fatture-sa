@@ -211,7 +211,7 @@ async function onSubmit() {
         <!-- Dati fattura -->
         <div class="glass-card rounded-2xl p-5 animate-in">
           <div class="flex items-center gap-2.5 mb-5">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
               <FileText class="w-3.5 h-3.5 text-white" />
             </div>
             <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Dati fattura</h2>
@@ -341,7 +341,7 @@ async function onSubmit() {
         <div class="glass-card rounded-2xl p-5 animate-in-d1">
           <div class="flex items-center justify-between mb-5">
             <div class="flex items-center gap-2.5">
-              <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
                 <List class="w-3.5 h-3.5 text-white" />
               </div>
               <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Righe fattura</h2>
@@ -492,10 +492,12 @@ async function onSubmit() {
             <button
               type="submit"
               :disabled="saving"
-              class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 flex items-center gap-2 hover:shadow-lg hover:shadow-sage-200 cursor-pointer"
+              class="group relative overflow-hidden text-white font-semibold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 disabled:opacity-60 cursor-pointer focus:outline-none"
+              style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
             >
-              <Check class="w-4 h-4" />
-              {{ saving ? 'Salvataggio…' : isEdit ? 'Aggiorna fattura' : 'Crea fattura' }}
+              <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
+              <Check class="w-4 h-4 relative z-10" />
+              <span class="relative z-10">{{ saving ? 'Salvataggio…' : isEdit ? 'Aggiorna fattura' : 'Crea fattura' }}</span>
             </button>
           </div>
         </div>

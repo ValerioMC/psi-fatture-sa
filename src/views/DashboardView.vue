@@ -63,16 +63,16 @@ function isCurrentMonth(month: number): boolean {
 }
 
 function barGradient(month: MonthlyRevenue): string {
-  if (month.revenue === 0) return 'rgba(163,186,163,0.15)'
+  if (month.revenue === 0) return 'rgba(203,213,225,0.3)'
   const hovered = hoveredMonth.value === month.month
   if (isCurrentMonth(month.month)) {
     return hovered
-      ? 'linear-gradient(to top, #0153a2, #0c8aeb, #7cc2fd)'
-      : 'linear-gradient(to top, #0153a2, #0c8aeb, #36a5fa)'
+      ? 'linear-gradient(to top, #312e81, #4338ca, #818cf8)'
+      : 'linear-gradient(to top, #3730a3, #4f46e5, #6366f1)'
   }
   return hovered
-    ? 'linear-gradient(to top, #3a513e, #5d8062, #a1baa3)'
-    : 'linear-gradient(to top, #3a513e, #5d8062, #7a9b7e)'
+    ? 'linear-gradient(to top, #065f46, #059669, #34d399)'
+    : 'linear-gradient(to top, #047857, #059669, #10b981)'
 }
 
 const peakMonth = computed((): MonthlyRevenue | null => {
@@ -111,11 +111,11 @@ const issuedUnpaid = computed(() => {
 })
 
 const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg, #5d8062, #48654c)',
-  'linear-gradient(135deg, #0c8aeb, #0153a2)',
-  'linear-gradient(135deg, #b88e67, #8a5f42)',
-  'linear-gradient(135deg, #7a9b7e, #5d8062)',
-  'linear-gradient(135deg, #d4a017, #a16207)',
+  'linear-gradient(135deg, #059669, #047857)',
+  'linear-gradient(135deg, #4f46e5, #4338ca)',
+  'linear-gradient(135deg, #78716c, #57534e)',
+  'linear-gradient(135deg, #10b981, #059669)',
+  'linear-gradient(135deg, #d97706, #b45309)',
 ]
 
 function clientInitials(name: string): string {
@@ -179,7 +179,8 @@ onMounted(loadDashboard)
           <p class="text-xs text-red-500 font-mono break-all">{{ error }}</p>
           <button
             type="button"
-            class="mt-4 bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
+            class="mt-4 text-white font-medium px-4 py-1.5 rounded-xl text-sm cursor-pointer transition-all"
+            style="background: linear-gradient(135deg, #1e1b4b, #4338ca);"
             @click="loadDashboard"
           >
             Riprova
@@ -194,11 +195,11 @@ onMounted(loadDashboard)
 
           <!-- Fatturato totale -->
           <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d1 cursor-default">
-            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #5d8062, #48654c)" />
+            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #059669, #047857)" />
             <div class="p-5">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Fatturato</span>
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
                   <TrendingUp class="w-3.5 h-3.5 text-white" />
                 </div>
               </div>
@@ -209,11 +210,11 @@ onMounted(loadDashboard)
 
           <!-- Incassato + collection rate bar -->
           <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d2 cursor-default">
-            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #0c8aeb, #0153a2)" />
+            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #4f46e5, #4338ca)" />
             <div class="p-5">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Incassato</span>
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
                   <CheckCircle2 class="w-3.5 h-3.5 text-white" />
                 </div>
               </div>
@@ -223,13 +224,13 @@ onMounted(loadDashboard)
                   <span class="text-[11px] text-sage-400">{{ data.paid_invoices }} pagate</span>
                   <span
                     class="text-[11px] font-bold tabular-nums"
-                    :class="collectionRate >= 75 ? 'text-sage-600' : 'text-amber-500'"
+                    :class="collectionRate >= 75 ? 'text-emerald-600' : 'text-amber-500'"
                   >{{ collectionRate }}%</span>
                 </div>
                 <div class="h-1 rounded-full bg-sage-100 overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-700"
-                    :style="{ width: collectionRate + '%', background: 'linear-gradient(90deg, #0c8aeb, #0153a2)' }"
+                    :style="{ width: collectionRate + '%', background: 'linear-gradient(90deg, #059669, #047857)' }"
                   />
                 </div>
               </div>
@@ -238,11 +239,11 @@ onMounted(loadDashboard)
 
           <!-- Da incassare -->
           <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d3 cursor-default">
-            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #d4a017, #a16207)" />
+            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #d97706, #b45309)" />
             <div class="p-5">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Da incassare</span>
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d4a017, #a16207)">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d97706, #b45309)">
                   <Clock class="w-3.5 h-3.5 text-white" />
                 </div>
               </div>
@@ -258,18 +259,18 @@ onMounted(loadDashboard)
 
           <!-- N. Fatture con status dots -->
           <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d4 cursor-default">
-            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #b88e67, #8a5f42)" />
+            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #78716c, #57534e)" />
             <div class="p-5">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Fatture</span>
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #b88e67, #8a5f42)">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #78716c, #57534e)">
                   <FileText class="w-3.5 h-3.5 text-white" />
                 </div>
               </div>
               <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ data.total_invoices }}</p>
               <div class="flex items-center gap-3 mt-1.5">
-                <span class="flex items-center gap-1 text-[11px] text-sage-500">
-                  <span class="w-1.5 h-1.5 rounded-full bg-sage-500 inline-block shrink-0" />
+                <span class="flex items-center gap-1 text-[11px] text-emerald-600">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
                   {{ data.paid_invoices }} pag.
                 </span>
                 <span v-if="data.draft_invoices" class="flex items-center gap-1 text-[11px] text-warm-500">
@@ -358,7 +359,7 @@ onMounted(loadDashboard)
                     </span>
                     <span
                       class="absolute left-1/2 -translate-x-1/2 top-full block"
-                      style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid rgba(40,55,43,0.95)"
+                      style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid rgba(15,23,42,0.95)"
                     />
                   </div>
 
@@ -409,11 +410,11 @@ onMounted(loadDashboard)
                   <div class="h-1.5 rounded-full overflow-hidden flex bg-sage-50">
                     <div
                       class="rounded-l-full transition-all duration-700"
-                      :style="{ width: netPercentage + '%', background: 'linear-gradient(90deg, #48654c, #5d8062)' }"
+                      :style="{ width: netPercentage + '%', background: 'linear-gradient(90deg, #047857, #059669)' }"
                     />
                     <div
                       class="rounded-r-full transition-all duration-700"
-                      :style="{ width: (100 - netPercentage) + '%', background: 'linear-gradient(90deg, #d4a017, #a16207)' }"
+                      :style="{ width: (100 - netPercentage) + '%', background: 'linear-gradient(90deg, #d97706, #b45309)' }"
                     />
                   </div>
                   <div class="flex justify-between mt-1">
@@ -453,7 +454,7 @@ onMounted(loadDashboard)
               </div>
 
               <!-- Net result gradient box -->
-              <div class="mt-3 rounded-xl px-4 py-3" style="background: linear-gradient(135deg, #3a513e, #5d8062)">
+              <div class="mt-3 rounded-xl px-4 py-3" style="background: linear-gradient(135deg, #065f46, #059669)">
                 <p class="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">Netto stimato</p>
                 <p class="text-xl font-bold text-white tracking-tight tabular-nums">{{ formatCurrency(taxEstimate.netIncome) }}</p>
               </div>

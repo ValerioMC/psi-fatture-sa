@@ -306,9 +306,11 @@ async function onSubmit() {
         <button
           type="submit"
           :disabled="saving"
-          class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-6 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60"
+          class="group relative overflow-hidden text-white font-semibold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 disabled:opacity-60 cursor-pointer focus:outline-none"
+          style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
         >
-          {{ saving ? 'Salvataggio...' : 'Salva impostazioni' }}
+          <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
+          <span class="relative z-10">{{ saving ? 'Salvataggio...' : 'Salva impostazioni' }}</span>
         </button>
       </div>
     </form>

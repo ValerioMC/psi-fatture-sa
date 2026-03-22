@@ -195,7 +195,7 @@ async function generate(): Promise<void> {
             type="button"
             :disabled="loading"
             class="ml-auto group relative overflow-hidden text-white font-semibold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all disabled:opacity-60"
-            style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.3);"
+            style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
             @click="loadPreview"
           >
             <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
@@ -307,7 +307,7 @@ async function generate(): Promise<void> {
               type="button"
               :disabled="generating || selectedClients.size === 0"
               class="group relative overflow-hidden text-white font-semibold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all disabled:opacity-60"
-              style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.3);"
+              style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
               @click="generate"
             >
               <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />

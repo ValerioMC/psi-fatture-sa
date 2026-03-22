@@ -27,10 +27,10 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string; gradient: string }> = {
   draft:     { label: 'Bozza',     bg: 'bg-warm-100/80',   text: 'text-warm-600',  dot: 'bg-warm-400',  gradient: 'linear-gradient(90deg, #9ca3af, #6b7280)' },
-  issued:    { label: 'Emessa',    bg: 'bg-ocean-100/80',  text: 'text-ocean-700', dot: 'bg-ocean-500', gradient: 'linear-gradient(90deg, #0c8aeb, #0153a2)' },
-  paid:      { label: 'Pagata',    bg: 'bg-sage-100/80',   text: 'text-sage-700',  dot: 'bg-sage-500',  gradient: 'linear-gradient(90deg, #5d8062, #48654c)' },
+  issued:    { label: 'Emessa',    bg: 'bg-ocean-100/80',  text: 'text-ocean-700', dot: 'bg-ocean-500', gradient: 'linear-gradient(90deg, #4f46e5, #4338ca)' },
+  paid:      { label: 'Pagata',    bg: 'bg-emerald-100/80', text: 'text-emerald-700', dot: 'bg-emerald-500', gradient: 'linear-gradient(90deg, #059669, #047857)' },
   overdue:   { label: 'Scaduta',   bg: 'bg-red-100/80',    text: 'text-red-700',   dot: 'bg-red-500',   gradient: 'linear-gradient(90deg, #ef4444, #b91c1c)' },
-  cancelled: { label: 'Annullata', bg: 'bg-sage-50',       text: 'text-sage-400',  dot: 'bg-sage-300',  gradient: 'linear-gradient(90deg, #d1d5db, #9ca3af)' },
+  cancelled: { label: 'Annullata', bg: 'bg-warm-100/60',   text: 'text-warm-500',  dot: 'bg-warm-400',  gradient: 'linear-gradient(90deg, #d6d3d1, #a8a29e)' },
 }
 
 const statusConfig = computed(() =>
@@ -112,11 +112,13 @@ function canMarkAsPaid(): boolean {
             v-if="canMarkAsPaid()"
             type="button"
             :disabled="markingPaid"
-            class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-sage-200 disabled:opacity-60 cursor-pointer"
+            class="group relative overflow-hidden text-white font-medium px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 disabled:opacity-60 cursor-pointer focus:outline-none"
+            style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
             @click="markAsPaid"
           >
-            <CheckCircle class="w-4 h-4" />
-            {{ markingPaid ? 'Aggiornamento…' : 'Segna come Pagata' }}
+            <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
+            <CheckCircle class="w-4 h-4 relative z-10" />
+            <span class="relative z-10">{{ markingPaid ? 'Aggiornamento…' : 'Segna come Pagata' }}</span>
           </button>
           <button
             type="button"
@@ -183,7 +185,7 @@ function canMarkAsPaid(): boolean {
                 <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-2">Paziente</p>
                 <div class="flex items-center gap-2.5 justify-end">
                   <p class="text-base font-semibold text-sage-900 leading-tight">{{ invoice.client_name }}</p>
-                  <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+                  <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
                     <User class="w-4 h-4 text-white" />
                   </div>
                 </div>

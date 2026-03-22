@@ -55,13 +55,13 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen" style="background: linear-gradient(135deg, #f6f8f6 0%, #e3ebe3 50%, #f0f7ff 100%)">
+  <div class="min-h-screen" style="background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)">
     <div class="flex items-start justify-center py-12 px-4">
       <div class="w-full max-w-2xl animate-in">
         <!-- Welcome header -->
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
-            style="background: linear-gradient(135deg, #5d8062, #0c8aeb)">
+            style="background: linear-gradient(135deg, #1e1b4b, #4338ca)">
             <FileText class="w-8 h-8 text-white" />
           </div>
           <h1 class="text-3xl font-bold heading-serif gradient-text">Benvenuto in PSI Fatture</h1>
@@ -284,9 +284,11 @@ async function onSubmit() {
             <button
               type="submit"
               :disabled="saving"
-              class="bg-gradient-to-r from-sage-600 to-ocean-500 text-white hover:from-sage-700 hover:to-ocean-600 px-6 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 shadow-lg"
+              class="group relative overflow-hidden text-white font-semibold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 disabled:opacity-60 cursor-pointer focus:outline-none"
+              style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
             >
-              {{ saving ? 'Salvataggio...' : 'Inizia a usare PSI Fatture →' }}
+              <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
+              <span class="relative z-10">{{ saving ? 'Salvataggio...' : 'Inizia a usare PSI Fatture →' }}</span>
             </button>
           </div>
         </form>

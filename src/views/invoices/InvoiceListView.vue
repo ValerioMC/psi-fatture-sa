@@ -156,7 +156,7 @@ function rowDelay(idx: number): number {
         <button
           type="button"
           class="group relative overflow-hidden text-white font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 cursor-pointer focus:outline-none"
-          style="background: linear-gradient(135deg, #5d8062, #0c8aeb); box-shadow: 0 4px 14px rgba(93,128,98,0.3);"
+          style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
           @click="router.push('/invoices/new')"
         >
           <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
@@ -168,7 +168,7 @@ function rowDelay(idx: number): number {
       <!-- Financial summary strip -->
       <div v-if="!invoicesStore.loading && invoicesStore.invoices.length > 0" class="grid grid-cols-3 gap-4 mb-5 animate-in">
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
             <TrendingUp class="w-4 h-4 text-white" />
           </div>
           <div class="min-w-0">
@@ -177,7 +177,7 @@ function rowDelay(idx: number): number {
           </div>
         </div>
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
             <Euro class="w-4 h-4 text-white" />
           </div>
           <div class="min-w-0">
@@ -186,7 +186,7 @@ function rowDelay(idx: number): number {
           </div>
         </div>
         <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d4a017, #a16207)">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d97706, #b45309)">
             <Clock class="w-4 h-4 text-white" />
           </div>
           <div class="min-w-0">
@@ -267,7 +267,7 @@ function rowDelay(idx: number): number {
             <button
               type="button"
               class="text-white font-medium px-4 py-1.5 rounded-xl text-sm transition-all duration-200 disabled:opacity-50 cursor-pointer"
-              style="background: linear-gradient(135deg, #5d8062, #0c8aeb);"
+              style="background: linear-gradient(135deg, #1e1b4b, #4338ca);"
               :disabled="bulkUpdating"
               @click="requestBulkUpdate"
             >
