@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { TrendingUp, Euro, Clock, FileText, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import {
+  TrendingUp, Euro, Clock, FileText,
+  ChevronLeft, ChevronRight,
+  Plus, Users, CalendarDays, ArrowRight,
+  CheckCircle2,
+} from 'lucide-vue-next'
 import { getDashboard } from '@/api'
 import type { DashboardData, MonthlyRevenue } from '@/types'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
@@ -12,15 +17,20 @@ import { estimateForfettarioTax, estimateOrdinarioTax } from '@/utils/tax'
 const router = useRouter()
 const configStore = useConfigStore()
 const currentYear  = new Date().getFullYear()
-const currentMonth = new Date().getMonth() + 1   // 1–12
+const currentMonth = new Date().getMonth() + 1
+const currentHour  = new Date().getHours()
 const selectedYear = ref(currentYear)
 const data         = ref<DashboardData | null>(null)
 const loading      = ref(false)
 const error        = ref<string | null>(null)
 const firstFiveYears = ref(false)
-
-/** Month currently hovered in the chart (1–12), null when none. */
 const hoveredMonth = ref<number | null>(null)
+
+const greeting = computed(() => {
+  if (currentHour < 12) return 'Buongiorno'
+  if (currentHour < 18) return 'Buon pomeriggio'
+  return 'Buonasera'
+})
 
 async function loadDashboard() {
   loading.value = true
@@ -52,7 +62,6 @@ function isCurrentMonth(month: number): boolean {
   return selectedYear.value === currentYear && month === currentMonth
 }
 
-/** Returns the gradient string for a bar based on its state. */
 function barGradient(month: MonthlyRevenue): string {
   if (month.revenue === 0) return 'rgba(163,186,163,0.15)'
   const hovered = hoveredMonth.value === month.month
@@ -77,7 +86,7 @@ const isForfettario = computed(() => configStore.config?.tax_regime === 'forfett
 
 const taxEstimate = computed(() => {
   if (!data.value || !configStore.config) return null
-  const revenue     = data.value.total_net_revenue
+  const revenue = data.value.total_net_revenue
   if (revenue <= 0) return null
   const { coefficient } = configStore.config
   if (isForfettario.value) {
@@ -91,6 +100,32 @@ const netPercentage = computed(() => {
   return Math.round((taxEstimate.value.netIncome / taxEstimate.value.annualRevenue) * 100)
 })
 
+const collectionRate = computed(() => {
+  if (!data.value || data.value.total_revenue === 0) return 0
+  return Math.round((data.value.paid_revenue / data.value.total_revenue) * 100)
+})
+
+const issuedUnpaid = computed(() => {
+  if (!data.value) return 0
+  return Math.max(0, data.value.total_invoices - data.value.paid_invoices - data.value.draft_invoices)
+})
+
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg, #5d8062, #48654c)',
+  'linear-gradient(135deg, #0c8aeb, #0153a2)',
+  'linear-gradient(135deg, #b88e67, #8a5f42)',
+  'linear-gradient(135deg, #7a9b7e, #5d8062)',
+  'linear-gradient(135deg, #d4a017, #a16207)',
+]
+
+function clientInitials(name: string): string {
+  return name.split(' ').slice(0, 2).map(w => w[0] ?? '').join('').toUpperCase()
+}
+
+function clientAvatarGradient(id: number): string {
+  return AVATAR_GRADIENTS[id % AVATAR_GRADIENTS.length]
+}
+
 onMounted(loadDashboard)
 </script>
 
@@ -99,25 +134,29 @@ onMounted(loadDashboard)
     <div class="max-w-5xl mx-auto">
 
       <!-- ── Header ──────────────────────────────────────────────────────── -->
-      <div class="flex items-center justify-between mb-8 animate-in">
+      <div class="flex items-start justify-between mb-8 animate-in">
         <div>
-          <h1 class="text-2xl font-semibold text-sage-900 tracking-tight">Dashboard</h1>
-          <p class="text-sm text-sage-500 mt-0.5">Panoramica anno fiscale</p>
+          <p class="text-[10px] font-bold text-sage-400 uppercase tracking-widest mb-1">{{ greeting }}</p>
+          <h1 class="text-2xl font-bold text-sage-900 tracking-tight">
+            {{ configStore.config?.first_name || 'Dashboard' }}
+          </h1>
+          <p class="text-sm text-sage-500 mt-0.5">Panoramica anno fiscale {{ selectedYear }}</p>
         </div>
-        <div class="glass-card flex items-center gap-1 rounded-xl px-1 py-1 shadow-sm">
+        <!-- Year picker -->
+        <div class="glass-card flex items-center gap-0.5 rounded-xl px-1.5 py-1.5 shadow-sm">
           <button
             type="button"
-            class="p-1.5 text-sage-400 hover:text-sage-700 rounded-lg hover:bg-sage-50/60 transition-all"
+            class="p-1.5 text-sage-400 hover:text-sage-700 rounded-lg hover:bg-sage-50/60 transition-all cursor-pointer"
             @click="prevYear"
           >
             <ChevronLeft class="w-4 h-4" />
           </button>
-          <span class="text-sm font-semibold text-sage-800 min-w-[3rem] text-center px-1">
+          <span class="text-sm font-bold text-sage-800 min-w-[3.5rem] text-center tabular-nums">
             {{ selectedYear }}
           </span>
           <button
             type="button"
-            class="p-1.5 text-sage-400 hover:text-sage-700 rounded-lg hover:bg-sage-50/60 transition-all"
+            class="p-1.5 text-sage-400 hover:text-sage-700 rounded-lg hover:bg-sage-50/60 transition-all cursor-pointer"
             @click="nextYear"
           >
             <ChevronRight class="w-4 h-4" />
@@ -140,7 +179,7 @@ onMounted(loadDashboard)
           <p class="text-xs text-red-500 font-mono break-all">{{ error }}</p>
           <button
             type="button"
-            class="mt-4 bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+            class="mt-4 bg-gradient-to-r from-sage-600 to-ocean-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium cursor-pointer"
             @click="loadDashboard"
           >
             Riprova
@@ -151,65 +190,135 @@ onMounted(loadDashboard)
       <template v-else-if="data">
 
         <!-- ── KPI cards ───────────────────────────────────────────────── -->
-        <div class="grid grid-cols-4 gap-4 mb-5">
-          <div class="glass-card rounded-2xl p-5 shadow-sm hover-lift animate-in-d1">
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Fatturato totale</span>
-              <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #5d8062, #48654c)">
-                <TrendingUp class="w-4 h-4 text-white" />
+        <div class="grid grid-cols-4 gap-4 mb-4">
+
+          <!-- Fatturato totale -->
+          <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d1 cursor-default">
+            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #5d8062, #48654c)" />
+            <div class="p-5">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Fatturato</span>
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #5d8062, #48654c)">
+                  <TrendingUp class="w-3.5 h-3.5 text-white" />
+                </div>
               </div>
+              <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ formatCurrency(data.total_revenue) }}</p>
+              <p class="text-[11px] text-sage-400 mt-1.5">{{ data.total_invoices }} fatture emesse</p>
             </div>
-            <p class="text-2xl font-bold text-sage-900 tracking-tight">{{ formatCurrency(data.total_revenue) }}</p>
-            <p class="text-xs text-sage-400 mt-1.5">{{ data.total_invoices }} fatture totali</p>
           </div>
 
-          <div class="glass-card rounded-2xl p-5 shadow-sm hover-lift animate-in-d2">
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Incassato</span>
-              <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
-                <Euro class="w-4 h-4 text-white" />
+          <!-- Incassato + collection rate bar -->
+          <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d2 cursor-default">
+            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #0c8aeb, #0153a2)" />
+            <div class="p-5">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Incassato</span>
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #0c8aeb, #0153a2)">
+                  <CheckCircle2 class="w-3.5 h-3.5 text-white" />
+                </div>
+              </div>
+              <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ formatCurrency(data.paid_revenue) }}</p>
+              <div class="mt-2">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-[11px] text-sage-400">{{ data.paid_invoices }} pagate</span>
+                  <span
+                    class="text-[11px] font-bold tabular-nums"
+                    :class="collectionRate >= 75 ? 'text-sage-600' : 'text-amber-500'"
+                  >{{ collectionRate }}%</span>
+                </div>
+                <div class="h-1 rounded-full bg-sage-100 overflow-hidden">
+                  <div
+                    class="h-full rounded-full transition-all duration-700"
+                    :style="{ width: collectionRate + '%', background: 'linear-gradient(90deg, #0c8aeb, #0153a2)' }"
+                  />
+                </div>
               </div>
             </div>
-            <p class="text-2xl font-bold text-sage-900 tracking-tight">{{ formatCurrency(data.paid_revenue) }}</p>
-            <p class="text-xs text-sage-400 mt-1.5">{{ data.paid_invoices }} fatture pagate</p>
           </div>
 
-          <div class="glass-card rounded-2xl p-5 shadow-sm hover-lift animate-in-d3">
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Da incassare</span>
-              <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #d4a017, #a16207)">
-                <Clock class="w-4 h-4 text-white" />
+          <!-- Da incassare -->
+          <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d3 cursor-default">
+            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #d4a017, #a16207)" />
+            <div class="p-5">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Da incassare</span>
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d4a017, #a16207)">
+                  <Clock class="w-3.5 h-3.5 text-white" />
+                </div>
+              </div>
+              <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ formatCurrency(data.unpaid_revenue) }}</p>
+              <div class="flex items-center gap-2 mt-1.5">
+                <span v-if="issuedUnpaid > 0" class="text-[11px] text-amber-500">{{ issuedUnpaid }} emesse</span>
+                <span v-if="issuedUnpaid > 0 && data.draft_invoices > 0" class="text-sage-200 text-xs">·</span>
+                <span v-if="data.draft_invoices > 0" class="text-[11px] text-sage-400">{{ data.draft_invoices }} bozze</span>
+                <span v-if="issuedUnpaid === 0 && data.draft_invoices === 0" class="text-[11px] text-sage-400">Tutto incassato</span>
               </div>
             </div>
-            <p class="text-2xl font-bold text-sage-900 tracking-tight">{{ formatCurrency(data.unpaid_revenue) }}</p>
-            <p class="text-xs text-sage-400 mt-1.5">{{ data.draft_invoices }} bozze</p>
           </div>
 
-          <div class="glass-card rounded-2xl p-5 shadow-sm hover-lift animate-in-d4">
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-semibold text-sage-500 uppercase tracking-wider">N. Fatture</span>
-              <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #b88e67, #8a5f42)">
-                <FileText class="w-4 h-4 text-white" />
+          <!-- N. Fatture con status dots -->
+          <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d4 cursor-default">
+            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #b88e67, #8a5f42)" />
+            <div class="p-5">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Fatture</span>
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #b88e67, #8a5f42)">
+                  <FileText class="w-3.5 h-3.5 text-white" />
+                </div>
+              </div>
+              <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ data.total_invoices }}</p>
+              <div class="flex items-center gap-3 mt-1.5">
+                <span class="flex items-center gap-1 text-[11px] text-sage-500">
+                  <span class="w-1.5 h-1.5 rounded-full bg-sage-500 inline-block shrink-0" />
+                  {{ data.paid_invoices }} pag.
+                </span>
+                <span v-if="data.draft_invoices" class="flex items-center gap-1 text-[11px] text-warm-500">
+                  <span class="w-1.5 h-1.5 rounded-full bg-warm-400 inline-block shrink-0" />
+                  {{ data.draft_invoices }} bozze
+                </span>
               </div>
             </div>
-            <p class="text-2xl font-bold text-sage-900 tracking-tight">{{ data.total_invoices }}</p>
-            <p class="text-xs text-sage-400 mt-1.5">nell'anno {{ selectedYear }}</p>
           </div>
+        </div>
+
+        <!-- ── Quick actions strip ─────────────────────────────────────── -->
+        <div class="flex gap-2 mb-5 animate-in-d1">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs font-semibold text-sage-600 hover:text-sage-900 bg-white/60 hover:bg-white border border-sage-200 hover:border-sage-300 px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-sm hover:shadow"
+            @click="router.push('/invoices/new')"
+          >
+            <Plus class="w-3.5 h-3.5" />
+            Nuova fattura
+          </button>
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs font-semibold text-sage-600 hover:text-sage-900 bg-white/60 hover:bg-white border border-sage-200 hover:border-sage-300 px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-sm hover:shadow"
+            @click="router.push('/clients/new')"
+          >
+            <Users class="w-3.5 h-3.5" />
+            Nuovo paziente
+          </button>
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs font-semibold text-sage-600 hover:text-sage-900 bg-white/60 hover:bg-white border border-sage-200 hover:border-sage-300 px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-sm hover:shadow"
+            @click="router.push('/agenda')"
+          >
+            <CalendarDays class="w-3.5 h-3.5" />
+            Agenda
+          </button>
         </div>
 
         <!-- ── Chart + Tax ─────────────────────────────────────────────── -->
         <div class="grid grid-cols-5 gap-4 mb-5">
 
-          <!-- ── Monthly bar chart ───────────────────────────────────── -->
+          <!-- Monthly bar chart -->
           <div class="col-span-3 glass-card rounded-2xl p-5 shadow-sm animate-in-d2 flex flex-col gap-4">
-
-            <!-- Card header -->
             <div class="flex items-start justify-between">
               <div>
                 <h2 class="text-sm font-semibold text-sage-800">Andamento mensile</h2>
                 <p class="text-xs text-sage-400 mt-0.5">Fatturato netto · {{ selectedYear }}</p>
               </div>
-              <!-- Peak month badge -->
               <div v-if="peakMonth" class="shrink-0 ml-4 text-right">
                 <p class="text-[10px] uppercase tracking-wider text-sage-400">Mese migliore</p>
                 <p class="text-xs font-semibold text-sage-700 mt-0.5">
@@ -218,34 +327,17 @@ onMounted(loadDashboard)
               </div>
             </div>
 
-            <!-- Chart body -->
             <div class="flex flex-col gap-2">
-
-              <!--
-                Bar area: FIXED height h-44.
-                Guide lines via absolute overlay at z-index:-1 (renders behind
-                non-positioned flex children in the same stacking context).
-                overflow-visible lets tooltips escape upward.
-              -->
-              <div class="h-44 flex items-end gap-1 relative overflow-visible">
-
-                <!-- Guide lines (z:-1 → behind bars) -->
-                <div
-                  class="absolute inset-0 flex flex-col justify-between pointer-events-none"
-                  style="z-index: -1"
-                >
+              <div class="h-48 flex items-end gap-1 relative overflow-visible">
+                <!-- Guide lines -->
+                <div class="absolute inset-0 flex flex-col justify-between pointer-events-none" style="z-index: -1">
                   <div class="h-px w-full bg-sage-200/40" />
                   <div class="h-px w-full bg-sage-200/35" />
                   <div class="h-px w-full bg-sage-200/30" />
                   <div class="h-px w-full bg-sage-200/25" />
-                  <div /><!-- spacer aligns to baseline -->
+                  <div />
                 </div>
 
-                <!--
-                  Bar columns: relative so the absolute tooltip positions
-                  relative to each column. No z-index → no stacking context
-                  → tooltip z-50 escapes to the document root SC.
-                -->
                 <div
                   v-for="month in data.monthly_revenue"
                   :key="month.month"
@@ -254,19 +346,16 @@ onMounted(loadDashboard)
                   @mouseenter="hoveredMonth = month.month"
                   @mouseleave="hoveredMonth = null"
                 >
-                  <!-- Tooltip (appears above the bar top; Vue-controlled for clean z-index) -->
+                  <!-- Tooltip -->
                   <div
                     v-if="hoveredMonth === month.month && month.revenue > 0"
-                    class="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)]
-                           bg-sage-900/95 text-white rounded-lg px-2.5 py-1.5
-                           whitespace-nowrap shadow-xl pointer-events-none z-50"
-                    style="font-size: 11px; font-weight: 500; letter-spacing: -0.01em"
+                    class="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] bg-sage-900/95 text-white rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none z-50"
+                    style="font-size: 11px; font-weight: 500"
                   >
                     {{ formatCurrency(month.revenue) }}
                     <span class="text-sage-400 ml-1.5 font-normal" style="font-size: 10px">
                       {{ month.invoice_count }} fatt.
                     </span>
-                    <!-- Arrow -->
                     <span
                       class="absolute left-1/2 -translate-x-1/2 top-full block"
                       style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid rgba(40,55,43,0.95)"
@@ -275,26 +364,19 @@ onMounted(loadDashboard)
 
                   <!-- Bar -->
                   <div
-                    class="w-full rounded-t-[4px] transition-all duration-500"
-                    :style="{
-                      height: barHeight(month.revenue),
-                      background: barGradient(month),
-                    }"
+                    class="w-full rounded-t-md transition-all duration-500"
+                    :style="{ height: barHeight(month.revenue), background: barGradient(month) }"
                   />
                 </div>
               </div>
 
-              <!-- Month labels row (fixed below bars, never affects bar heights) -->
+              <!-- Month labels -->
               <div class="flex gap-1">
-                <div
-                  v-for="month in data.monthly_revenue"
-                  :key="month.month"
-                  class="flex-1 text-center"
-                >
+                <div v-for="month in data.monthly_revenue" :key="month.month" class="flex-1 text-center">
                   <span
                     class="text-[10px] transition-colors duration-150"
                     :class="isCurrentMonth(month.month)
-                      ? 'text-ocean-500 font-semibold'
+                      ? 'text-ocean-500 font-bold'
                       : hoveredMonth === month.month
                         ? 'text-sage-600'
                         : 'text-sage-400'"
@@ -306,106 +388,89 @@ onMounted(loadDashboard)
             </div>
           </div>
 
-          <!-- ── Tax estimate ────────────────────────────────────────── -->
+          <!-- Tax estimate -->
           <div class="col-span-2 glass-card rounded-2xl p-5 shadow-sm animate-in-d2 flex flex-col">
-            <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center justify-between mb-4">
               <h2 class="text-sm font-semibold text-sage-800">Stima Fiscale</h2>
               <span
-                class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wider"
-                :class="isForfettario
-                  ? 'bg-sage-100/80 text-sage-600'
-                  : 'bg-blue-50 text-blue-600'"
+                class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider"
+                :class="isForfettario ? 'bg-sage-100/80 text-sage-600' : 'bg-ocean-50 text-ocean-600'"
               >
                 {{ isForfettario ? 'Forfettario' : 'Ordinario' }}
               </span>
             </div>
 
             <template v-if="taxEstimate">
-              <!-- Compensi -->
-              <div class="mb-2.5">
-                <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">Compensi</p>
-                <p class="text-xl font-bold text-sage-900 tracking-tight">
-                  {{ formatCurrency(data.total_net_revenue) }}
-                </p>
-              </div>
-
-              <!-- Proportion bar -->
-              <div class="mb-3.5">
-                <div class="h-1.5 rounded-full overflow-hidden flex bg-sage-50">
-                  <div
-                    class="rounded-l-full transition-all duration-700"
-                    :style="{ width: netPercentage + '%', background: 'linear-gradient(90deg, #48654c, #5d8062)' }"
-                  />
-                  <div
-                    class="rounded-r-full transition-all duration-700"
-                    :style="{ width: (100 - netPercentage) + '%', background: 'linear-gradient(90deg, #d4a017, #a16207)' }"
-                  />
-                </div>
-                <div class="flex justify-between mt-1">
-                  <span class="text-[9px] text-sage-400">{{ netPercentage }}% netto</span>
-                  <span class="text-[9px] text-amber-500/80">{{ 100 - netPercentage }}% imposte</span>
+              <!-- Compensi + proportion bar -->
+              <div class="mb-4">
+                <p class="text-[10px] text-sage-400 uppercase tracking-widest mb-0.5">Compensi annui</p>
+                <p class="text-xl font-bold text-sage-900 tracking-tight tabular-nums">{{ formatCurrency(data.total_net_revenue) }}</p>
+                <div class="mt-2">
+                  <div class="h-1.5 rounded-full overflow-hidden flex bg-sage-50">
+                    <div
+                      class="rounded-l-full transition-all duration-700"
+                      :style="{ width: netPercentage + '%', background: 'linear-gradient(90deg, #48654c, #5d8062)' }"
+                    />
+                    <div
+                      class="rounded-r-full transition-all duration-700"
+                      :style="{ width: (100 - netPercentage) + '%', background: 'linear-gradient(90deg, #d4a017, #a16207)' }"
+                    />
+                  </div>
+                  <div class="flex justify-between mt-1">
+                    <span class="text-[9px] text-sage-400">{{ netPercentage }}% netto</span>
+                    <span class="text-[9px] text-amber-500/80">{{ 100 - netPercentage }}% imposte</span>
+                  </div>
                 </div>
               </div>
 
-              <!-- Breakdown -->
+              <!-- Breakdown rows -->
               <div class="space-y-1.5 flex-1">
                 <div class="flex justify-between text-xs">
-                  <span class="text-sage-500">
-                    Redd. imponibile
-                    <span class="text-sage-300">({{ configStore.config?.coefficient }}%)</span>
-                  </span>
-                  <span class="text-sage-600 font-medium">{{ formatCurrency(taxEstimate.taxableIncome) }}</span>
+                  <span class="text-sage-500">Redd. imponibile <span class="text-sage-300">({{ configStore.config?.coefficient }}%)</span></span>
+                  <span class="text-sage-700 font-medium tabular-nums">{{ formatCurrency(taxEstimate.taxableIncome) }}</span>
                 </div>
                 <div class="flex justify-between text-xs">
                   <span class="text-sage-500">Contributi prev.</span>
-                  <span class="text-amber-600 font-medium">&minus;{{ formatCurrency(taxEstimate.inpsContribution) }}</span>
+                  <span class="text-amber-600 font-medium tabular-nums">&minus;{{ formatCurrency(taxEstimate.inpsContribution) }}</span>
                 </div>
 
                 <template v-if="taxEstimate.type === 'forfettario'">
                   <div class="flex justify-between text-xs">
-                    <span class="text-sage-500">
-                      Imp. sostitutiva
-                      <span class="text-sage-300">({{ taxEstimate.substituteTaxRate }}%)</span>
-                    </span>
-                    <span class="text-amber-600 font-medium">&minus;{{ formatCurrency(taxEstimate.substituteTax) }}</span>
+                    <span class="text-sage-500">Imp. sostitutiva <span class="text-sage-300">({{ taxEstimate.substituteTaxRate }}%)</span></span>
+                    <span class="text-amber-600 font-medium tabular-nums">&minus;{{ formatCurrency(taxEstimate.substituteTax) }}</span>
                   </div>
                 </template>
-
                 <template v-else>
                   <div class="flex justify-between text-xs">
                     <span class="text-sage-500">IRPEF</span>
-                    <span class="text-amber-600 font-medium">&minus;{{ formatCurrency(taxEstimate.irpef) }}</span>
+                    <span class="text-amber-600 font-medium tabular-nums">&minus;{{ formatCurrency(taxEstimate.irpef) }}</span>
                   </div>
                   <div class="flex justify-between text-xs">
                     <span class="text-sage-500">Addizionali</span>
-                    <span class="text-amber-600 font-medium">
-                      &minus;{{ formatCurrency(taxEstimate.addizionaleRegionale + taxEstimate.addizionaleComunale) }}
-                    </span>
+                    <span class="text-amber-600 font-medium tabular-nums">&minus;{{ formatCurrency(taxEstimate.addizionaleRegionale + taxEstimate.addizionaleComunale) }}</span>
                   </div>
                 </template>
               </div>
 
-              <!-- Net result -->
-              <div class="border-t border-sage-100/60 pt-2.5 mt-2.5">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-xs font-semibold text-sage-700">Netto stimato</span>
-                  <span class="text-base font-bold text-sage-900">{{ formatCurrency(taxEstimate.netIncome) }}</span>
-                </div>
+              <!-- Net result gradient box -->
+              <div class="mt-3 rounded-xl px-4 py-3" style="background: linear-gradient(135deg, #3a513e, #5d8062)">
+                <p class="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">Netto stimato</p>
+                <p class="text-xl font-bold text-white tracking-tight tabular-nums">{{ formatCurrency(taxEstimate.netIncome) }}</p>
               </div>
 
               <!-- Tax rate toggle (forfettario only) -->
-              <div v-if="isForfettario" class="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-sage-50">
+              <div v-if="isForfettario" class="flex items-center gap-1.5 mt-3 pt-3 border-t border-sage-100/50">
                 <span class="text-[10px] text-sage-400 mr-1">Aliquota</span>
                 <button
                   type="button"
-                  class="text-[10px] px-2 py-0.5 rounded-full transition-all"
-                  :class="firstFiveYears ? 'bg-sage-600 text-white' : 'bg-sage-50 text-sage-400 hover:text-sage-600'"
+                  class="text-[10px] px-2.5 py-1 rounded-lg transition-all cursor-pointer font-bold"
+                  :class="firstFiveYears ? 'bg-sage-700 text-white' : 'bg-sage-50 text-sage-400 hover:text-sage-600'"
                   @click="firstFiveYears = true"
                 >5%</button>
                 <button
                   type="button"
-                  class="text-[10px] px-2 py-0.5 rounded-full transition-all"
-                  :class="!firstFiveYears ? 'bg-sage-600 text-white' : 'bg-sage-50 text-sage-400 hover:text-sage-600'"
+                  class="text-[10px] px-2.5 py-1 rounded-lg transition-all cursor-pointer font-bold"
+                  :class="!firstFiveYears ? 'bg-sage-700 text-white' : 'bg-sage-50 text-sage-400 hover:text-sage-600'"
                   @click="firstFiveYears = false"
                 >15%</button>
               </div>
@@ -422,45 +487,69 @@ onMounted(loadDashboard)
         </div>
 
         <!-- ── Recent invoices ─────────────────────────────────────────── -->
-        <div class="glass-card rounded-2xl shadow-sm animate-in-d3">
+        <div class="glass-card rounded-2xl shadow-sm animate-in-d3 overflow-hidden">
           <div class="px-6 py-4 flex items-center justify-between border-b border-sage-100/50">
-            <h2 class="text-sm font-semibold text-sage-800">Fatture recenti</h2>
+            <div>
+              <h2 class="text-sm font-semibold text-sage-800">Fatture recenti</h2>
+              <p class="text-xs text-sage-400 mt-0.5">Ultime attività dell'anno</p>
+            </div>
             <button
               type="button"
-              class="text-xs font-semibold text-sage-500 hover:text-sage-700 transition-colors"
+              class="group flex items-center gap-1 text-xs font-semibold text-sage-500 hover:text-sage-800 transition-colors cursor-pointer"
               @click="router.push('/invoices')"
             >
-              Vedi tutte →
+              Vedi tutte
+              <ArrowRight class="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
             </button>
           </div>
 
-          <div v-if="data.recent_invoices.length === 0" class="px-6 py-10 text-center">
-            <FileText class="w-10 h-10 text-sage-200 mx-auto mb-2" />
-            <p class="text-sm text-sage-400">Nessuna fattura nell'anno.</p>
+          <div v-if="data.recent_invoices.length === 0" class="px-6 py-12 text-center">
+            <div class="w-12 h-12 rounded-2xl bg-sage-50 flex items-center justify-center mx-auto mb-3">
+              <FileText class="w-6 h-6 text-sage-200" />
+            </div>
+            <p class="text-sm font-semibold text-sage-500">Nessuna fattura</p>
+            <p class="text-xs text-sage-400 mt-1">Non ci sono fatture per il {{ selectedYear }}.</p>
           </div>
 
           <table v-else class="w-full text-sm">
             <thead>
-              <tr class="border-b border-sage-50">
-                <th class="px-6 py-3 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Numero</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Cliente</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Data</th>
-                <th class="px-6 py-3 text-right text-xs font-semibold text-sage-400 uppercase tracking-wider">Totale</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-sage-400 uppercase tracking-wider">Stato</th>
+              <tr class="border-b border-sage-100/60 bg-sage-50/30">
+                <th class="px-5 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Numero</th>
+                <th class="px-5 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Cliente</th>
+                <th class="px-5 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Data</th>
+                <th class="px-5 py-3 text-right text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Totale</th>
+                <th class="px-5 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Stato</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody class="divide-y divide-sage-50">
               <tr
-                v-for="invoice in data.recent_invoices"
+                v-for="(invoice, idx) in data.recent_invoices"
                 :key="invoice.id"
-                class="border-b border-sage-50/70 hover:bg-sage-50/40 cursor-pointer transition-colors"
+                :style="{ '--i': Math.min(idx, 8) }"
+                class="invoice-row hover:bg-sage-50/60 cursor-pointer transition-colors duration-150"
                 @click="router.push(`/invoices/${invoice.id}`)"
               >
-                <td class="px-6 py-3.5 font-semibold text-sage-800">{{ invoice.invoice_number }}</td>
-                <td class="px-6 py-3.5 text-sage-600">{{ invoice.client_name }}</td>
-                <td class="px-6 py-3.5 text-sage-400">{{ formatDate(invoice.issue_date) }}</td>
-                <td class="px-6 py-3.5 text-right font-semibold text-sage-800">{{ formatCurrency(invoice.total_due) }}</td>
-                <td class="px-6 py-3.5"><StatusBadge :status="invoice.status" type="invoice" /></td>
+                <td class="px-5 py-3.5">
+                  <span class="font-mono text-xs font-semibold text-sage-700 bg-sage-50 border border-sage-100 px-2 py-1 rounded-lg">
+                    {{ invoice.invoice_number }}
+                  </span>
+                </td>
+                <td class="px-5 py-3.5">
+                  <div class="flex items-center gap-2.5">
+                    <div
+                      class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white text-[10px] font-bold shadow-sm"
+                      :style="{ background: clientAvatarGradient(invoice.id) }"
+                    >
+                      {{ clientInitials(invoice.client_name) }}
+                    </div>
+                    <span class="text-sm text-sage-700 font-medium truncate max-w-[160px]">{{ invoice.client_name }}</span>
+                  </div>
+                </td>
+                <td class="px-5 py-3.5 text-xs text-sage-400">{{ formatDate(invoice.issue_date) }}</td>
+                <td class="px-5 py-3.5 text-right font-semibold text-sage-800 tabular-nums">{{ formatCurrency(invoice.total_due) }}</td>
+                <td class="px-5 py-3.5">
+                  <StatusBadge :status="invoice.status" type="invoice" />
+                </td>
               </tr>
             </tbody>
           </table>
@@ -468,12 +557,13 @@ onMounted(loadDashboard)
 
       </template>
 
+      <!-- ── No data ─────────────────────────────────────────────────────── -->
       <div v-else class="flex items-center justify-center h-64">
         <div class="text-center">
           <p class="text-sm text-sage-400">Nessun dato disponibile.</p>
           <button
             type="button"
-            class="mt-3 text-sm font-medium text-sage-600 hover:text-sage-800 transition-colors"
+            class="mt-3 text-sm font-medium text-sage-600 hover:text-sage-800 transition-colors cursor-pointer"
             @click="loadDashboard"
           >
             Ricarica
@@ -484,3 +574,19 @@ onMounted(loadDashboard)
     </div>
   </div>
 </template>
+
+<style scoped>
+.invoice-row {
+  animation: row-in 0.3s ease both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateX(-5px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invoice-row { animation: none; }
+}
+</style>
