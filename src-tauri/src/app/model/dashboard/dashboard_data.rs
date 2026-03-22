@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::model::invoice::Invoice;
 
+use super::monthly_revenue::MonthlyRevenue;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardData {
     pub year: i64,
@@ -14,12 +16,4 @@ pub struct DashboardData {
     pub draft_invoices: i64,
     pub monthly_revenue: Vec<MonthlyRevenue>,
     pub recent_invoices: Vec<Invoice>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MonthlyRevenue {
-    pub month: i64,
-    pub month_name: String,
-    pub revenue: f64,
-    pub invoice_count: i64,
 }

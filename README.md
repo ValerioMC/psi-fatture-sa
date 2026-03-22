@@ -164,6 +164,33 @@ src-tauri/target/release/bundle/
     └── PSI Fatture_0.1.0_x64-setup.exe   ← installer Windows
 ```
 
+## Dati demo (seed)
+
+Lo script `scripts/seed_db.py` popola il database locale con dati realistici, sovrascrivendo quelli esistenti.
+
+**Prerequisito:** avviare l'app almeno una volta (crea e inizializza il DB).
+
+```bash
+bash scripts/seed.sh
+# oppure
+python3 scripts/seed_db.py
+
+# percorso DB custom
+python3 scripts/seed_db.py --db /percorso/database.db
+```
+
+Dati generati:
+
+| Dato | Quantità |
+|------|----------|
+| Configurazione professionale | Dott.ssa Maria Demo (regime forfettario) |
+| Pazienti | 50 |
+| Prestazioni | 20 (€70–€120) |
+| Appuntamenti | ~5.500 (≥6/giorno, 2025–2026) |
+| Fatture mensili | ~750 (pagate/emesse/bozza per anno) |
+
+Il caricamento è rapido (~2 s) perché scrive direttamente nel SQLite bypassando l'app.
+
 ## Struttura del progetto
 
 ```
