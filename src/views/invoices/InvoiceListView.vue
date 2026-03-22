@@ -31,9 +31,14 @@ const TARGET_STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
   { value: 'cancelled', label: 'Annullata' },
 ]
 
-const YEAR_OPTIONS = [currentYear, currentYear - 1, currentYear - 2]
+const YEAR_OPTIONS = [
+  { value: null, label: 'Tutti gli anni' },
+  { value: currentYear, label: String(currentYear) },
+  { value: currentYear - 1, label: String(currentYear - 1) },
+  { value: currentYear - 2, label: String(currentYear - 2) },
+]
 
-const filters = reactive({ year: currentYear, status: '', search: '' })
+const filters = reactive<{ year: number | null; status: string; search: string }>({ year: currentYear, status: '', search: '' })
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 // ─── Financial summary ────────────────────────────────────────────────────────
@@ -101,7 +106,7 @@ function bulkConfirmMessage(): string {
 function loadInvoices() {
   clearSelection()
   invoicesStore.fetchInvoices({
-    year:   filters.year,
+    year:   filters.year ?? undefined,
     status: filters.status || undefined,
     search: filters.search || undefined,
   })
@@ -185,10 +190,10 @@ async function handleDelete() {
       <!-- Filters -->
       <div class="glass-card rounded-2xl px-5 py-4 shadow-sm mb-4 flex items-center gap-3 animate-in">
         <select
-          v-model.number="filters.year"
+          v-model="filters.year"
           class="bg-white/60 border border-sage-200/70 rounded-xl px-3 py-2 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all"
         >
-          <option v-for="y in YEAR_OPTIONS" :key="y" :value="y">{{ y }}</option>
+          <option v-for="opt in YEAR_OPTIONS" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>
         </select>
 
         <select

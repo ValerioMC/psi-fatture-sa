@@ -37,7 +37,7 @@ pub async fn find_ids(
     let sql = format!(
         "SELECT i.id FROM invoices i
          JOIN clients c ON i.client_id = c.id
-         WHERE {} ORDER BY i.issue_date DESC, i.invoice_number DESC",
+         WHERE {} ORDER BY CAST(i.invoice_number AS INTEGER) DESC",
         conditions.join(" AND ")
     );
 

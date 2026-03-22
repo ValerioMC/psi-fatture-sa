@@ -157,6 +157,15 @@ function statusPillClass(status: string): string {
   return map[status] ?? 'bg-sage-50 text-sage-500'
 }
 
+function statusAccentClass(status: string): string {
+  const map: Record<string, string> = {
+    scheduled: 'bg-ocean-400',
+    completed: 'bg-sage-500',
+    cancelled: 'bg-warm-300',
+  }
+  return map[status] ?? 'bg-sage-300'
+}
+
 function statusLabel(status: string): string {
   const map: Record<string, string> = {
     scheduled: 'Programmato',
@@ -427,29 +436,44 @@ onMounted(async () => {
                 />
               </div>
 
-              <!-- Content -->
+              <!-- Content card -->
               <div
-                class="flex-1 pl-3 py-2.5 pr-4 rounded-lg mx-1 mb-1 transition-colors"
-                :class="appt.status === 'cancelled' ? 'opacity-50' : 'group-hover:bg-sage-50/60'"
+                class="flex-1 min-w-0 ml-2 mb-2 rounded-xl border bg-white/80 shadow-sm overflow-hidden transition-all"
+                :class="[
+                  appt.status === 'cancelled' ? 'opacity-50' : 'group-hover:shadow-md group-hover:bg-white',
+                  appt.status === 'scheduled' ? 'border-ocean-100' : appt.status === 'completed' ? 'border-sage-100' : 'border-warm-100',
+                ]"
               >
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-sage-900 truncate leading-tight">{{ appt.client_name }}</p>
-                    <p v-if="appt.service_name" class="text-xs text-sage-500 truncate mt-0.5">{{ appt.service_name }}</p>
+                <div class="flex">
+                  <!-- Left accent strip -->
+                  <div class="w-[3px] shrink-0 self-stretch" :class="statusAccentClass(appt.status)" />
+
+                  <div class="flex-1 min-w-0 px-3 py-2.5">
+                    <!-- Header: client name + status badge sempre a destra -->
+                    <div class="flex items-start justify-between gap-2 min-w-0">
+                      <p class="text-sm font-semibold text-sage-900 truncate leading-tight flex-1 min-w-0">{{ appt.client_name }}</p>
+                      <span
+                        class="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                        :class="statusPillClass(appt.status)"
+                      >
+                        {{ statusLabel(appt.status) }}
+                      </span>
+                    </div>
+
+                    <!-- Service name -->
+                    <p v-if="appt.service_name" class="text-xs text-sage-500 truncate mt-0.5 leading-tight">{{ appt.service_name }}</p>
+
+                    <!-- Time range + duration -->
+                    <div class="flex items-center gap-1.5 mt-1.5">
+                      <span class="text-[10px] text-sage-400 tabular-nums">{{ appt.start_time.slice(0,5) }} – {{ appt.end_time.slice(0,5) }}</span>
+                      <span v-if="apptDuration(appt)" class="text-[10px] text-sage-300">·</span>
+                      <span v-if="apptDuration(appt)" class="text-[10px] text-sage-400">{{ apptDuration(appt) }}</span>
+                    </div>
+
+                    <!-- Notes -->
+                    <p v-if="appt.notes" class="text-[10px] text-sage-400 mt-1 italic truncate">{{ appt.notes }}</p>
                   </div>
-                  <span
-                    class="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full mt-0.5"
-                    :class="statusPillClass(appt.status)"
-                  >
-                    {{ statusLabel(appt.status) }}
-                  </span>
                 </div>
-                <div class="flex items-center gap-2 mt-1">
-                  <span class="text-[10px] text-sage-400">{{ appt.start_time.slice(0,5) }} – {{ appt.end_time.slice(0,5) }}</span>
-                  <span v-if="apptDuration(appt)" class="text-[10px] text-sage-300">·</span>
-                  <span v-if="apptDuration(appt)" class="text-[10px] text-sage-400">{{ apptDuration(appt) }}</span>
-                </div>
-                <p v-if="appt.notes" class="text-[10px] text-sage-400 mt-1 italic truncate">{{ appt.notes }}</p>
               </div>
             </div>
           </div>
