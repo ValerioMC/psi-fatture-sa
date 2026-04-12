@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versione da rilasciare (es. v1.0.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -52,8 +58,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'PSI Fatture ${{ github.ref_name }}'
+          tagName: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
+          releaseName: 'PSI Fatture ${{ github.event_name == ''workflow_dispatch'' && github.event.inputs.version || github.ref_name }}'
           releaseBody: 'Scarica il file appropriato per il tuo sistema operativo.'
           releaseDraft: true
           prerelease: false
