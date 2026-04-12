@@ -163,7 +163,7 @@ async function onSubmit() {
               type="checkbox"
               class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
             />
-            <span class="text-sm text-sage-700">Iscritto all'albo degli psicoanalisti (ENPAP non applicabile)</span>
+            <span class="text-sm text-sage-700">Iscritto all'albo degli psicoanalisti</span>
           </label>
         </div>
       </div>

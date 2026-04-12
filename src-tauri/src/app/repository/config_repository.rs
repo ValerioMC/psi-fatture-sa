@@ -10,11 +10,20 @@ pub async fn find(
 }
 
 /// Saves (upsert) the professional config and returns the updated record.
+///
+/// Uses INSERT OR REPLACE so it works both on first setup and on subsequent updates.
 pub async fn save(
     db: &DatabaseConnection,
     active: ActiveModel,
 ) -> Result<professional_config::Model, sea_orm::DbErr> {
-    active.save(db).await?;
+    let existing = professional_config::Entity::find_by_id(1).one(db).await?;
+
+    if existing.is_some() {
+        active.update(db).await?;
+    } else {
+        professional_config::Entity::insert(active).exec(db).await?;
+    }
+
     professional_config::Entity::find_by_id(1)
         .one(db)
         .await?
