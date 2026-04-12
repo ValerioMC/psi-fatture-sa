@@ -22,10 +22,7 @@ pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Service, String> {
 }
 
 /// Creates a new service and returns the created record.
-pub async fn create(
-    db: &DatabaseConnection,
-    input: CreateServiceInput,
-) -> Result<Service, String> {
+pub async fn create(db: &DatabaseConnection, input: CreateServiceInput) -> Result<Service, String> {
     let active = ActiveModel {
         name: Set(input.name),
         description: Set(input.description),
@@ -42,10 +39,7 @@ pub async fn create(
 }
 
 /// Updates an existing service and returns the updated record.
-pub async fn update(
-    db: &DatabaseConnection,
-    input: UpdateServiceInput,
-) -> Result<Service, String> {
+pub async fn update(db: &DatabaseConnection, input: UpdateServiceInput) -> Result<Service, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let active = ActiveModel {
         id: Set(input.id),

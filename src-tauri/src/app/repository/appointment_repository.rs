@@ -135,7 +135,11 @@ pub async fn mark_as_invoiced(
     if appointment_ids.is_empty() {
         return Ok(());
     }
-    let ids_csv: String = appointment_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(",");
+    let ids_csv: String = appointment_ids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
     db.execute_unprepared(&format!(
         "UPDATE appointments SET invoice_id = {invoice_id} WHERE id IN ({ids_csv})"
     ))

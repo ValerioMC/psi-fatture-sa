@@ -66,4 +66,3 @@ pub async fn has_invoices(db: &DatabaseConnection, client_id: i64) -> Result<boo
         .await?;
     Ok(found.is_some())
 }
-

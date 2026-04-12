@@ -6,9 +6,7 @@ use crate::AppState;
 
 /// Returns the professional config, or None if not yet configured.
 #[tauri::command]
-pub async fn get_config(
-    state: State<'_, AppState>,
-) -> Result<Option<ProfessionalConfig>, String> {
+pub async fn get_config(state: State<'_, AppState>) -> Result<Option<ProfessionalConfig>, String> {
     config_service::get(&state.db).await
 }
 

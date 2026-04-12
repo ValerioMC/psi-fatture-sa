@@ -22,10 +22,7 @@ pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Client, String> {
 }
 
 /// Creates a new client and returns the created record.
-pub async fn create(
-    db: &DatabaseConnection,
-    input: CreateClientInput,
-) -> Result<Client, String> {
+pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result<Client, String> {
     let active = ActiveModel {
         client_type: Set(input.client_type.as_str().to_owned()),
         first_name: Set(input.first_name),
@@ -52,10 +49,7 @@ pub async fn create(
 }
 
 /// Updates an existing client and returns the updated record.
-pub async fn update(
-    db: &DatabaseConnection,
-    input: UpdateClientInput,
-) -> Result<Client, String> {
+pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result<Client, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let active = ActiveModel {
         id: Set(input.id),

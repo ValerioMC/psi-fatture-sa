@@ -1,8 +1,8 @@
 use tauri::State;
 
 use crate::app::model::invoice::{
-    BulkUpdateStatusInput, CreateInvoiceInput, GenerateMonthlyInput, Invoice,
-    InvoiceFilters, MonthlyInvoicePreview, UpdateInvoiceInput,
+    BulkUpdateStatusInput, CreateInvoiceInput, GenerateMonthlyInput, Invoice, InvoiceFilters,
+    MonthlyInvoicePreview, UpdateInvoiceInput,
 };
 use crate::app::service::invoice_service;
 use crate::AppState;

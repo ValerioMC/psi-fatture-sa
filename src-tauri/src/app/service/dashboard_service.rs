@@ -4,8 +4,18 @@ use crate::app::model::dashboard::{DashboardData, MonthlyRevenue};
 use crate::app::repository::invoice_repository;
 
 const MONTH_NAMES: [&str; 12] = [
-    "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
-    "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
+    "Gennaio",
+    "Febbraio",
+    "Marzo",
+    "Aprile",
+    "Maggio",
+    "Giugno",
+    "Luglio",
+    "Agosto",
+    "Settembre",
+    "Ottobre",
+    "Novembre",
+    "Dicembre",
 ];
 
 /// Returns aggregated dashboard analytics for the given year.
@@ -14,9 +24,24 @@ pub async fn get(db: &DatabaseConnection, year: i64) -> Result<DashboardData, St
     let total_net_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_net),0) AS REAL) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
     let paid_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status='paid'", year).await?;
     let unpaid_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status IN ('issued','overdue')", year).await?;
-    let total_invoices = query_i64(db, "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
-    let paid_invoices = query_i64(db, "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='paid'", year).await?;
-    let draft_invoices = query_i64(db, "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='draft'", year).await?;
+    let total_invoices = query_i64(
+        db,
+        "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status!='cancelled'",
+        year,
+    )
+    .await?;
+    let paid_invoices = query_i64(
+        db,
+        "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='paid'",
+        year,
+    )
+    .await?;
+    let draft_invoices = query_i64(
+        db,
+        "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='draft'",
+        year,
+    )
+    .await?;
 
     let monthly_revenue = build_monthly_revenue(db, year).await?;
     let recent_invoices = load_recent_invoices(db, year).await?;

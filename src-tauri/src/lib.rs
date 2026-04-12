@@ -1,15 +1,13 @@
+#![allow(clippy::module_inception)]
+
 mod app;
 mod migration;
 
 use sea_orm::DatabaseConnection;
 
 use app::controller::{
-    appointment_controller::*,
-    client_controller::*,
-    config_controller::*,
-    dashboard_controller::*,
-    invoice_controller::*,
-    service_controller::*,
+    appointment_controller::*, client_controller::*, config_controller::*, dashboard_controller::*,
+    invoice_controller::*, service_controller::*,
 };
 
 /// Application state shared across all Tauri commands.
