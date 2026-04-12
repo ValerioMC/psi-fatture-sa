@@ -116,6 +116,7 @@ pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), String> {
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 fn build_active(
     client_id: i64,
     service_id: Option<i64>,

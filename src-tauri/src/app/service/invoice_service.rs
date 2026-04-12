@@ -3,13 +3,12 @@ use std::collections::BTreeMap;
 use sea_orm::{ActiveValue::Set, DatabaseConnection, TransactionTrait};
 
 use crate::app::entity::invoice as invoices;
-use crate::app::model::invoice::{
-    BulkUpdateStatusInput, CreateInvoiceInput, GenerateMonthlyInput, Invoice, InvoiceFilters,
-    InvoiceLineInput, InvoiceStatus, MonthlyInvoicePreview, PaymentMethod,
-    UpdateInvoiceInput,
-};
 use crate::app::entity::service as services;
 use crate::app::model::appointment::Appointment as AppointmentModel;
+use crate::app::model::invoice::{
+    BulkUpdateStatusInput, CreateInvoiceInput, GenerateMonthlyInput, Invoice, InvoiceFilters,
+    InvoiceLineInput, InvoiceStatus, MonthlyInvoicePreview, UpdateInvoiceInput,
+};
 use crate::app::repository::{appointment_repository, invoice_repository};
 use crate::app::service::tax_service::{calculate_invoice_totals, InvoiceLineData};
 
@@ -32,10 +31,7 @@ pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Invoice, String> {
 }
 
 /// Creates a new invoice in a transaction and returns it.
-pub async fn create(
-    db: &DatabaseConnection,
-    input: CreateInvoiceInput,
-) -> Result<Invoice, String> {
+pub async fn create(db: &DatabaseConnection, input: CreateInvoiceInput) -> Result<Invoice, String> {
     let tx = db.begin().await.map_err(|e| e.to_string())?;
 
     let year = extract_year(&input.issue_date)?;
@@ -72,10 +68,7 @@ pub async fn create(
 }
 
 /// Updates an invoice in a transaction and returns the updated record.
-pub async fn update(
-    db: &DatabaseConnection,
-    input: UpdateInvoiceInput,
-) -> Result<Invoice, String> {
+pub async fn update(db: &DatabaseConnection, input: UpdateInvoiceInput) -> Result<Invoice, String> {
     let tx = db.begin().await.map_err(|e| e.to_string())?;
 
     let totals = compute_totals(&tx, &input.lines, input.apply_enpap).await?;
@@ -225,22 +218,22 @@ pub async fn bulk_update_status(
     input: BulkUpdateStatusInput,
 ) -> Result<u64, String> {
     let count = input.ids.len() as u64;
-    invoice_repository::bulk_update_status(
-        db,
-        &input.ids,
-        input.status.as_str(),
-        &input.paid_date,
-    )
-    .await?;
+    invoice_repository::bulk_update_status(db, &input.ids, input.status.as_str(), &input.paid_date)
+        .await?;
     Ok(count)
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
 /// Loads all services into a lookup map keyed by service id.
-async fn load_service_map(db: &DatabaseConnection) -> Result<BTreeMap<i64, services::Model>, String> {
+async fn load_service_map(
+    db: &DatabaseConnection,
+) -> Result<BTreeMap<i64, services::Model>, String> {
     use sea_orm::EntityTrait;
-    let all = services::Entity::find().all(db).await.map_err(|e| e.to_string())?;
+    let all = services::Entity::find()
+        .all(db)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(all.into_iter().map(|s| (s.id, s)).collect())
 }
 
@@ -307,7 +300,11 @@ fn to_line_data(lines: &[InvoiceLineInput]) -> Vec<InvoiceLineData> {
 }
 
 fn last_day_of_month(year: i64, month: i64) -> String {
-    let (ny, nm) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
+    let (ny, nm) = if month == 12 {
+        (year + 1, 1)
+    } else {
+        (year, month + 1)
+    };
     let next_first = chrono::NaiveDate::from_ymd_opt(ny as i32, nm as u32, 1)
         .unwrap_or_else(|| chrono::NaiveDate::from_ymd_opt(year as i32, month as u32, 28).unwrap());
     let last = next_first.pred_opt().unwrap();
@@ -315,7 +312,7 @@ fn last_day_of_month(year: i64, month: i64) -> String {
 }
 
 fn format_date_short(iso: &str) -> String {
-    if let Some(d) = chrono::NaiveDate::parse_from_str(iso, "%Y-%m-%d").ok() {
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(iso, "%Y-%m-%d") {
         d.format("%d/%m").to_string()
     } else {
         iso.to_owned()
@@ -340,7 +337,12 @@ async fn compute_totals(
         })
         .collect();
 
-    Ok(calculate_invoice_totals(&line_data, &regime, enpap_rate, ritenuta_rate))
+    Ok(calculate_invoice_totals(
+        &line_data,
+        &regime,
+        enpap_rate,
+        ritenuta_rate,
+    ))
 }
 
 fn extract_year(date_str: &str) -> Result<i64, String> {

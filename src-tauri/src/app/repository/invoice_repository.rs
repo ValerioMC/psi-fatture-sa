@@ -3,8 +3,10 @@ use sea_orm::{
     EntityTrait, FromQueryResult, QueryFilter, QueryOrder, Statement,
 };
 
-use crate::app::entity::{invoice_line, invoice as invoices};
-use crate::app::model::invoice::{Invoice, InvoiceLine, InvoiceLineInput, InvoiceFilters, InvoiceStatus, PaymentMethod};
+use crate::app::entity::{invoice as invoices, invoice_line};
+use crate::app::model::invoice::{
+    Invoice, InvoiceFilters, InvoiceLine, InvoiceLineInput, InvoiceStatus, PaymentMethod,
+};
 
 /// Returns invoice ids matching the given filters.
 pub async fn find_ids(
@@ -231,7 +233,9 @@ pub async fn get_tax_regime(db: &impl sea_orm::ConnectionTrait) -> Result<String
     .await
     .map_err(|e| e.to_string())?;
 
-    Ok(row.map(|r| r.tax_regime).unwrap_or_else(|| "forfettario".to_string()))
+    Ok(row
+        .map(|r| r.tax_regime)
+        .unwrap_or_else(|| "forfettario".to_string()))
 }
 
 /// Updates the status (and optionally paid_date) for multiple invoices in one query.
@@ -253,11 +257,7 @@ pub async fn bulk_update_status(
         "UPDATE invoices SET status = ?, paid_date = ?, updated_at = ? WHERE id IN ({in_clause})"
     );
 
-    let mut values: Vec<sea_orm::Value> = vec![
-        status.into(),
-        paid_date.clone().into(),
-        now.into(),
-    ];
+    let mut values: Vec<sea_orm::Value> = vec![status.into(), paid_date.clone().into(), now.into()];
     for id in ids {
         values.push((*id).into());
     }

@@ -216,6 +216,52 @@ psi-fatture-sa/
 └── package.json            # Dipendenze frontend
 ```
 
+## Qualità del codice Rust
+
+Il progetto integra **Rustfmt** (formatter) e **Clippy** (linter), entrambi strumenti ufficiali del toolchain Rust. Non richiedono installazione separata: sono già inclusi se hai Rust via `rustup`.
+
+Il workflow `.github/workflows/lint.yml` esegue entrambi i check automaticamente ad ogni push e pull request su `main`. Un warning Clippy non risolto blocca il check CI.
+
+### Rustfmt — formattazione
+
+```bash
+cd src-tauri
+
+# Formatta tutti i file .rs
+cargo fmt
+
+# Verifica senza modificare (usato in CI)
+cargo fmt --check
+```
+
+La configurazione si trova in `src-tauri/rustfmt.toml`:
+
+| Opzione | Valore | Effetto |
+|---------|--------|---------|
+| `edition` | `"2021"` | Allineato all'edizione Rust del progetto |
+| `max_width` | `100` | Lunghezza massima di riga (default 80) |
+| `imports_granularity` | `"Module"` | Raggruppa gli `use` per modulo |
+| `group_imports` | `"StdExternalCrate"` | Ordine: std → crate esterne → crate interne |
+
+### Clippy — linting
+
+```bash
+cd src-tauri
+
+# Analisi con tutti i warning (stessa modalità del CI)
+cargo clippy -- -D warnings
+
+# Analisi permissiva (solo output, non blocca)
+cargo clippy
+```
+
+### VS Code
+
+Il file `.vscode/settings.json` già presente nel repo configura:
+
+- **Format-on-save** automatico per i file `.rs`
+- **Clippy come checker** in tempo reale al posto del semplice `cargo check` — i warning appaiono direttamente nell'editor mentre scrivi
+
 ## Stack tecnologico
 
 - **Frontend**: Vue 3, TypeScript, Tailwind CSS 4, Pinia, Vite
