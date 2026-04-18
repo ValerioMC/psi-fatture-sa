@@ -100,7 +100,7 @@ async function handlePrint(): Promise<void> {
         v-if="!loading && invoice"
         type="button"
         class="group relative overflow-hidden flex items-center gap-2 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-sm transition-all"
-        style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
+        style="background: linear-gradient(135deg, #1e1b4b, #1a3d63); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
         @click="handlePrint"
       >
         <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
@@ -131,9 +131,6 @@ async function handlePrint(): Promise<void> {
       v-else-if="invoice && client && config"
       class="invoice-doc"
     >
-      <!-- Gradient top bar -->
-      <div class="header-band" />
-
       <div class="doc-body">
 
         <!-- ══════════════════════════════
@@ -369,12 +366,6 @@ async function handlePrint(): Promise<void> {
   line-height: 1.55;
 }
 
-/* ── Gradient top bar ── */
-.header-band {
-  height: 6px;
-  background: #0f172a;
-}
-
 /* ── Body padding ── */
 .doc-body {
   padding: 36px 48px 40px;
@@ -406,7 +397,7 @@ async function handlePrint(): Promise<void> {
 
 .company-profession {
   font-size: 7.5pt;
-  color: #4f46e5;
+  color: #1e4976;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.4px;
@@ -419,7 +410,7 @@ async function handlePrint(): Promise<void> {
   margin-bottom: 2px;
   line-height: 1.45;
 }
-.albo-info strong { color: #4338ca; font-weight: 600; }
+.albo-info strong { color: #1a3d63; font-weight: 600; }
 
 .company-details {
   margin-top: 8px;
@@ -434,7 +425,7 @@ async function handlePrint(): Promise<void> {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: #4f46e5;
+  color: #1e4976;
   margin-bottom: 4px;
 }
 
@@ -514,7 +505,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #4f46e5;
+  color: #1e4976;
   font-weight: 700;
   margin-bottom: 8px;
 }
@@ -539,20 +530,20 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #4f46e5;
+  color: #1e4976;
   text-transform: uppercase;
   margin-right: 3px;
 }
 
 .payment-tag {
   display: inline-block;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  background: #e8f0fa;
+  border: 1px solid #b8cfe8;
   border-radius: 4px;
   padding: 3px 10px;
   font-size: 8pt;
   font-weight: 600;
-  color: #4338ca;
+  color: #1a3d63;
   margin-bottom: 9px;
 }
 
@@ -590,7 +581,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #4f46e5;
+  color: #1e4976;
   font-weight: 700;
   margin-bottom: 7px;
 }
@@ -617,7 +608,7 @@ async function handlePrint(): Promise<void> {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #4338ca;
+  color: #1a3d63;
   border: none;
 }
 
@@ -651,7 +642,7 @@ async function handlePrint(): Promise<void> {
   padding: 1px 5px;
   font-size: 7pt;
   font-weight: 600;
-  color: #4f46e5;
+  color: #1e4976;
 }
 
 /* ══════════════════════════════
@@ -786,7 +777,7 @@ async function handlePrint(): Promise<void> {
   line-height: 10px;
   font-size: 8pt;
   font-weight: 700;
-  color: #4338ca;
+  color: #1a3d63;
 }
 
 /* Invoice notes */
@@ -802,7 +793,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #4f46e5;
+  color: #1e4976;
   font-weight: 700;
   margin-bottom: 5px;
 }
@@ -825,7 +816,7 @@ async function handlePrint(): Promise<void> {
   line-height: 1.7;
 }
 
-.bar-name { color: #4338ca; font-weight: 600; }
+.bar-name { color: #1a3d63; font-weight: 600; }
 .bar-dot  { color: #cbd5e1; margin: 0 4px; }
 
 /* ══════════════════════════════
