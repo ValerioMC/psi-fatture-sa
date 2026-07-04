@@ -4,6 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useClientsStore } from '@/stores/clients'
 import { getClient } from '@/api'
 import type { CreateClientInput, UpdateClientInput } from '@/types'
+import {
+  validateCap,
+  validateCodiceFiscale,
+  validateEmail,
+  validatePartitaIva,
+  validateProvincia,
+} from '@/utils/validation'
 import { User, Building2, MapPin, Phone, ShieldCheck, ArrowLeft, Check, X } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -35,6 +42,32 @@ const form = reactive<CreateClientInput>({
   notes: undefined,
   sts_authorization: false,
 })
+
+type ValidatedField = 'fiscal_code' | 'vat_number' | 'email' | 'zip_code' | 'province'
+
+const fieldErrors = reactive<Partial<Record<ValidatedField, string>>>({})
+
+const FIELD_VALIDATORS: Record<ValidatedField, () => { valid: boolean; message?: string }> = {
+  fiscal_code: () => validateCodiceFiscale(form.fiscal_code),
+  vat_number: () => validatePartitaIva(form.vat_number ?? ''),
+  email: () => validateEmail(form.email ?? ''),
+  zip_code: () => validateCap(form.zip_code),
+  province: () => validateProvincia(form.province),
+}
+
+function validateField(field: ValidatedField) {
+  const result = FIELD_VALIDATORS[field]()
+  if (result.valid) {
+    delete fieldErrors[field]
+  } else {
+    fieldErrors[field] = result.message
+  }
+}
+
+function validateAllFields(): boolean {
+  ;(Object.keys(FIELD_VALIDATORS) as ValidatedField[]).forEach(validateField)
+  return Object.keys(fieldErrors).length === 0
+}
 
 const patientDisplayName = computed(() => {
   if (!isEdit.value) return null
@@ -72,6 +105,10 @@ onMounted(async () => {
 })
 
 async function onSubmit() {
+  if (!validateAllFields()) {
+    error.value = 'Correggi i campi evidenziati prima di salvare.'
+    return
+  }
   saving.value = true
   error.value = null
   try {
@@ -214,9 +251,14 @@ async function onSubmit() {
                 type="text"
                 required
                 placeholder="RSSMRA80A01H501U"
-                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
+                class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 font-mono uppercase focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
+                :class="fieldErrors.fiscal_code
+                  ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
+                  : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
                 @input="form.fiscal_code = form.fiscal_code.toUpperCase()"
+                @blur="validateField('fiscal_code')"
               />
+              <p v-if="fieldErrors.fiscal_code" class="text-xs text-red-500 mt-1">{{ fieldErrors.fiscal_code }}</p>
             </div>
             <div v-if="form.client_type === 'azienda'">
               <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Partita IVA</label>
@@ -224,8 +266,13 @@ async function onSubmit() {
                 v-model="form.vat_number"
                 type="text"
                 placeholder="01234567890"
-                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
+                class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
+                :class="fieldErrors.vat_number
+                  ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
+                  : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
+                @blur="validateField('vat_number')"
               />
+              <p v-if="fieldErrors.vat_number" class="text-xs text-red-500 mt-1">{{ fieldErrors.vat_number }}</p>
             </div>
           </div>
         </div>
@@ -266,9 +313,14 @@ async function onSubmit() {
                   type="text"
                   maxlength="2"
                   placeholder="RM"
-                  class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 uppercase text-center focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
+                  class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 uppercase text-center focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
+                  :class="fieldErrors.province
+                    ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
+                    : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
                   @input="form.province = form.province.toUpperCase()"
+                  @blur="validateField('province')"
                 />
+                <p v-if="fieldErrors.province" class="text-xs text-red-500 mt-1">{{ fieldErrors.province }}</p>
               </div>
               <div>
                 <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">CAP</label>
@@ -276,10 +328,14 @@ async function onSubmit() {
                   v-model="form.zip_code"
                   type="text"
                   maxlength="5"
-                  pattern="\d{5}"
                   placeholder="00100"
-                  class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
+                  class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
+                  :class="fieldErrors.zip_code
+                    ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
+                    : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
+                  @blur="validateField('zip_code')"
                 />
+                <p v-if="fieldErrors.zip_code" class="text-xs text-red-500 mt-1">{{ fieldErrors.zip_code }}</p>
               </div>
             </div>
           </div>
@@ -301,8 +357,13 @@ async function onSubmit() {
                 v-model="form.email"
                 type="email"
                 placeholder="mario.rossi@email.it"
-                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
+                class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
+                :class="fieldErrors.email
+                  ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
+                  : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
+                @blur="validateField('email')"
               />
+              <p v-if="fieldErrors.email" class="text-xs text-red-500 mt-1">{{ fieldErrors.email }}</p>
             </div>
             <div>
               <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Telefono</label>

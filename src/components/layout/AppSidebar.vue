@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute, RouterLink } from 'vue-router'
 import { useConfigStore } from '@/stores/config'
+import BrandMark from '@/components/ui/BrandMark.vue'
 import {
   LayoutDashboard,
   Users,
@@ -34,10 +35,10 @@ const isActive = (path: string) =>
     <!-- ── Logo ── -->
     <div class="px-6 py-6 flex items-center gap-3">
       <div
-        class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 14px rgba(67, 56, 202, 0.35);"
+        class="shrink-0 rounded-xl"
+        style="box-shadow: 0 4px 14px rgba(67, 56, 202, 0.35); line-height: 0;"
       >
-        <FileText class="w-4.5 h-4.5 text-white" />
+        <BrandMark :size="36" />
       </div>
       <div>
         <h1 class="text-base font-bold leading-none gradient-text heading-serif">PSI Fatture</h1>

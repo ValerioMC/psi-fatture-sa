@@ -5,6 +5,7 @@ use crate::app::model::appointment::{
     Appointment, CreateAppointmentInput, CreateRecurringAppointmentsInput, UpdateAppointmentInput,
 };
 use crate::app::repository::appointment_repository;
+use crate::app::service::validation_service as validate;
 
 /// Lists appointments with optional date range and client filters.
 pub async fn list(
@@ -26,6 +27,13 @@ pub async fn create(
     db: &DatabaseConnection,
     input: CreateAppointmentInput,
 ) -> Result<Appointment, String> {
+    validate_appointment_fields(
+        input.client_id,
+        &input.date,
+        &input.start_time,
+        &input.end_time,
+    )?;
+
     let active = build_active(
         input.client_id,
         input.service_id,
@@ -48,6 +56,13 @@ pub async fn create_recurring(
     db: &DatabaseConnection,
     input: CreateRecurringAppointmentsInput,
 ) -> Result<Vec<Appointment>, String> {
+    if input.dates.is_empty() {
+        return Err("Seleziona almeno una data per la ricorrenza".to_string());
+    }
+    for date in &input.dates {
+        validate_appointment_fields(input.client_id, date, &input.start_time, &input.end_time)?;
+    }
+
     let tx = db.begin().await.map_err(|e| e.to_string())?;
 
     let group_id = appointment_repository::insert_recurrence_group(&tx, input.client_id)
@@ -86,6 +101,14 @@ pub async fn update(
     db: &DatabaseConnection,
     input: UpdateAppointmentInput,
 ) -> Result<Appointment, String> {
+    validate::validate_id(input.id, "Appuntamento")?;
+    validate_appointment_fields(
+        input.client_id,
+        &input.date,
+        &input.start_time,
+        &input.end_time,
+    )?;
+
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let active = appointments::ActiveModel {
         id: Set(input.id),
@@ -115,6 +138,23 @@ pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), String> {
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
+
+/// Validates the shared fields of appointment inputs.
+fn validate_appointment_fields(
+    client_id: i64,
+    date: &str,
+    start_time: &str,
+    end_time: &str,
+) -> Result<(), String> {
+    validate::validate_id(client_id, "Cliente")?;
+    validate::parse_iso_date(date, "Data")?;
+    validate::validate_time(start_time, "Ora inizio")?;
+    validate::validate_time(end_time, "Ora fine")?;
+    if end_time <= start_time {
+        return Err("L'ora di fine deve essere successiva all'ora di inizio".to_string());
+    }
+    Ok(())
+}
 
 #[allow(clippy::too_many_arguments)]
 fn build_active(

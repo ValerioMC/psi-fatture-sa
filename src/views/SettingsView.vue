@@ -4,6 +4,12 @@ import { Check } from 'lucide-vue-next'
 import { useConfigStore } from '@/stores/config'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import type { UpsertConfigInput } from '@/types'
+import {
+  validateCodiceFiscale,
+  validateEmail,
+  validateIban,
+  validatePartitaIva,
+} from '@/utils/validation'
 
 const configStore = useConfigStore()
 
@@ -49,7 +55,36 @@ onMounted(async () => {
   }
 })
 
+type ValidatedField = 'vat_number' | 'fiscal_code' | 'iban' | 'pec_email'
+
+const fieldErrors = reactive<Partial<Record<ValidatedField, string>>>({})
+
+const FIELD_VALIDATORS: Record<ValidatedField, () => { valid: boolean; message?: string }> = {
+  vat_number: () => validatePartitaIva(form.vat_number),
+  fiscal_code: () => validateCodiceFiscale(form.fiscal_code),
+  iban: () => validateIban(form.iban),
+  pec_email: () => validateEmail(form.pec_email),
+}
+
+function validateField(field: ValidatedField) {
+  const result = FIELD_VALIDATORS[field]()
+  if (result.valid) {
+    delete fieldErrors[field]
+  } else {
+    fieldErrors[field] = result.message
+  }
+}
+
+function validateAllFields(): boolean {
+  ;(Object.keys(FIELD_VALIDATORS) as ValidatedField[]).forEach(validateField)
+  return Object.keys(fieldErrors).length === 0
+}
+
 async function onSubmit() {
+  if (!validateAllFields()) {
+    error.value = 'Correggi i campi evidenziati prima di salvare.'
+    return
+  }
   saving.value = true
   saved.value = false
   error.value = null
@@ -110,8 +145,13 @@ async function onSubmit() {
               v-model="form.vat_number"
               type="text"
               required
-              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+              class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white/80"
+              :class="fieldErrors.vat_number
+                ? 'border-red-300 focus:ring-red-400'
+                : 'border-sage-200 focus:ring-sage-400'"
+              @blur="validateField('vat_number')"
             />
+            <p v-if="fieldErrors.vat_number" class="text-xs text-red-500 mt-1">{{ fieldErrors.vat_number }}</p>
           </div>
           <div>
             <label class="text-sm font-medium text-sage-700 block mb-1">Codice Fiscale</label>
@@ -119,8 +159,14 @@ async function onSubmit() {
               v-model="form.fiscal_code"
               type="text"
               required
-              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+              class="w-full border rounded-lg px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 bg-white/80"
+              :class="fieldErrors.fiscal_code
+                ? 'border-red-300 focus:ring-red-400'
+                : 'border-sage-200 focus:ring-sage-400'"
+              @input="form.fiscal_code = form.fiscal_code.toUpperCase()"
+              @blur="validateField('fiscal_code')"
             />
+            <p v-if="fieldErrors.fiscal_code" class="text-xs text-red-500 mt-1">{{ fieldErrors.fiscal_code }}</p>
           </div>
         </div>
       </div>
@@ -275,16 +321,26 @@ async function onSubmit() {
             <input
               v-model="form.pec_email"
               type="email"
-              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+              class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white/80"
+              :class="fieldErrors.pec_email
+                ? 'border-red-300 focus:ring-red-400'
+                : 'border-sage-200 focus:ring-sage-400'"
+              @blur="validateField('pec_email')"
             />
+            <p v-if="fieldErrors.pec_email" class="text-xs text-red-500 mt-1">{{ fieldErrors.pec_email }}</p>
           </div>
           <div class="col-span-2">
             <label class="text-sm font-medium text-sage-700 block mb-1">IBAN</label>
             <input
               v-model="form.iban"
               type="text"
-              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+              class="w-full border rounded-lg px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 bg-white/80"
+              :class="fieldErrors.iban
+                ? 'border-red-300 focus:ring-red-400'
+                : 'border-sage-200 focus:ring-sage-400'"
+              @blur="validateField('iban')"
             />
+            <p v-if="fieldErrors.iban" class="text-xs text-red-500 mt-1">{{ fieldErrors.iban }}</p>
           </div>
         </div>
       </div>
@@ -296,7 +352,7 @@ async function onSubmit() {
 
       <div
         v-if="saved"
-        class="flex items-center gap-2 rounded-lg bg-sage-50 border border-sage-200 px-4 py-3 text-sm text-sage-700"
+        class="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700"
       >
         <Check class="w-4 h-4" />
         Impostazioni salvate con successo.

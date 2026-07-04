@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { FileText } from 'lucide-vue-next'
+import BrandMark from '@/components/ui/BrandMark.vue'
 import { useConfigStore } from '@/stores/config'
 import type { UpsertConfigInput } from '@/types'
+import { validateCodiceFiscale, validatePartitaIva } from '@/utils/validation'
 
 const router = useRouter()
 const configStore = useConfigStore()
@@ -40,7 +41,21 @@ const TAX_REGIME_OPTIONS = [
   { value: 'ordinario', label: 'Regime Ordinario' },
 ]
 
+function validateForm(): string | null {
+  const checks = [
+    validatePartitaIva(form.vat_number),
+    validateCodiceFiscale(form.fiscal_code),
+  ]
+  const firstError = checks.find((c) => !c.valid)
+  return firstError?.message ?? null
+}
+
 async function onSubmit() {
+  const validationError = validateForm()
+  if (validationError) {
+    error.value = validationError
+    return
+  }
   saving.value = true
   error.value = null
   try {
@@ -60,9 +75,8 @@ async function onSubmit() {
       <div class="w-full max-w-2xl animate-in">
         <!-- Welcome header -->
         <div class="text-center mb-8">
-          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
-            style="background: linear-gradient(135deg, #1e1b4b, #4338ca)">
-            <FileText class="w-8 h-8 text-white" />
+          <div class="inline-flex items-center justify-center mb-4" style="line-height: 0">
+            <BrandMark :size="64" />
           </div>
           <h1 class="text-3xl font-bold heading-serif gradient-text">Benvenuto in PSI Fatture</h1>
           <p class="text-sage-600 mt-2 text-sm">

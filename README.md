@@ -216,6 +216,16 @@ psi-fatture-sa/
 └── package.json            # Dipendenze frontend
 ```
 
+## Test
+
+```bash
+# Frontend (vitest): logica fiscale e validazione (codice fiscale, P.IVA, IBAN…)
+npm test
+
+# Backend (cargo): calcolo totali fattura e validazione input
+cd src-tauri && cargo test
+```
+
 ## Qualità del codice Rust
 
 Il progetto integra **Rustfmt** (formatter) e **Clippy** (linter), entrambi strumenti ufficiali del toolchain Rust. Non richiedono installazione separata: sono già inclusi se hai Rust via `rustup`.
@@ -267,3 +277,7 @@ Il file `.vscode/settings.json` già presente nel repo configura:
 - **Frontend**: Vue 3, TypeScript, Tailwind CSS 4, Pinia, Vite
 - **Backend**: Rust, Tauri 2, SeaORM, SQLite
 - **Build**: Tauri CLI, Vite, vue-tsc
+- **Test**: Vitest (frontend), cargo test (backend)
+
+I font (Lexend, Crimson Pro) sono self-hosted via `@fontsource`: l'app rende
+correttamente anche offline, senza dipendere da Google Fonts.

@@ -3,6 +3,7 @@ use sea_orm::{ActiveValue::Set, DatabaseConnection};
 use crate::app::entity::client::{self, ActiveModel};
 use crate::app::model::client::{Client, ClientType, CreateClientInput, UpdateClientInput};
 use crate::app::repository::client_repository;
+use crate::app::service::validation_service as validate;
 
 /// Lists all clients, optionally filtered by search query.
 pub async fn list(db: &DatabaseConnection, search: Option<String>) -> Result<Vec<Client>, String> {
@@ -23,6 +24,12 @@ pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Client, String> {
 
 /// Creates a new client and returns the created record.
 pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result<Client, String> {
+    validate_client_fields(
+        &input.last_name,
+        &input.fiscal_code,
+        input.vat_number.as_deref(),
+    )?;
+
     let active = ActiveModel {
         client_type: Set(input.client_type.as_str().to_owned()),
         first_name: Set(input.first_name),
@@ -50,6 +57,13 @@ pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result
 
 /// Updates an existing client and returns the updated record.
 pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result<Client, String> {
+    validate::validate_id(input.id, "Cliente")?;
+    validate_client_fields(
+        &input.last_name,
+        &input.fiscal_code,
+        input.vat_number.as_deref(),
+    )?;
+
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let active = ActiveModel {
         id: Set(input.id),
@@ -92,6 +106,20 @@ pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), String> {
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
+
+/// Validates the shared fields of client inputs.
+fn validate_client_fields(
+    last_name: &str,
+    fiscal_code: &str,
+    vat_number: Option<&str>,
+) -> Result<(), String> {
+    validate::validate_required(last_name, "Cognome / Ragione sociale")?;
+    validate::validate_fiscal_code(fiscal_code)?;
+    if let Some(vat) = vat_number {
+        validate::validate_vat_number(vat)?;
+    }
+    Ok(())
+}
 
 fn into_domain(m: client::Model) -> Client {
     Client {

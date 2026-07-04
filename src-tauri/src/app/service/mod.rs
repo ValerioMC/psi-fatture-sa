@@ -5,3 +5,4 @@ pub mod dashboard_service;
 pub mod invoice_service;
 pub mod service_service;
 pub mod tax_service;
+pub mod validation_service;

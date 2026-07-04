@@ -57,6 +57,7 @@ const selectedIds    = ref<Set<number>>(new Set())
 const bulkTargetStatus = ref<InvoiceStatus>('paid')
 const bulkUpdating   = ref(false)
 const showBulkConfirm = ref(false)
+const bulkError      = ref<string | null>(null)
 
 const selectedCount = computed(() => selectedIds.value.size)
 const allSelected   = computed(
@@ -77,20 +78,24 @@ function toggleSelect(id: number) {
   selectedIds.value = next
 }
 
-function clearSelection() { selectedIds.value = new Set() }
+function clearSelection() {
+  selectedIds.value = new Set()
+  bulkError.value = null
+}
 
 function requestBulkUpdate() { showBulkConfirm.value = true }
 
 async function executeBulkUpdate() {
   showBulkConfirm.value = false
   bulkUpdating.value = true
+  bulkError.value = null
   try {
     const ids = [...selectedIds.value]
     const paidDate = bulkTargetStatus.value === 'paid' ? new Date().toISOString().slice(0, 10) : undefined
     await invoicesStore.bulkUpdateStatus(ids, bulkTargetStatus.value, paidDate)
     clearSelection()
   } catch (e) {
-    console.error('[bulk] FAILED:', e)
+    bulkError.value = `Aggiornamento non riuscito: ${String(e)}`
   } finally {
     bulkUpdating.value = false
   }
@@ -131,6 +136,8 @@ async function handleDelete() {
   if (!invoiceToDelete.value) return
   try {
     await invoicesStore.removeInvoice(invoiceToDelete.value.id)
+  } catch (e) {
+    bulkError.value = `Eliminazione non riuscita: ${String(e)}`
   } finally {
     invoiceToDelete.value = null
   }
@@ -283,6 +290,15 @@ function rowDelay(idx: number): number {
           </button>
         </div>
       </Transition>
+
+      <!-- Bulk error -->
+      <div
+        v-if="bulkError"
+        class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center gap-2 mb-4"
+      >
+        <X class="w-4 h-4 shrink-0 text-red-400" />
+        {{ bulkError }}
+      </div>
 
       <!-- Table card -->
       <div class="glass-card rounded-2xl shadow-sm overflow-hidden animate-in-d1">

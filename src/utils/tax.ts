@@ -1,6 +1,9 @@
 /**
  * Tax calculation utilities for Italian psychologist invoices.
- * Ported from the Python domain logic.
+ *
+ * The invoice totals logic mirrors the Rust implementation in
+ * `src-tauri/src/app/service/tax_service.rs`: any change here must be
+ * replicated there, or the live preview will differ from the saved invoice.
  */
 
 export interface LineData {
@@ -35,19 +38,17 @@ export function calculateInvoiceTotals(
   taxRegime: string,
   applyEnpap: boolean,
 ): InvoiceTotals {
-  const total_net = lines.reduce(
-    (sum, line) => sum + line.quantity * line.unit_price,
-    0,
-  )
-
-  const total_tax = lines.reduce(
-    (sum, line) => sum + line.quantity * line.unit_price * (line.vat_rate / 100),
-    0,
-  )
-
-  const total_gross = total_net + total_tax
+  let total_net = 0
+  let total_tax = 0
+  for (const line of lines) {
+    const lineNet = round2(sanitize(line.quantity) * sanitize(line.unit_price))
+    const lineVat = round2(lineNet * sanitize(line.vat_rate) / 100)
+    total_net += lineNet
+    total_tax += lineVat
+  }
 
   const contributo_enpap = applyEnpap ? round2(total_net * ENPAP_RATE) : 0
+  const total_gross = total_net + total_tax + contributo_enpap
 
   const ritenuta_base = total_net + contributo_enpap
   const ritenuta_acconto =
@@ -58,8 +59,7 @@ export function calculateInvoiceTotals(
     !hasVat && total_net > MARCA_DA_BOLLO_THRESHOLD
   const marca_da_bollo = appliesMarcaDaBollo ? MARCA_DA_BOLLO_AMOUNT : 0
 
-  const total_due =
-    total_gross + contributo_enpap - ritenuta_acconto + marca_da_bollo
+  const total_due = total_gross - ritenuta_acconto + marca_da_bollo
 
   return {
     total_net: round2(total_net),
@@ -70,6 +70,11 @@ export function calculateInvoiceTotals(
     total_gross: round2(total_gross),
     total_due: round2(total_due),
   }
+}
+
+/** Treats NaN (e.g. an emptied number input) as zero to keep previews stable. */
+function sanitize(value: number): number {
+  return Number.isFinite(value) ? value : 0
 }
 
 function round2(value: number): number {

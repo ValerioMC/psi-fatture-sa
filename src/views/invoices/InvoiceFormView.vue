@@ -59,6 +59,7 @@ const form = reactive({
   payment_method: 'bonifico' as PaymentMethod,
   notes: '',
   apply_enpap: true,
+  paid_date: '' as string | undefined,
   lines: [newLine()] as FormLine[],
 })
 
@@ -72,7 +73,8 @@ const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
 const STATUS_OPTIONS: Array<{ value: InvoiceStatus; label: string; dot: string }> = [
   { value: 'draft',     label: 'Bozza',     dot: 'bg-warm-400' },
   { value: 'issued',    label: 'Emessa',    dot: 'bg-ocean-500' },
-  { value: 'paid',      label: 'Pagata',    dot: 'bg-sage-500' },
+  { value: 'paid',      label: 'Pagata',    dot: 'bg-emerald-500' },
+  { value: 'overdue',   label: 'Scaduta',   dot: 'bg-gold-500' },
   { value: 'cancelled', label: 'Annullata', dot: 'bg-sage-300' },
 ]
 
@@ -118,6 +120,7 @@ onMounted(async () => {
     form.payment_method = invoice.payment_method
     form.notes = invoice.notes
     form.apply_enpap = invoice.apply_enpap
+    form.paid_date = invoice.paid_date ?? ''
     form.lines = invoice.lines.map((l) => ({
       _key: lineKeyCounter++,
       service_id: l.service_id,
@@ -133,9 +136,41 @@ onMounted(async () => {
   }
 })
 
-async function onSubmit() {
+function validateForm(): string | null {
+  if (!form.client_id) {
+    return 'Seleziona un cliente.'
+  }
+  if (!form.issue_date) {
+    return 'Inserisci la data di emissione.'
+  }
+  if (form.due_date && form.due_date < form.issue_date) {
+    return 'La data di scadenza precede la data di emissione.'
+  }
   if (form.lines.length === 0) {
-    error.value = 'Aggiungi almeno una riga alla fattura.'
+    return 'Aggiungi almeno una riga alla fattura.'
+  }
+  for (const [idx, line] of form.lines.entries()) {
+    const row = idx + 1
+    if (!line.description.trim()) {
+      return `Riga ${row}: descrizione obbligatoria.`
+    }
+    if (!Number.isInteger(line.quantity) || line.quantity < 1) {
+      return `Riga ${row}: la quantità deve essere un numero intero maggiore di zero.`
+    }
+    if (!Number.isFinite(line.unit_price) || line.unit_price < 0) {
+      return `Riga ${row}: prezzo unitario non valido.`
+    }
+    if (!Number.isFinite(line.vat_rate) || line.vat_rate < 0 || line.vat_rate > 100) {
+      return `Riga ${row}: aliquota IVA non valida (0-100).`
+    }
+  }
+  return null
+}
+
+async function onSubmit() {
+  const validationError = validateForm()
+  if (validationError) {
+    error.value = validationError
     return
   }
 
@@ -158,6 +193,7 @@ async function onSubmit() {
         payment_method: form.payment_method,
         notes: form.notes,
         apply_enpap: form.apply_enpap,
+        paid_date: form.status === 'paid' ? form.paid_date || undefined : undefined,
         lines: lineInputs,
       }
       await invoicesStore.editInvoice(input)
@@ -302,6 +338,22 @@ async function onSubmit() {
                   {{ opt.label }}
                 </button>
               </div>
+            </div>
+
+            <!-- Data pagamento (solo per stato Pagata) -->
+            <div v-if="form.status === 'paid'" class="col-span-2">
+              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">
+                <span class="flex items-center gap-1.5">
+                  <Calendar class="w-3 h-3" />
+                  Data pagamento
+                </span>
+              </label>
+              <input
+                v-model="form.paid_date"
+                type="date"
+                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
+              />
+              <p class="text-[11px] text-sage-400 mt-1">Se vuota, viene impostata la data odierna.</p>
             </div>
 
             <!-- Notes -->

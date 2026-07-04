@@ -14,26 +14,33 @@ pub async fn find_ids(
     filters: &InvoiceFilters,
 ) -> Result<Vec<i64>, String> {
     let mut conditions = vec!["1=1".to_string()];
+    let mut values: Vec<sea_orm::Value> = Vec::new();
 
     if let Some(y) = filters.year {
-        conditions.push(format!("i.year = {y}"));
+        conditions.push("i.year = ?".to_string());
+        values.push(y.into());
     }
-    if let Some(s) = &filters.status {
-        if !s.is_empty() {
-            let s = s.replace('\'', "''");
-            conditions.push(format!("i.status = '{s}'"));
-        }
+    if let Some(s) = filters.status.as_deref().filter(|s| !s.is_empty()) {
+        conditions.push("i.status = ?".to_string());
+        values.push(s.into());
     }
     if let Some(cid) = filters.client_id {
-        conditions.push(format!("i.client_id = {cid}"));
+        conditions.push("i.client_id = ?".to_string());
+        values.push(cid.into());
     }
-    if let Some(q) = &filters.search {
-        if !q.trim().is_empty() {
-            let q = q.trim().replace('\'', "''");
-            conditions.push(format!(
-                "(lower(c.first_name || ' ' || c.last_name) LIKE lower('%{q}%') OR i.invoice_number LIKE '%{q}%')"
-            ));
-        }
+    if let Some(q) = filters
+        .search
+        .as_deref()
+        .map(str::trim)
+        .filter(|q| !q.is_empty())
+    {
+        let pattern = format!("%{q}%");
+        conditions.push(
+            "(lower(c.first_name || ' ' || c.last_name) LIKE lower(?) OR i.invoice_number LIKE ?)"
+                .to_string(),
+        );
+        values.push(pattern.clone().into());
+        values.push(pattern.into());
     }
 
     let sql = format!(
@@ -48,9 +55,10 @@ pub async fn find_ids(
         id: i64,
     }
 
-    let rows = IdRow::find_by_statement(Statement::from_string(
+    let rows = IdRow::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
-        sql,
+        &sql,
+        values,
     ))
     .all(db)
     .await
@@ -59,33 +67,62 @@ pub async fn find_ids(
     Ok(rows.into_iter().map(|r| r.id).collect())
 }
 
+#[derive(FromQueryResult)]
+struct InvoiceRow {
+    id: i64,
+    client_id: i64,
+    client_name: String,
+    invoice_number: String,
+    year: i64,
+    issue_date: String,
+    due_date: Option<String>,
+    status: String,
+    payment_method: String,
+    notes: Option<String>,
+    apply_enpap: i32,
+    contributo_enpap: f64,
+    ritenuta_acconto: f64,
+    marca_da_bollo: i32,
+    total_net: f64,
+    total_tax: f64,
+    total_gross: f64,
+    total_due: f64,
+    paid_date: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+impl InvoiceRow {
+    fn into_invoice(self, lines: Vec<InvoiceLine>) -> Invoice {
+        Invoice {
+            id: self.id,
+            client_id: self.client_id,
+            client_name: self.client_name,
+            invoice_number: self.invoice_number,
+            year: self.year,
+            issue_date: self.issue_date,
+            due_date: self.due_date,
+            status: InvoiceStatus::from(self.status),
+            payment_method: PaymentMethod::from(self.payment_method),
+            notes: self.notes.unwrap_or_default(),
+            apply_enpap: self.apply_enpap != 0,
+            contributo_enpap: self.contributo_enpap,
+            ritenuta_acconto: self.ritenuta_acconto,
+            marca_da_bollo: self.marca_da_bollo != 0,
+            total_net: self.total_net,
+            total_tax: self.total_tax,
+            total_gross: self.total_gross,
+            total_due: self.total_due,
+            paid_date: self.paid_date,
+            lines,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+    }
+}
+
 /// Loads a full invoice (with client_name and lines) by id.
 pub async fn load_invoice(db: &DatabaseConnection, id: i64) -> Result<Invoice, String> {
-    #[derive(FromQueryResult)]
-    struct InvoiceRow {
-        id: i64,
-        client_id: i64,
-        client_name: String,
-        invoice_number: String,
-        year: i64,
-        issue_date: String,
-        due_date: Option<String>,
-        status: String,
-        payment_method: String,
-        notes: Option<String>,
-        apply_enpap: i32,
-        contributo_enpap: f64,
-        ritenuta_acconto: f64,
-        marca_da_bollo: i32,
-        total_net: f64,
-        total_tax: f64,
-        total_gross: f64,
-        total_due: f64,
-        paid_date: Option<String>,
-        created_at: String,
-        updated_at: String,
-    }
-
     let row = InvoiceRow::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         "SELECT i.*, c.first_name || ' ' || c.last_name AS client_name
@@ -100,31 +137,65 @@ pub async fn load_invoice(db: &DatabaseConnection, id: i64) -> Result<Invoice, S
     .ok_or_else(|| format!("Invoice {id} not found"))?;
 
     let lines = load_lines(db, id).await?;
+    Ok(row.into_invoice(lines))
+}
 
-    Ok(Invoice {
-        id: row.id,
-        client_id: row.client_id,
-        client_name: row.client_name,
-        invoice_number: row.invoice_number,
-        year: row.year,
-        issue_date: row.issue_date,
-        due_date: row.due_date,
-        status: InvoiceStatus::from(row.status),
-        payment_method: PaymentMethod::from(row.payment_method),
-        notes: row.notes.unwrap_or_default(),
-        apply_enpap: row.apply_enpap != 0,
-        contributo_enpap: row.contributo_enpap,
-        ritenuta_acconto: row.ritenuta_acconto,
-        marca_da_bollo: row.marca_da_bollo != 0,
-        total_net: row.total_net,
-        total_tax: row.total_tax,
-        total_gross: row.total_gross,
-        total_due: row.total_due,
-        paid_date: row.paid_date,
-        lines,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-    })
+/// Loads multiple invoices (with client_name and lines) in two queries,
+/// preserving the order of the given ids.
+pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<Invoice>, String> {
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let placeholders = vec!["?"; ids.len()].join(", ");
+    let id_values: Vec<sea_orm::Value> = ids.iter().map(|id| (*id).into()).collect();
+
+    let sql = format!(
+        "SELECT i.*, c.first_name || ' ' || c.last_name AS client_name
+         FROM invoices i
+         JOIN clients c ON i.client_id = c.id
+         WHERE i.id IN ({placeholders})"
+    );
+    let rows = InvoiceRow::find_by_statement(Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Sqlite,
+        &sql,
+        id_values.clone(),
+    ))
+    .all(db)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let lines_sql =
+        format!("SELECT * FROM invoice_lines WHERE invoice_id IN ({placeholders}) ORDER BY id");
+    let line_models = invoice_line::Model::find_by_statement(Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Sqlite,
+        &lines_sql,
+        id_values,
+    ))
+    .all(db)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let mut lines_by_invoice: std::collections::HashMap<i64, Vec<InvoiceLine>> =
+        std::collections::HashMap::new();
+    for m in line_models {
+        lines_by_invoice
+            .entry(m.invoice_id)
+            .or_default()
+            .push(into_line(m));
+    }
+
+    let mut by_id: std::collections::HashMap<i64, InvoiceRow> =
+        rows.into_iter().map(|r| (r.id, r)).collect();
+
+    Ok(ids
+        .iter()
+        .filter_map(|id| {
+            by_id
+                .remove(id)
+                .map(|row| row.into_invoice(lines_by_invoice.remove(id).unwrap_or_default()))
+        })
+        .collect())
 }
 
 /// Inserts a new invoice record.
@@ -238,15 +309,16 @@ pub async fn get_tax_regime(db: &impl sea_orm::ConnectionTrait) -> Result<String
         .unwrap_or_else(|| "forfettario".to_string()))
 }
 
-/// Updates the status (and optionally paid_date) for multiple invoices in one query.
+/// Updates the status (and optionally paid_date) for multiple invoices in one
+/// query, returning the number of rows actually updated.
 pub async fn bulk_update_status(
     db: &DatabaseConnection,
     ids: &[i64],
     status: &str,
     paid_date: &Option<String>,
-) -> Result<(), String> {
+) -> Result<u64, String> {
     if ids.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
 
     let placeholders: Vec<String> = ids.iter().map(|_| "?".to_string()).collect();
@@ -262,15 +334,16 @@ pub async fn bulk_update_status(
         values.push((*id).into());
     }
 
-    db.execute(Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Sqlite,
-        &sql,
-        values,
-    ))
-    .await
-    .map_err(|e| e.to_string())?;
+    let result = db
+        .execute(Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            &sql,
+            values,
+        ))
+        .await
+        .map_err(|e| e.to_string())?;
 
-    Ok(())
+    Ok(result.rows_affected())
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
@@ -283,19 +356,20 @@ async fn load_lines(db: &DatabaseConnection, invoice_id: i64) -> Result<Vec<Invo
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok(models
-        .into_iter()
-        .map(|m| InvoiceLine {
-            id: Some(m.id),
-            invoice_id: Some(m.invoice_id),
-            service_id: m.service_id,
-            description: m.description,
-            quantity: m.quantity,
-            unit_price: m.unit_price,
-            vat_rate: m.vat_rate,
-            line_total: m.line_total,
-        })
-        .collect())
+    Ok(models.into_iter().map(into_line).collect())
+}
+
+fn into_line(m: invoice_line::Model) -> InvoiceLine {
+    InvoiceLine {
+        id: Some(m.id),
+        invoice_id: Some(m.invoice_id),
+        service_id: m.service_id,
+        description: m.description,
+        quantity: m.quantity,
+        unit_price: m.unit_price,
+        vat_rate: m.vat_rate,
+        line_total: m.line_total,
+    }
 }
 
 fn round2(v: f64) -> f64 {

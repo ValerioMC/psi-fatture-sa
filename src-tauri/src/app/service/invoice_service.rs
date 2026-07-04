@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use sea_orm::{ActiveValue::Set, DatabaseConnection, TransactionTrait};
+use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
 use crate::app::entity::invoice as invoices;
 use crate::app::entity::service as services;
@@ -10,7 +10,10 @@ use crate::app::model::invoice::{
     InvoiceLineInput, InvoiceStatus, MonthlyInvoicePreview, UpdateInvoiceInput,
 };
 use crate::app::repository::{appointment_repository, invoice_repository};
-use crate::app::service::tax_service::{calculate_invoice_totals, InvoiceLineData};
+use crate::app::service::tax_service::{
+    calculate_invoice_totals, ritenuta_rate_for_regime, InvoiceLineData, ENPAP_RATE,
+};
+use crate::app::service::validation_service as validate;
 
 /// Lists invoices with optional filters (year, status, client_id, search).
 pub async fn list(
@@ -18,11 +21,7 @@ pub async fn list(
     filters: InvoiceFilters,
 ) -> Result<Vec<Invoice>, String> {
     let ids = invoice_repository::find_ids(db, &filters).await?;
-    let mut results = Vec::with_capacity(ids.len());
-    for id in ids {
-        results.push(invoice_repository::load_invoice(db, id).await?);
-    }
-    Ok(results)
+    invoice_repository::load_invoices(db, &ids).await
 }
 
 /// Returns a single invoice with its lines.
@@ -32,56 +31,44 @@ pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Invoice, String> {
 
 /// Creates a new invoice in a transaction and returns it.
 pub async fn create(db: &DatabaseConnection, input: CreateInvoiceInput) -> Result<Invoice, String> {
+    validate_invoice_input(
+        input.client_id,
+        &input.issue_date,
+        input.due_date.as_deref(),
+        &input.lines,
+    )?;
+
     let tx = db.begin().await.map_err(|e| e.to_string())?;
-
-    let year = extract_year(&input.issue_date)?;
-    let invoice_number = invoice_repository::next_invoice_number(&tx, year).await?;
-    let totals = compute_totals(&tx, &input.lines, input.apply_enpap).await?;
-
-    let active = invoices::ActiveModel {
-        client_id: Set(input.client_id),
-        invoice_number: Set(invoice_number),
-        year: Set(year),
-        issue_date: Set(input.issue_date),
-        due_date: Set(input.due_date),
-        status: Set(input.status.as_str().to_owned()),
-        payment_method: Set(input.payment_method.as_str().to_owned()),
-        notes: Set(Some(input.notes)),
-        apply_enpap: Set(input.apply_enpap as i32),
-        contributo_enpap: Set(totals.contributo_enpap),
-        ritenuta_acconto: Set(totals.ritenuta_acconto),
-        marca_da_bollo: Set((totals.marca_da_bollo > 0.0) as i32),
-        total_net: Set(totals.total_net),
-        total_tax: Set(totals.total_tax),
-        total_gross: Set(totals.total_gross),
-        total_due: Set(totals.total_due),
-        ..Default::default()
-    };
-
-    let invoice = invoice_repository::insert_invoice(&tx, active)
-        .await
-        .map_err(|e| e.to_string())?;
-    invoice_repository::insert_lines(&tx, invoice.id, &input.lines).await?;
+    let id = create_in_tx(&tx, &input).await?;
     tx.commit().await.map_err(|e| e.to_string())?;
 
-    invoice_repository::load_invoice(db, invoice.id).await
+    invoice_repository::load_invoice(db, id).await
 }
 
 /// Updates an invoice in a transaction and returns the updated record.
 pub async fn update(db: &DatabaseConnection, input: UpdateInvoiceInput) -> Result<Invoice, String> {
+    validate::validate_id(input.id, "Fattura")?;
+    validate_invoice_input(
+        input.client_id,
+        &input.issue_date,
+        input.due_date.as_deref(),
+        &input.lines,
+    )?;
+
     let tx = db.begin().await.map_err(|e| e.to_string())?;
 
     let totals = compute_totals(&tx, &input.lines, input.apply_enpap).await?;
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let paid_date = resolve_paid_date(&input.status, input.paid_date.clone());
 
     let active = invoices::ActiveModel {
         id: Set(input.id),
         client_id: Set(input.client_id),
-        issue_date: Set(input.issue_date),
-        due_date: Set(input.due_date),
+        issue_date: Set(input.issue_date.clone()),
+        due_date: Set(input.due_date.clone()),
         status: Set(input.status.as_str().to_owned()),
         payment_method: Set(input.payment_method.as_str().to_owned()),
-        notes: Set(Some(input.notes)),
+        notes: Set(Some(input.notes.clone())),
         apply_enpap: Set(input.apply_enpap as i32),
         contributo_enpap: Set(totals.contributo_enpap),
         ritenuta_acconto: Set(totals.ritenuta_acconto),
@@ -90,7 +77,7 @@ pub async fn update(db: &DatabaseConnection, input: UpdateInvoiceInput) -> Resul
         total_tax: Set(totals.total_tax),
         total_gross: Set(totals.total_gross),
         total_due: Set(totals.total_due),
-        paid_date: Set(input.paid_date),
+        paid_date: Set(paid_date),
         updated_at: Set(now),
         ..Default::default()
     };
@@ -116,6 +103,7 @@ pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), String> {
 
 /// Returns the next invoice number for the given year.
 pub async fn next_number(db: &DatabaseConnection, year: i64) -> Result<String, String> {
+    validate::validate_year(year)?;
     invoice_repository::next_invoice_number(db, year).await
 }
 
@@ -127,12 +115,16 @@ pub async fn preview_monthly(
     year: i64,
     month: i64,
 ) -> Result<Vec<MonthlyInvoicePreview>, String> {
+    validate::validate_year(year)?;
+    validate::validate_month(month)?;
+
     let appointments = appointment_repository::find_unbilled_for_month(db, year, month).await?;
     if appointments.is_empty() {
         return Ok(vec![]);
     }
 
     let regime = invoice_repository::get_tax_regime(db).await?;
+    let ritenuta_rate = ritenuta_rate_for_regime(&regime);
 
     let mut by_client: BTreeMap<i64, (String, Vec<_>)> = BTreeMap::new();
     for appt in &appointments {
@@ -149,9 +141,7 @@ pub async fn preview_monthly(
     for (client_id, (client_name, appts)) in &by_client {
         let lines = build_lines_from_appointments(appts, &svc_map);
         let line_data = to_line_data(&lines);
-        let enpap_rate = 2.0;
-        let ritenuta_rate = if regime == "ordinario" { 20.0 } else { 0.0 };
-        let totals = calculate_invoice_totals(&line_data, &regime, enpap_rate, ritenuta_rate);
+        let totals = calculate_invoice_totals(&line_data, ENPAP_RATE, ritenuta_rate);
 
         previews.push(MonthlyInvoicePreview {
             client_id: *client_id,
@@ -167,10 +157,18 @@ pub async fn preview_monthly(
 }
 
 /// Generates invoices for the selected clients from their monthly appointments.
+///
+/// Each client's invoice and appointment links are committed atomically.
 pub async fn generate_monthly(
     db: &DatabaseConnection,
     input: GenerateMonthlyInput,
 ) -> Result<Vec<Invoice>, String> {
+    validate::validate_year(input.year)?;
+    validate::validate_month(input.month)?;
+    if input.client_ids.is_empty() {
+        return Err("Seleziona almeno un cliente".to_string());
+    }
+
     let appointments =
         appointment_repository::find_unbilled_for_month(db, input.year, input.month).await?;
 
@@ -182,8 +180,8 @@ pub async fn generate_monthly(
     }
 
     let svc_map = load_service_map(db).await?;
-    let issue_date = last_day_of_month(input.year, input.month);
-    let mut created = Vec::new();
+    let issue_date = last_day_of_month(input.year, input.month)?;
+    let mut created_ids = Vec::new();
 
     for (client_id, appts) in &by_client {
         let appt_ids: Vec<i64> = appts.iter().map(|a| a.id).collect();
@@ -201,29 +199,97 @@ pub async fn generate_monthly(
             lines,
         };
 
-        let invoice = create(db, invoice_input).await?;
-        appointment_repository::mark_as_invoiced(db, &appt_ids, invoice.id).await?;
-        created.push(invoice);
+        let tx = db.begin().await.map_err(|e| e.to_string())?;
+        let invoice_id = create_in_tx(&tx, &invoice_input).await?;
+        appointment_repository::mark_as_invoiced(&tx, &appt_ids, invoice_id).await?;
+        tx.commit().await.map_err(|e| e.to_string())?;
+
+        created_ids.push(invoice_id);
     }
 
-    Ok(created)
+    invoice_repository::load_invoices(db, &created_ids).await
 }
 
-/// Updates the status of multiple invoices at once.
+/// Updates the status of multiple invoices at once and returns the number
+/// of rows actually updated.
 ///
-/// When the target status is "paid", sets `paid_date` to today.
-/// For any other status, clears `paid_date`.
+/// When the target status is "paid", `paid_date` defaults to today if missing.
+/// For any other status, `paid_date` is cleared.
 pub async fn bulk_update_status(
     db: &DatabaseConnection,
     input: BulkUpdateStatusInput,
 ) -> Result<u64, String> {
-    let count = input.ids.len() as u64;
-    invoice_repository::bulk_update_status(db, &input.ids, input.status.as_str(), &input.paid_date)
-        .await?;
-    Ok(count)
+    if input.ids.is_empty() {
+        return Err("Nessuna fattura selezionata".to_string());
+    }
+    let paid_date = resolve_paid_date(&input.status, input.paid_date.clone());
+    invoice_repository::bulk_update_status(db, &input.ids, input.status.as_str(), &paid_date).await
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
+
+/// Validates the shared fields of create/update invoice inputs.
+fn validate_invoice_input(
+    client_id: i64,
+    issue_date: &str,
+    due_date: Option<&str>,
+    lines: &[InvoiceLineInput],
+) -> Result<(), String> {
+    validate::validate_id(client_id, "Cliente")?;
+    validate::validate_invoice_dates(issue_date, due_date)?;
+    validate::validate_invoice_lines(lines)?;
+    Ok(())
+}
+
+/// Inserts an invoice with its lines inside an existing transaction.
+async fn create_in_tx<C: ConnectionTrait>(
+    tx: &C,
+    input: &CreateInvoiceInput,
+) -> Result<i64, String> {
+    let year = extract_year(&input.issue_date)?;
+    let invoice_number = invoice_repository::next_invoice_number(tx, year).await?;
+    let totals = compute_totals(tx, &input.lines, input.apply_enpap).await?;
+    let paid_date = resolve_paid_date(&input.status, None);
+
+    let active = invoices::ActiveModel {
+        client_id: Set(input.client_id),
+        invoice_number: Set(invoice_number),
+        year: Set(year),
+        issue_date: Set(input.issue_date.clone()),
+        due_date: Set(input.due_date.clone()),
+        status: Set(input.status.as_str().to_owned()),
+        payment_method: Set(input.payment_method.as_str().to_owned()),
+        notes: Set(Some(input.notes.clone())),
+        apply_enpap: Set(input.apply_enpap as i32),
+        contributo_enpap: Set(totals.contributo_enpap),
+        ritenuta_acconto: Set(totals.ritenuta_acconto),
+        marca_da_bollo: Set((totals.marca_da_bollo > 0.0) as i32),
+        total_net: Set(totals.total_net),
+        total_tax: Set(totals.total_tax),
+        total_gross: Set(totals.total_gross),
+        total_due: Set(totals.total_due),
+        paid_date: Set(paid_date),
+        ..Default::default()
+    };
+
+    let invoice = invoice_repository::insert_invoice(tx, active)
+        .await
+        .map_err(|e| e.to_string())?;
+    invoice_repository::insert_lines(tx, invoice.id, &input.lines).await?;
+    Ok(invoice.id)
+}
+
+/// Returns the paid date consistent with the target status: kept (or set to
+/// today) for paid invoices, cleared for every other status.
+fn resolve_paid_date(status: &InvoiceStatus, paid_date: Option<String>) -> Option<String> {
+    if *status == InvoiceStatus::Paid {
+        paid_date
+            .filter(|d| !d.is_empty())
+            .or_else(|| Some(chrono::Local::now().format("%Y-%m-%d").to_string()))
+    } else {
+        None
+    }
+}
 
 /// Loads all services into a lookup map keyed by service id.
 async fn load_service_map(
@@ -299,16 +365,19 @@ fn to_line_data(lines: &[InvoiceLineInput]) -> Vec<InvoiceLineData> {
         .collect()
 }
 
-fn last_day_of_month(year: i64, month: i64) -> String {
-    let (ny, nm) = if month == 12 {
+/// Returns the last day of the given month as an ISO date string.
+///
+/// Month must already be validated (1-12).
+fn last_day_of_month(year: i64, month: i64) -> Result<String, String> {
+    let (next_year, next_month) = if month == 12 {
         (year + 1, 1)
     } else {
         (year, month + 1)
     };
-    let next_first = chrono::NaiveDate::from_ymd_opt(ny as i32, nm as u32, 1)
-        .unwrap_or_else(|| chrono::NaiveDate::from_ymd_opt(year as i32, month as u32, 28).unwrap());
-    let last = next_first.pred_opt().unwrap();
-    last.format("%Y-%m-%d").to_string()
+    chrono::NaiveDate::from_ymd_opt(next_year as i32, next_month as u32, 1)
+        .and_then(|d| d.pred_opt())
+        .map(|d| d.format("%Y-%m-%d").to_string())
+        .ok_or_else(|| format!("Data non valida: {year}-{month}"))
 }
 
 fn format_date_short(iso: &str) -> String {
@@ -320,35 +389,54 @@ fn format_date_short(iso: &str) -> String {
 }
 
 async fn compute_totals(
-    db: &impl sea_orm::ConnectionTrait,
-    lines: &[crate::app::model::invoice::InvoiceLineInput],
+    db: &impl ConnectionTrait,
+    lines: &[InvoiceLineInput],
     apply_enpap: bool,
 ) -> Result<crate::app::service::tax_service::InvoiceTotals, String> {
     let regime = invoice_repository::get_tax_regime(db).await?;
-    let enpap_rate = if apply_enpap { 2.0 } else { 0.0 };
-    let ritenuta_rate = if regime == "ordinario" { 20.0 } else { 0.0 };
-
-    let line_data: Vec<InvoiceLineData> = lines
-        .iter()
-        .map(|l| InvoiceLineData {
-            quantity: l.quantity,
-            unit_price: l.unit_price,
-            vat_rate: l.vat_rate,
-        })
-        .collect();
+    let enpap_rate = if apply_enpap { ENPAP_RATE } else { 0.0 };
+    let ritenuta_rate = ritenuta_rate_for_regime(&regime);
 
     Ok(calculate_invoice_totals(
-        &line_data,
-        &regime,
+        &to_line_data(lines),
         enpap_rate,
         ritenuta_rate,
     ))
 }
 
 fn extract_year(date_str: &str) -> Result<i64, String> {
-    date_str
-        .split('-')
-        .next()
-        .and_then(|y| y.parse::<i64>().ok())
-        .ok_or_else(|| format!("Invalid date format: {date_str}"))
+    use chrono::Datelike;
+    let date = validate::parse_iso_date(date_str, "Data emissione")?;
+    Ok(date.year() as i64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn last_day_of_month_handles_regular_and_leap_years() {
+        assert_eq!(last_day_of_month(2026, 1).unwrap(), "2026-01-31");
+        assert_eq!(last_day_of_month(2026, 12).unwrap(), "2026-12-31");
+        assert_eq!(last_day_of_month(2024, 2).unwrap(), "2024-02-29");
+        assert_eq!(last_day_of_month(2026, 2).unwrap(), "2026-02-28");
+    }
+
+    #[test]
+    fn paid_date_kept_for_paid_and_cleared_otherwise() {
+        let kept = resolve_paid_date(&InvoiceStatus::Paid, Some("2026-07-01".to_string()));
+        assert_eq!(kept, Some("2026-07-01".to_string()));
+
+        let defaulted = resolve_paid_date(&InvoiceStatus::Paid, None);
+        assert!(defaulted.is_some());
+
+        let cleared = resolve_paid_date(&InvoiceStatus::Issued, Some("2026-07-01".to_string()));
+        assert_eq!(cleared, None);
+    }
+
+    #[test]
+    fn extract_year_requires_valid_date() {
+        assert_eq!(extract_year("2026-07-04").unwrap(), 2026);
+        assert!(extract_year("not-a-date").is_err());
+    }
 }

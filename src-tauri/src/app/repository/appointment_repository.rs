@@ -13,14 +13,18 @@ pub async fn find_all(
     client_id: Option<i64>,
 ) -> Result<Vec<Appointment>, String> {
     let mut conditions = vec!["1=1".to_string()];
+    let mut values: Vec<sea_orm::Value> = Vec::new();
     if let Some(d) = date_from {
-        conditions.push(format!("a.date >= '{d}'"));
+        conditions.push("a.date >= ?".to_string());
+        values.push(d.into());
     }
     if let Some(d) = date_to {
-        conditions.push(format!("a.date <= '{d}'"));
+        conditions.push("a.date <= ?".to_string());
+        values.push(d.into());
     }
     if let Some(c) = client_id {
-        conditions.push(format!("a.client_id = {c}"));
+        conditions.push("a.client_id = ?".to_string());
+        values.push(c.into());
     }
 
     let sql = format!(
@@ -36,13 +40,12 @@ pub async fn find_all(
         conditions.join(" AND ")
     );
 
-    load_appointments_by_sql(db, sql).await
+    load_appointments_by_sql(db, &sql, values).await
 }
 
 /// Returns a single appointment by id.
 pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Appointment, String> {
-    let sql = format!(
-        "SELECT a.id, a.client_id, a.service_id, a.date, a.start_time, a.end_time,
+    let sql = "SELECT a.id, a.client_id, a.service_id, a.date, a.start_time, a.end_time,
                 a.status, a.notes, a.recurrence_group_id, a.invoice_id,
                 a.created_at, a.updated_at,
                 c.first_name || ' ' || c.last_name AS client_name,
@@ -50,10 +53,9 @@ pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Appointment,
          FROM appointments a
          JOIN clients c ON a.client_id = c.id
          LEFT JOIN services s ON a.service_id = s.id
-         WHERE a.id = {id}"
-    );
+         WHERE a.id = ?";
 
-    let mut results = load_appointments_by_sql(db, sql).await?;
+    let mut results = load_appointments_by_sql(db, sql, vec![id.into()]).await?;
     results
         .pop()
         .ok_or_else(|| format!("Appointment {id} not found"))
@@ -107,8 +109,7 @@ pub async fn find_unbilled_for_month(
         format!("{year:04}-{:02}-01", month + 1)
     };
 
-    let sql = format!(
-        "SELECT a.id, a.client_id, a.service_id, a.date, a.start_time, a.end_time,
+    let sql = "SELECT a.id, a.client_id, a.service_id, a.date, a.start_time, a.end_time,
                 a.status, a.notes, a.recurrence_group_id, a.invoice_id,
                 a.created_at, a.updated_at,
                 c.first_name || ' ' || c.last_name AS client_name,
@@ -118,12 +119,11 @@ pub async fn find_unbilled_for_month(
          LEFT JOIN services s ON a.service_id = s.id
          WHERE a.status = 'completed'
            AND a.invoice_id IS NULL
-           AND a.date >= '{date_from}'
-           AND a.date < '{date_to}'
-         ORDER BY a.client_id, a.date, a.start_time"
-    );
+           AND a.date >= ?
+           AND a.date < ?
+         ORDER BY a.client_id, a.date, a.start_time";
 
-    load_appointments_by_sql(db, sql).await
+    load_appointments_by_sql(db, sql, vec![date_from.into(), date_to.into()]).await
 }
 
 /// Links a set of appointment ids to an invoice.
@@ -135,13 +135,16 @@ pub async fn mark_as_invoiced(
     if appointment_ids.is_empty() {
         return Ok(());
     }
-    let ids_csv: String = appointment_ids
-        .iter()
-        .map(|id| id.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
-    db.execute_unprepared(&format!(
-        "UPDATE appointments SET invoice_id = {invoice_id} WHERE id IN ({ids_csv})"
+    let placeholders = vec!["?"; appointment_ids.len()].join(", ");
+    let sql = format!("UPDATE appointments SET invoice_id = ? WHERE id IN ({placeholders})");
+    let mut values: Vec<sea_orm::Value> = vec![invoice_id.into()];
+    for id in appointment_ids {
+        values.push((*id).into());
+    }
+    db.execute(Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Sqlite,
+        &sql,
+        values,
     ))
     .await
     .map_err(|e| e.to_string())?;
@@ -152,7 +155,8 @@ pub async fn mark_as_invoiced(
 
 async fn load_appointments_by_sql(
     db: &DatabaseConnection,
-    sql: String,
+    sql: &str,
+    values: Vec<sea_orm::Value>,
 ) -> Result<Vec<Appointment>, String> {
     #[derive(FromQueryResult)]
     struct Row {
@@ -172,9 +176,10 @@ async fn load_appointments_by_sql(
         service_name: Option<String>,
     }
 
-    let rows = Row::find_by_statement(Statement::from_string(
+    let rows = Row::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         sql,
+        values,
     ))
     .all(db)
     .await
