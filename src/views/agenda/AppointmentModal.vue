@@ -198,7 +198,10 @@ function toggleRecurringDay(day: number) {
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="emit('close')" />
-      <div class="relative glass-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto animate-in">
+      <div
+        data-lenis-prevent
+        class="relative glass-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto animate-in"
+      >
         <div class="flex items-center justify-between mb-5">
           <h3 class="text-base font-semibold text-sage-900">
             {{ isEdit ? 'Modifica Appuntamento' : 'Nuovo Appuntamento' }}

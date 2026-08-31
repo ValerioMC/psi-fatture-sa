@@ -35,6 +35,7 @@ const form = reactive<UpsertConfigInput>({
   pec_email: '',
   iban: '',
   coefficient: 78,
+  profession: 'psicologo',
   is_psicoanalista: false,
   initial_invoice_number: 1,
 })
@@ -44,6 +45,11 @@ const TITLE_OPTIONS = ['Dott.', 'Dott.ssa', 'Dr.', 'Dr.ssa', 'Prof.', 'Prof.ssa'
 const TAX_REGIME_OPTIONS = [
   { value: 'forfettario', label: 'Regime Forfettario' },
   { value: 'ordinario', label: 'Regime Ordinario' },
+]
+
+const PROFESSION_OPTIONS = [
+  { value: 'psicologo', label: 'Psicologo' },
+  { value: 'psicoterapeuta', label: 'Psicoterapeuta' },
 ]
 
 onMounted(async () => {
@@ -202,16 +208,38 @@ async function onSubmit() {
             />
           </div>
         </div>
-        <div class="mt-3">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input
-              v-model="form.is_psicoanalista"
-              type="checkbox"
-              class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
-            />
-            <span class="text-sm text-sage-700">Iscritto all'albo degli psicoanalisti</span>
-          </label>
+      </div>
+
+      <!-- Profession -->
+      <div class="glass-card rounded-xl p-6 animate-in-d1">
+        <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Professione</h2>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm font-medium text-sage-700 block mb-1">Professione</label>
+            <select
+              v-model="form.profession"
+              class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+            >
+              <option v-for="opt in PROFESSION_OPTIONS" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div class="flex items-end pb-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                v-model="form.is_psicoanalista"
+                type="checkbox"
+                class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
+              />
+              <span class="text-sm text-sage-700">Anche psicoanalista (membro IPA)</span>
+            </label>
+          </div>
         </div>
+        <p class="text-xs text-sage-400 mt-2">
+          La professione appare nell'intestazione delle fatture. Se selezioni psicoanalista, in fattura viene
+          aggiunta la dicitura "Membro della International Psychoanalytical Association (IPA)".
+        </p>
       </div>
 
       <!-- Invoice numbering -->

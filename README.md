@@ -183,11 +183,12 @@ Dati generati:
 
 | Dato | Quantità |
 |------|----------|
-| Configurazione professionale | Dott.ssa Maria Demo (regime forfettario) |
+| Configurazione professionale | Dott.ssa Maria Demo (psicoterapeuta e psicoanalista, regime forfettario) |
 | Pazienti | 50 |
 | Prestazioni | 20 (€70–€120) |
-| Appuntamenti | ~5.500 (≥6/giorno, 2025–2026) |
-| Fatture mensili | ~750 (pagate/emesse/bozza per anno) |
+| Appuntamenti | ~1.500 (2025 → dicembre 2026, dimensionati sul budget mensile) |
+| Fatture mensili | ~320, dal 2025 fino al mese corrente (pagate/emesse/bozza) |
+| Fatturato | ~€6.300–6.950 netti/mese, sempre < €7.000/mese e < €85.000/anno (tetto forfettario) |
 
 Il caricamento è rapido (~2 s) perché scrive direttamente nel SQLite bypassando l'app.
 

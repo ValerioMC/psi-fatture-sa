@@ -7,6 +7,7 @@ import { useServicesStore } from '@/stores/services'
 import type { Appointment } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppointmentModal from './AppointmentModal.vue'
+import { useSmoothScrollInstance } from '@/composables/useSmoothScroll'
 
 const clientsStore = useClientsStore()
 const servicesStore = useServicesStore()
@@ -23,6 +24,7 @@ const showModal = ref(false)
 const modalDate = ref<string | undefined>(undefined)
 const editingAppointment = ref<Appointment | null>(null)
 const dayPanelRef = ref<HTMLElement | null>(null)
+const lenis = useSmoothScrollInstance()
 
 const MONTH_NAMES = [
   'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -126,7 +128,10 @@ async function loadAppointments() {
 function selectDate(date: string) {
   selectedDate.value = date
   nextTick(() => {
-    dayPanelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (dayPanelRef.value === null) return
+    // scroll-mt-6 on the panel is honored by scrollIntoView but not by Lenis, hence the offset
+    if (lenis.value !== null) lenis.value.scrollTo(dayPanelRef.value, { offset: -24 })
+    else dayPanelRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
 }
 

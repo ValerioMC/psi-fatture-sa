@@ -3,11 +3,18 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandMark from '@/components/ui/BrandMark.vue'
 import { useConfigStore } from '@/stores/config'
+import { useSmoothScroll } from '@/composables/useSmoothScroll'
 import type { UpsertConfigInput } from '@/types'
-import { validateCodiceFiscale, validatePartitaIva } from '@/utils/validation'
+import {
+  validateCodiceFiscale,
+  validateEmail,
+  validateIban,
+  validatePartitaIva,
+} from '@/utils/validation'
 
 const router = useRouter()
 const configStore = useConfigStore()
+useSmoothScroll()
 
 const saving = ref(false)
 const error = ref<string | null>(null)
@@ -30,6 +37,7 @@ const form = reactive<UpsertConfigInput>({
   pec_email: '',
   iban: '',
   coefficient: 78,
+  profession: 'psicologo',
   is_psicoanalista: false,
   initial_invoice_number: 1,
 })
@@ -41,19 +49,39 @@ const TAX_REGIME_OPTIONS = [
   { value: 'ordinario', label: 'Regime Ordinario' },
 ]
 
-function validateForm(): string | null {
-  const checks = [
-    validatePartitaIva(form.vat_number),
-    validateCodiceFiscale(form.fiscal_code),
-  ]
-  const firstError = checks.find((c) => !c.valid)
-  return firstError?.message ?? null
+const PROFESSION_OPTIONS = [
+  { value: 'psicologo', label: 'Psicologo' },
+  { value: 'psicoterapeuta', label: 'Psicoterapeuta' },
+]
+
+type ValidatedField = 'vat_number' | 'fiscal_code' | 'iban' | 'pec_email'
+
+const fieldErrors = reactive<Partial<Record<ValidatedField, string>>>({})
+
+const FIELD_VALIDATORS: Record<ValidatedField, () => { valid: boolean; message?: string }> = {
+  vat_number: () => validatePartitaIva(form.vat_number),
+  fiscal_code: () => validateCodiceFiscale(form.fiscal_code),
+  iban: () => validateIban(form.iban),
+  pec_email: () => validateEmail(form.pec_email),
+}
+
+function validateField(field: ValidatedField) {
+  const result = FIELD_VALIDATORS[field]()
+  if (result.valid) {
+    delete fieldErrors[field]
+  } else {
+    fieldErrors[field] = result.message
+  }
+}
+
+function validateAllFields(): boolean {
+  ;(Object.keys(FIELD_VALIDATORS) as ValidatedField[]).forEach(validateField)
+  return Object.keys(fieldErrors).length === 0
 }
 
 async function onSubmit() {
-  const validationError = validateForm()
-  if (validationError) {
-    error.value = validationError
+  if (!validateAllFields()) {
+    error.value = 'Correggi i campi evidenziati prima di salvare.'
     return
   }
   saving.value = true
@@ -124,8 +152,13 @@ async function onSubmit() {
                   v-model="form.vat_number"
                   type="text"
                   required
-                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                  class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white/80"
+                  :class="fieldErrors.vat_number
+                    ? 'border-red-300 focus:ring-red-400'
+                    : 'border-sage-200 focus:ring-sage-400'"
+                  @blur="validateField('vat_number')"
                 />
+                <p v-if="fieldErrors.vat_number" class="text-xs text-red-500 mt-1">{{ fieldErrors.vat_number }}</p>
               </div>
               <div>
                 <label class="text-sm font-medium text-sage-700 block mb-1">Codice Fiscale</label>
@@ -133,10 +166,50 @@ async function onSubmit() {
                   v-model="form.fiscal_code"
                   type="text"
                   required
-                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                  class="w-full border rounded-lg px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 bg-white/80"
+                  :class="fieldErrors.fiscal_code
+                    ? 'border-red-300 focus:ring-red-400'
+                    : 'border-sage-200 focus:ring-sage-400'"
+                  @input="form.fiscal_code = form.fiscal_code.toUpperCase()"
+                  @blur="validateField('fiscal_code')"
                 />
+                <p v-if="fieldErrors.fiscal_code" class="text-xs text-red-500 mt-1">{{ fieldErrors.fiscal_code }}</p>
               </div>
             </div>
+          </div>
+
+          <hr class="border-sage-100" />
+
+          <!-- Profession -->
+          <div>
+            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Professione</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-sm font-medium text-sage-700 block mb-1">Professione</label>
+                <select
+                  v-model="form.profession"
+                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                >
+                  <option v-for="opt in PROFESSION_OPTIONS" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="flex items-end pb-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input
+                    v-model="form.is_psicoanalista"
+                    type="checkbox"
+                    class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
+                  />
+                  <span class="text-sm text-sage-700">Sono anche psicoanalista (membro IPA)</span>
+                </label>
+              </div>
+            </div>
+            <p class="text-xs text-sage-400 mt-2">
+              La professione selezionata appare nell'intestazione delle fatture. Se sei anche psicoanalista,
+              in fattura viene aggiunta la dicitura "Membro della International Psychoanalytical Association (IPA)".
+            </p>
           </div>
 
           <hr class="border-sage-100" />
@@ -168,16 +241,27 @@ async function onSubmit() {
                 />
               </div>
             </div>
-            <div class="mt-3">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input
-                  v-model="form.is_psicoanalista"
-                  type="checkbox"
-                  class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
-                />
-                <span class="text-sm text-sage-700">Sono iscritto all'albo degli psicoanalisti</span>
-              </label>
+          </div>
+
+          <hr class="border-sage-100" />
+
+          <!-- Invoice numbering -->
+          <div>
+            <h2 class="text-sm font-semibold text-sage-700 uppercase tracking-wider mb-4">Numerazione fatture</h2>
+            <div class="max-w-xs">
+              <label class="text-sm font-medium text-sage-700 block mb-1">Numero prima fattura</label>
+              <input
+                v-model.number="form.initial_invoice_number"
+                type="number"
+                min="1"
+                required
+                class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+              />
             </div>
+            <p class="text-xs text-sage-400 mt-2">
+              Se inizi a usare l'app a metà anno, indica il numero da cui partire: ad esempio, se l'ultima
+              fattura emessa quest'anno è la n. 23, inserisci 24. Se parti da zero lascia 1.
+            </p>
           </div>
 
           <hr class="border-sage-100" />
@@ -275,16 +359,26 @@ async function onSubmit() {
                 <input
                   v-model="form.pec_email"
                   type="email"
-                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                  class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white/80"
+                  :class="fieldErrors.pec_email
+                    ? 'border-red-300 focus:ring-red-400'
+                    : 'border-sage-200 focus:ring-sage-400'"
+                  @blur="validateField('pec_email')"
                 />
+                <p v-if="fieldErrors.pec_email" class="text-xs text-red-500 mt-1">{{ fieldErrors.pec_email }}</p>
               </div>
               <div class="col-span-2">
                 <label class="text-sm font-medium text-sage-700 block mb-1">IBAN</label>
                 <input
                   v-model="form.iban"
                   type="text"
-                  class="w-full border border-sage-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 bg-white/80"
+                  class="w-full border rounded-lg px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 bg-white/80"
+                  :class="fieldErrors.iban
+                    ? 'border-red-300 focus:ring-red-400'
+                    : 'border-sage-200 focus:ring-sage-400'"
+                  @blur="validateField('iban')"
                 />
+                <p v-if="fieldErrors.iban" class="text-xs text-red-500 mt-1">{{ fieldErrors.iban }}</p>
               </div>
             </div>
           </div>

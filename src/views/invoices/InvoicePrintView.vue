@@ -6,9 +6,11 @@ import { invoke } from '@tauri-apps/api/core'
 import { getInvoice, getClient, getConfig } from '@/api'
 import type { Invoice, Client, ProfessionalConfig } from '@/types'
 import { formatCurrency, formatDateLong } from '@/utils/format'
+import { useSmoothScroll } from '@/composables/useSmoothScroll'
 
 const route = useRoute()
 const router = useRouter()
+useSmoothScroll()
 const invoiceId = Number(route.params.id)
 
 const invoice = ref<Invoice | null>(null)
@@ -41,6 +43,10 @@ const professionalFullName = computed(() => {
   return [config.value.title, config.value.first_name, config.value.last_name]
     .filter(Boolean).join(' ')
 })
+
+const professionLabel = computed(() =>
+  config.value?.profession === 'psicoterapeuta' ? 'Psicoterapeuta' : 'Psicologo',
+)
 
 const clientDisplayName = computed(() => {
   if (!client.value) return ''
@@ -89,7 +95,7 @@ async function handlePrint(): Promise<void> {
     <!-- ── Toolbar (screen only) ── -->
     <div class="print:hidden fixed top-5 right-5 z-50 flex items-center gap-2">
       <button
-        type="button"gh
+        type="button"
         class="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-slate-200 text-slate-600 hover:text-slate-900 px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all"
         @click="router.push(`/invoices/${invoiceId}`)"
       >
@@ -141,12 +147,15 @@ async function handlePrint(): Promise<void> {
           <div class="header-left">
             <div class="company-name">{{ professionalFullName }}</div>
             <div class="company-profession">
-              Psicologo<template v-if="config.is_psicoanalista"> &nbsp;—&nbsp; Psicoanalista</template>
+              {{ professionLabel }}<template v-if="config.is_psicoanalista"> &nbsp;&mdash;&nbsp; Psicoanalista</template>
             </div>
             <div v-if="config.albo_number || config.albo_region" class="albo-info">
               <template v-if="config.albo_number">Iscriz. Albo n.&nbsp;<strong>{{ config.albo_number }}</strong></template>
-              <template v-if="config.albo_number && config.albo_region">&nbsp;—&nbsp;</template>
+              <template v-if="config.albo_number && config.albo_region">&nbsp;&mdash;&nbsp;</template>
               <template v-if="config.albo_region">Regione&nbsp;<strong>{{ config.albo_region }}</strong></template>
+            </div>
+            <div v-if="config.is_psicoanalista" class="albo-info">
+              Membro della <strong>International Psychoanalytical Association (IPA)</strong>
             </div>
             <div class="company-details">
               <template v-if="config.address">{{ config.address }}<br></template>

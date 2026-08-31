@@ -289,6 +289,33 @@ pub async fn next_invoice_number(
     Ok(format!("{:03}", next))
 }
 
+/// Returns true when another invoice (different id) already uses the given
+/// number in the given year. Numbers are compared as integers so "007" and
+/// "7" count as the same number.
+pub async fn invoice_number_taken(
+    db: &impl sea_orm::ConnectionTrait,
+    year: i64,
+    number: i64,
+    exclude_id: i64,
+) -> Result<bool, String> {
+    #[derive(FromQueryResult)]
+    struct Row {
+        n: i64,
+    }
+
+    let row = Row::find_by_statement(Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Sqlite,
+        "SELECT COUNT(*) AS n FROM invoices
+         WHERE year = ? AND CAST(invoice_number AS INTEGER) = ? AND id <> ?",
+        [year.into(), number.into(), exclude_id.into()],
+    ))
+    .one(db)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(row.map(|r| r.n).unwrap_or(0) > 0)
+}
+
 /// Returns the tax_regime from professional_config (defaults to "forfettario").
 pub async fn get_tax_regime(db: &impl sea_orm::ConnectionTrait) -> Result<String, String> {
     #[derive(FromQueryResult)]

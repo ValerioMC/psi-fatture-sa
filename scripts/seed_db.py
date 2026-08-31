@@ -9,8 +9,11 @@ What it creates:
   - 1 professional config (utente di default: Dott.ssa Maria Demo)
   - 50 pazienti con dati anagrafici italiani
   - 20 prestazioni psicologiche (70–120 €)
-  - Appuntamenti per 2025-01-01 → 2026-12-31 (≥6 al giorno, pazienti diversi)
-  - Fatture mensili per ogni paziente con appuntamenti completati
+  - Appuntamenti per 2025-01-01 → 2026-12-31, dimensionati su un budget
+    mensile di ~€6.300–6.950 netti (mai oltre €7.000/mese, quindi sotto il
+    tetto forfettario di €85.000/anno)
+  - Fatture mensili per ogni paziente con appuntamenti completati, fino
+    alla data odierna (i mesi futuri restano solo pianificati)
 
 Il caricamento sovrascrive tutti i dati esistenti nel database.
 """
@@ -41,15 +44,21 @@ def default_db_path() -> Path:
     return base / "psi-fatture-sa" / "database.db"
 
 # ─── Costanti ─────────────────────────────────────────────────────────────────
-TODAY          = date(2026, 3, 22)
+TODAY          = date.today()
 START          = date(2025, 1, 1)
 END            = date(2026, 12, 31)
-MIN_APPTS      = 6
-MAX_APPTS      = 9
 N_CLIENTS      = 50
 N_SERVICES     = 20
 PRICE_MIN      = 70
 PRICE_MAX      = 120
+
+# Regime forfettario: tetto €85.000/anno. Il fatturato netto mensile viene
+# tenuto in [MONTHLY_NET_MIN, MONTHLY_NET_MAX], quindi mai oltre €7.000/mese
+# e al massimo ~€83.400/anno.
+MONTHLY_NET_MIN   = 6300.0
+MONTHLY_NET_MAX   = 6950.0
+MAX_APPTS_PER_DAY = 8   # slot orari 08:00–15:00
+CLIENTS_PER_MONTH = 18  # pazienti attivi in un mese
 
 # ─── Dati italiani ────────────────────────────────────────────────────────────
 
@@ -186,19 +195,24 @@ def last_day_of_month(y: int, m: int) -> date:
 
 
 def invoice_status_for_month(y: int, m: int) -> tuple[str, str | None]:
-    """Return (status, paid_date) for a monthly invoice."""
-    if y == 2025:
-        paid = (last_day_of_month(y, m) + timedelta(days=random.randint(5, 30))).isoformat()
+    """Return (status, paid_date) for a monthly invoice, relative to TODAY."""
+    month_end = last_day_of_month(y, m)
+    age_days  = (TODAY - month_end).days
+
+    if age_days > 70:  # mesi chiusi da tempo: tutte pagate
+        paid = (month_end + timedelta(days=random.randint(5, 30))).isoformat()
         return "paid", paid
-    if y == 2026 and m == 1:
-        paid = (last_day_of_month(y, m) + timedelta(days=random.randint(5, 20))).isoformat()
-        return "paid", paid
-    if y == 2026 and m == 2:
-        if random.random() < 0.6:
-            paid = (last_day_of_month(y, m) + timedelta(days=random.randint(1, 15))).isoformat()
+    if age_days > 30:  # due mesi fa: quasi tutte pagate
+        if random.random() < 0.8:
+            paid = (month_end + timedelta(days=random.randint(5, 25))).isoformat()
             return "paid", paid
         return "issued", None
-    # March 2026 onwards — draft
+    if age_days > 0:  # mese scorso: metà pagate, metà emesse
+        if random.random() < 0.5:
+            paid = (month_end + timedelta(days=random.randint(1, max(1, age_days)))).isoformat()
+            return "paid", paid
+        return "issued", None
+    # Mese corrente non ancora chiuso — bozza
     return "draft", None
 
 # ─── Database operations ──────────────────────────────────────────────────────
@@ -225,15 +239,15 @@ def insert_config(conn: sqlite3.Connection) -> None:
             (id, title, first_name, last_name, vat_number, fiscal_code,
              tax_regime, albo_number, albo_region, address, city, province,
              zip_code, country, phone, pec_email, iban, coefficient,
-             is_psicoanalista, initial_invoice_number)
+             profession, is_psicoanalista, initial_invoice_number)
         VALUES
             (1, 'Dott.ssa', 'Maria', 'Demo',
-             '12345678901', 'DMRMRA80A41H501Z',
+             '12345678903', 'DMRMRA80A41H501N',
              'forfettario', '12345', 'Lazio',
              'Via Roma 1', 'Roma', 'RM', '00100', 'Italia',
              '+39 06 12345678', 'maria.demo@pec.it',
              'IT60X0542811101000000123456',
-             78.0, 0, 1)
+             78.0, 'psicoterapeuta', 1, 1)
         ON CONFLICT(id) DO UPDATE SET
             title              = excluded.title,
             first_name         = excluded.first_name,
@@ -251,6 +265,7 @@ def insert_config(conn: sqlite3.Connection) -> None:
             pec_email          = excluded.pec_email,
             iban               = excluded.iban,
             coefficient        = excluded.coefficient,
+            profession         = excluded.profession,
             is_psicoanalista   = excluded.is_psicoanalista,
             initial_invoice_number = excluded.initial_invoice_number,
             updated_at         = datetime('now')
@@ -333,29 +348,70 @@ def insert_services(conn: sqlite3.Connection) -> dict[int, float]:
     return result
 
 
+def month_range(start: date, end: date):
+    """Yield (year, month) pairs from start to end inclusive."""
+    y, m = start.year, start.month
+    while (y, m) <= (end.year, end.month):
+        yield y, m
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+
+
+def working_days(y: int, m: int) -> list[date]:
+    """Return the Monday–Saturday days of the given month."""
+    days = []
+    d = date(y, m, 1)
+    while d.month == m:
+        if d.weekday() < 6:
+            days.append(d)
+        d += timedelta(days=1)
+    return days
+
+
 def generate_and_insert_appointments(
     conn: sqlite3.Connection,
     client_ids: list[int],
     service_map: dict[int, dict],
 ) -> list[dict]:
-    """Generate ≥MIN_APPTS per day for every day in [START, END] and insert in bulk."""
+    """Generate appointments month by month, sized on the monthly net budget.
+
+    Ogni mese sceglie un budget in [MONTHLY_NET_MIN, MONTHLY_NET_MAX] e
+    aggiunge sedute (€70–120) finché il budget non è raggiunto, così il
+    fatturato mensile non supera mai €7.000 e quello annuo resta sotto il
+    tetto forfettario di €85.000.
+    """
     svc_ids = list(service_map.keys())
     rows    = []
 
-    current = START
-    while current <= END:
-        n           = random.randint(MIN_APPTS, MAX_APPTS)
-        day_clients = random.sample(client_ids, min(n, len(client_ids)))
-        status      = "completed" if current < TODAY else "scheduled"
+    for y, m in month_range(START, END):
+        budget    = random.uniform(MONTHLY_NET_MIN, MONTHLY_NET_MAX)
+        pool      = random.sample(client_ids, min(CLIENTS_PER_MONTH, len(client_ids)))
+        days      = working_days(y, m)
+        day_slots: dict[date, list[int]] = {d: [] for d in days}
 
-        for idx, client_id in enumerate(day_clients):
-            hour      = 8 + idx  # slot orario: 08:00, 09:00, ...
-            start_t   = f"{hour:02d}:00"
-            end_t     = f"{hour:02d}:50"
-            svc_id    = random.choice(svc_ids)
-            rows.append((client_id, svc_id, current.isoformat(), start_t, end_t, status, ""))
+        total = 0.0
+        while True:
+            svc_id = random.choice(svc_ids)
+            price  = service_map[svc_id]["price"]
+            if total + price > budget:
+                break
 
-        current += timedelta(days=1)
+            client_id  = random.choice(pool)
+            candidates = [
+                d for d in days
+                if len(day_slots[d]) < MAX_APPTS_PER_DAY and client_id not in day_slots[d]
+            ]
+            if not candidates:
+                break
+
+            day  = random.choice(candidates)
+            slot = len(day_slots[day])
+            day_slots[day].append(client_id)
+            status = "completed" if day < TODAY else "scheduled"
+            rows.append((
+                client_id, svc_id, day.isoformat(),
+                f"{8 + slot:02d}:00", f"{8 + slot:02d}:50", status, "",
+            ))
+            total += price
 
     conn.executemany("""
         INSERT INTO appointments
@@ -543,6 +599,17 @@ def main() -> None:
         n_draft = cur.fetchone()[0]
         cur.execute("SELECT COALESCE(SUM(total_due),0) FROM invoices WHERE status='paid'")
         total_paid = cur.fetchone()[0]
+        cur.execute(
+            "SELECT year, ROUND(SUM(total_net), 2) FROM invoices GROUP BY year ORDER BY year"
+        )
+        net_per_year = cur.fetchall()
+        cur.execute("""
+            SELECT COALESCE(MAX(t), 0) FROM (
+                SELECT SUM(total_net) AS t FROM invoices
+                GROUP BY year, strftime('%m', issue_date)
+            )
+        """)
+        max_month_net = cur.fetchone()[0]
 
         print("\n" + "=" * 60)
         print("✅  Seed completato con successo!")
@@ -556,6 +623,9 @@ def main() -> None:
         print(f"  Fatture emesse:        {n_issued}")
         print(f"  Fatture in bozza:      {n_draft}")
         print(f"  Incassato (2025–2026): €{total_paid:,.2f}")
+        for y, net in net_per_year:
+            print(f"  Fatturato netto {y}:  €{net:,.2f} (tetto forfettario €85.000)")
+        print(f"  Mese più alto:         €{max_month_net:,.2f} netti (limite €7.000)")
         print("=" * 60)
 
     except Exception as e:

@@ -22,6 +22,7 @@ pub struct Model {
     pub pec_email: String,
     pub iban: String,
     pub coefficient: f64,
+    pub profession: String,
     pub is_psicoanalista: i32,
     pub initial_invoice_number: i64,
     pub created_at: String,

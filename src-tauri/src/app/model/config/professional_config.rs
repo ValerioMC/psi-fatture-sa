@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::profession::Profession;
 use super::tax_regime::TaxRegime;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +23,7 @@ pub struct ProfessionalConfig {
     pub pec_email: String,
     pub iban: String,
     pub coefficient: f64,
+    pub profession: Profession,
     pub is_psicoanalista: bool,
     pub initial_invoice_number: i64,
     pub created_at: String,

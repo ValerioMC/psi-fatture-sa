@@ -1,6 +1,7 @@
 /** TypeScript types mirroring Rust domain models. */
 
 export type TaxRegime = 'forfettario' | 'ordinario'
+export type Profession = 'psicologo' | 'psicoterapeuta'
 export type ClientType = 'persona_fisica' | 'azienda'
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'overdue' | 'cancelled'
 export type PaymentMethod = 'bonifico' | 'contanti' | 'pos' | 'altro'
@@ -25,6 +26,7 @@ export interface ProfessionalConfig {
   pec_email: string
   iban: string
   coefficient: number
+  profession: Profession
   is_psicoanalista: boolean
   initial_invoice_number: number
   created_at: string
@@ -98,6 +100,8 @@ export interface CreateInvoiceInput {
 
 export interface UpdateInvoiceInput extends CreateInvoiceInput {
   id: number
+  /** New invoice number for manual renumbering; omit to keep the current one. */
+  invoice_number?: string
   paid_date?: string
 }
 

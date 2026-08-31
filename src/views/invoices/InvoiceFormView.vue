@@ -53,6 +53,7 @@ function newLine(): FormLine {
 
 const form = reactive({
   client_id: 0,
+  invoice_number: '',
   issue_date: TODAY,
   due_date: '' as string | undefined,
   status: 'draft' as InvoiceStatus,
@@ -114,6 +115,7 @@ onMounted(async () => {
   try {
     const invoice = await getInvoice(editId.value!)
     form.client_id = invoice.client_id
+    form.invoice_number = invoice.invoice_number
     form.issue_date = invoice.issue_date
     form.due_date = invoice.due_date ?? ''
     form.status = invoice.status
@@ -139,6 +141,12 @@ onMounted(async () => {
 function validateForm(): string | null {
   if (!form.client_id) {
     return 'Seleziona un cliente.'
+  }
+  if (isEdit.value && form.invoice_number.trim()) {
+    const n = Number(form.invoice_number.trim())
+    if (!Number.isInteger(n) || n < 1) {
+      return 'Il numero fattura deve essere un numero intero positivo.'
+    }
   }
   if (!form.issue_date) {
     return 'Inserisci la data di emissione.'
@@ -187,6 +195,7 @@ async function onSubmit() {
       const input: UpdateInvoiceInput = {
         id: editId.value!,
         client_id: form.client_id,
+        invoice_number: form.invoice_number.trim() || undefined,
         issue_date: form.issue_date,
         due_date: form.due_date || undefined,
         status: form.status,
@@ -276,6 +285,20 @@ async function onSubmit() {
                   {{ client.last_name }} {{ client.first_name }}
                 </option>
               </select>
+            </div>
+
+            <!-- Numero fattura (solo in modifica) -->
+            <div v-if="isEdit" class="col-span-2">
+              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Numero fattura</label>
+              <input
+                v-model="form.invoice_number"
+                type="text"
+                inputmode="numeric"
+                class="w-full max-w-[160px] border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
+              />
+              <p class="text-[11px] text-sage-400 mt-1">
+                Modificalo solo per correggere la numerazione, ad esempio per riusare il numero di una fattura cancellata. Deve essere unico nell'anno.
+              </p>
             </div>
 
             <!-- Date -->
