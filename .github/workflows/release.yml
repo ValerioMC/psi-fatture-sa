@@ -3,19 +3,70 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versione da rilasciare'
+        description: 'Versione da rilasciare (es. 0.9.0)'
         required: true
         type: string
 
 permissions:
   contents: write
 
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GH_REPO: ${{ github.repository }}
+
 jobs:
+  # Ricava tag e versione da un push di tag oppure da un avvio manuale.
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Risolvi tag e versione
+        id: resolve
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+            version="${version#v}"
+            tag="v$version"
+          else
+            tag="${{ github.ref_name }}"
+            version="${tag#v}"
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+            echo "::error::Versione non valida: '$version'. Attesa forma X.Y.Z o vX.Y.Z."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # La release nasce come draft: diventa visibile solo quando tutti i bundle sono caricati.
+  create-release:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Crea la release in draft
+        run: |
+          set -euo pipefail
+          tag="${{ needs.prepare.outputs.tag }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag già esistente, riuso."
+            exit 0
+          fi
+          gh release create "$tag" \
+            --draft \
+            --target "${{ github.sha }}" \
+            --title "PSI Fatture ${{ needs.prepare.outputs.version }}" \
+            --notes "Scarica il file adatto al tuo sistema operativo."
+
   build:
+    needs: [prepare, create-release]
     strategy:
       fail-fast: false
       matrix:
@@ -23,12 +74,18 @@ jobs:
           - platform: macos-latest
             target: aarch64-apple-darwin
             label: macOS-arm64
+            bundle_glob: 'src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg'
+            asset: PSI-Fatture-macOS-arm64.dmg
           - platform: macos-latest
             target: x86_64-apple-darwin
             label: macOS-x64
+            bundle_glob: 'src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg'
+            asset: PSI-Fatture-macOS-x64.dmg
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             label: Windows-x64
+            bundle_glob: 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe'
+            asset: PSI-Fatture-Windows-x64-setup.exe
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -50,17 +107,77 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
+      # Il bundle deve riportare la versione del tag, non quella committata.
+      - name: Allinea la versione al tag
+        shell: bash
+        run: node scripts/set-version.mjs "${{ needs.prepare.outputs.version }}"
+
       - name: Install frontend dependencies
         run: npm ci
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
-          releaseName: 'PSI Fatture ${{ github.event_name == ''workflow_dispatch'' && github.event.inputs.version || github.ref_name }}'
-          releaseBody: 'Scarica il file appropriato per il tuo sistema operativo.'
-          releaseDraft: true
-          prerelease: false
           args: --target ${{ matrix.target }}
+
+      # Il nome prodotto da Tauri contiene la versione: lo si normalizza per avere
+      # una URL di download stabile sul sito vetrina.
+      - name: Rinomina il bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          bundles=(${{ matrix.bundle_glob }})
+          if [ "${#bundles[@]}" -ne 1 ]; then
+            echo "::error::Atteso 1 bundle per ${{ matrix.label }}, trovati ${#bundles[@]}: ${bundles[*]-nessuno}"
+            exit 1
+          fi
+          mkdir -p upload
+          cp "${bundles[0]}" "upload/${{ matrix.asset }}"
+          echo "${bundles[0]} -> upload/${{ matrix.asset }}"
+
+      # Guardia contro asset scambiati fra piattaforme: l'estensione deve
+      # corrispondere al formato reale del file.
+      - name: Verifica il formato del bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="upload/${{ matrix.asset }}"
+          case "$asset" in
+            *.dmg)
+              magic=$(tail -c 512 "$asset" | head -c 4)
+              if [ "$magic" != "koly" ]; then
+                echo "::error::$asset non è un'immagine DMG (trailer '$magic')"
+                exit 1
+              fi
+              ;;
+            *.exe)
+              magic=$(head -c 2 "$asset")
+              if [ "$magic" != "MZ" ]; then
+                echo "::error::$asset non è un eseguibile Windows (header '$magic')"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Nessuna verifica definita per $asset"
+              exit 1
+              ;;
+          esac
+
+      - name: Carica il bundle sulla release
+        shell: bash
+        run: gh release upload "${{ needs.prepare.outputs.tag }}" "upload/${{ matrix.asset }}" --clobber
+
+  # Pubblica la release solo se tutte le piattaforme hanno caricato il bundle.
+  # --latest è ciò che rende risolvibile /releases/latest/download/<file>.
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pubblica la release come latest
+        run: |
+          set -euo pipefail
+          gh release edit "${{ needs.prepare.outputs.tag }}" \
+            --draft=false \
+            --prerelease=false \
+            --latest

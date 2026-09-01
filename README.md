@@ -126,19 +126,36 @@ Il progetto include un workflow CI/CD che builda automaticamente per macOS e Win
 
 ```bash
 # Crea un tag di versione e pusha
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.9.0
+git push origin v0.9.0
 ```
 
-GitHub Actions avvia le build su runner macOS e Windows. Al termine, trovi i file nella sezione **Releases** del repository (come draft da pubblicare).
+In alternativa: Actions > Release > *Run workflow*, indicando la versione.
+
+Il tag determina la versione del bundle: `scripts/set-version.mjs` la scrive in
+`package.json`, `src-tauri/tauri.conf.json` e `src-tauri/Cargo.toml` prima della build,
+quindi i valori committati in quei file sono solo un segnaposto.
+
+GitHub Actions avvia le build su runner macOS e Windows, crea la release come draft e la
+pubblica come **latest** solo quando tutte e tre le piattaforme hanno caricato il bundle.
 
 **Output generato per release:**
 
-| Piattaforma | File |
-|-------------|------|
-| macOS Apple Silicon | `PSI Fatture_0.1.0_aarch64.dmg` |
-| macOS Intel | `PSI Fatture_0.1.0_x64.dmg` |
-| Windows x64 | `PSI Fatture_0.1.0_x64-setup.exe` (installer NSIS) |
+| Piattaforma | Asset |
+|-------------|-------|
+| macOS Apple Silicon | `PSI-Fatture-macOS-arm64.dmg` |
+| macOS Intel | `PSI-Fatture-macOS-x64.dmg` |
+| Windows x64 | `PSI-Fatture-Windows-x64-setup.exe` (installer NSIS) |
+
+I nomi degli asset sono fissi e non contengono la versione: il sito vetrina vi punta con
+URL stabili nella forma
+
+```
+https://github.com/ValerioMC/psi-fatture-sa/releases/latest/download/<asset>
+```
+
+che GitHub redirige sempre all'ultima release pubblicata. Perche' il redirect funzioni la
+release deve essere pubblicata e non marcata come *pre-release*: il workflow lo garantisce.
 
 > Il workflow si trova in `.github/workflows/release.yml`.
 
