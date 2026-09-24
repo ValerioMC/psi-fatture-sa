@@ -40,8 +40,8 @@
     -->
     <!-- One side of the butterfly; the other is its mirror. -->
     <g id="wingPair">
-      <path id="wingU" d="M506 408 C420 376 300 346 180 340 C160 340 152 356 164 370 C204 430 258 500 316 544 C380 566 462 542 506 500 Z"/>
-      <path id="wingL" d="M506 508 C466 536 400 566 352 596 C316 618 318 668 362 676 C420 686 482 636 506 584 Z"/>
+      <path id="wingU" d="M502 412 C410 396 290 382 178 382 C160 382 152 396 162 410 C196 452 246 496 298 528 C362 532 442 518 502 500 Z"/>
+      <path id="wingL" d="M502 498 C440 512 364 524 322 546 C290 562 294 606 330 618 C392 636 470 616 504 590 Z"/>
     </g>
     <g id="wings">
       <use href="#wingPair"/>
@@ -52,10 +52,10 @@
     <g id="veins" fill="none" stroke-linecap="round">
       <!-- The wavy cross-bands of a hawkmoth's forewing, and one arc on the hindwing. -->
       <g id="veinSide">
-        <path d="M462 400 C436 428 452 460 424 492 C412 506 404 520 400 540"/>
-        <path d="M372 374 C346 404 366 436 334 470 C320 486 304 500 290 508"/>
-        <path d="M270 356 C252 380 266 404 240 428"/>
-        <path d="M486 572 C446 596 404 620 378 648"/>
+        <path d="M452 404 C434 430 448 460 430 488 C424 498 420 506 418 516"/>
+        <path d="M370 394 C350 420 366 450 344 478 C334 492 326 504 322 520"/>
+        <path d="M270 386 C254 406 266 430 246 450"/>
+        <path d="M494 560 C452 574 404 586 360 590"/>
       </g>
       <use href="#veinSide" transform="matrix(-1 0 0 1 1024 0)"/>
     </g>
