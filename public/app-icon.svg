@@ -35,30 +35,40 @@
     <!--
       The wings: ψυχή is the Greek for both "soul" and "butterfly", and Psyche is
       drawn with butterfly wings. Here the Ψ is the butterfly's body and two
-      pairs of frosted glass wings open behind it: the soul the discipline is
+      pairs of wings open behind it, carved tone-on-tone: the soul the discipline is
       named after, and the metamorphosis that is the work of therapy.
     -->
-    <linearGradient id="wingUpper" gradientUnits="userSpaceOnUse" x1="512" y1="500" x2="200" y2="290">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
-      <stop offset="0.55" stop-color="#d4d6ff" stop-opacity="0.30"/>
-      <stop offset="1" stop-color="#eceeff" stop-opacity="0.55"/>
-    </linearGradient>
-    <linearGradient id="wingLower" gradientUnits="userSpaceOnUse" x1="512" y1="530" x2="300" y2="720">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.08"/>
-      <stop offset="1" stop-color="#c9ccff" stop-opacity="0.42"/>
-    </linearGradient>
-    <linearGradient id="wingEdge" gradientUnits="userSpaceOnUse" x1="0" y1="260" x2="0" y2="740">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0.35"/>
-    </linearGradient>
-
-    <clipPath id="wingClip"><use href="#wingU"/><use href="#wingL"/></clipPath>
-
     <!-- One side of the butterfly; the other is its mirror. -->
     <g id="wingPair">
       <path id="wingU" d="M512 494 C474 420 386 302 296 270 C224 244 166 282 170 352 C174 432 262 494 400 508 C452 513 492 512 512 510 Z"/>
       <path id="wingL" d="M512 526 C452 532 360 560 320 618 C286 668 300 728 356 730 C418 732 478 646 512 554 Z"/>
     </g>
+    <g id="wings">
+      <use href="#wingPair"/>
+      <use href="#wingPair" transform="matrix(-1 0 0 1 1024 0)"/>
+    </g>
+    <g id="veins" fill="none" stroke-linecap="round">
+      <g id="veinSide">
+        <path d="M506 494 C440 420 340 320 262 288"/>
+        <path d="M506 502 C430 460 300 400 196 372"/>
+        <path d="M508 532 C456 570 380 630 340 700"/>
+      </g>
+      <use href="#veinSide" transform="matrix(-1 0 0 1 1024 0)"/>
+    </g>
+    <clipPath id="wingsClip"><use href="#wingU"/><use href="#wingL"/><use href="#wingU" transform="matrix(-1 0 0 1 1024 0)"/><use href="#wingL" transform="matrix(-1 0 0 1 1024 0)"/></clipPath>
+
+    <!--
+      Bas-relief: the wings are cut from the same ink as the ground. Only their
+      edges show them: lit where they face the lamp, shaded where they turn away.
+    -->
+    <mask id="wingLit" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <use href="#wings" fill="#ffffff"/>
+      <use href="#wings" fill="#000000" transform="translate(3 6)"/>
+    </mask>
+    <mask id="wingShade" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <use href="#wings" fill="#ffffff"/>
+      <use href="#wings" fill="#000000" transform="translate(-3 -6)"/>
+    </mask>
 
     <radialGradient id="halo" cx="0.5" cy="0.45" r="0.5">
       <stop offset="0" stop-color="#c4c6ff" stop-opacity="0.45"/>
@@ -115,35 +125,20 @@
     <!-- Light behind the Ψ, so it stands out from the ink. -->
     <circle cx="512" cy="500" r="340" fill="url(#halo)"/>
 
-    <!-- ── Wings: frosted glass behind the Ψ ──────────────────────────────── -->
+    <!-- ── Wings: a bas-relief in the ground's own ink ─────────────────────── -->
     <g>
-      <!-- Their shadow on the ink, so they float a little above it. -->
-      <g fill="#0e0a3c" fill-opacity="0.35" filter="url(#soft14)" transform="translate(0 18)">
-        <use href="#wingPair"/>
-        <use href="#wingPair" transform="matrix(-1 0 0 1 1024 0)"/>
+      <!-- A faint shadow where the raised shape meets the ground. -->
+      <use href="#wings" fill="#0e0a3c" fill-opacity="0.1" transform="translate(2 7)" filter="url(#soft6)"/>
+      <!-- The raised face: the ground itself, a breath lighter. -->
+      <use href="#wings" fill="#ffffff" fill-opacity="0.035"/>
+      <g mask="url(#wingLit)"><rect width="1024" height="1024" fill="#ffffff" fill-opacity="0.2" filter="url(#soft2)"/></g>
+      <g mask="url(#wingShade)"><rect width="1024" height="1024" fill="#0e0a3c" fill-opacity="0.26" filter="url(#soft2)"/></g>
+      <!-- Veins engraved into the face: a dark groove with a lit lip below it. -->
+      <g clip-path="url(#wingsClip)">
+        <use href="#veins" stroke="#0e0a3c" stroke-opacity="0.12" stroke-width="3"/>
+        <use href="#veins" stroke="#ffffff" stroke-opacity="0.07" stroke-width="2" transform="translate(0 2)"/>
       </g>
-      <g id="wingSide">
-        <g stroke="url(#wingEdge)" stroke-width="3" stroke-linejoin="round">
-          <use href="#wingU" fill="url(#wingUpper)"/>
-          <use href="#wingL" fill="url(#wingLower)"/>
-        </g>
-        <!-- A glow inside the rim, as light caught in the thickness of glass. -->
-        <g clip-path="url(#wingClip)" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="22" filter="url(#soft6)">
-          <use href="#wingU"/>
-          <use href="#wingL"/>
-        </g>
-        <!-- Veins fanning out from the body. -->
-        <g clip-path="url(#wingClip)" fill="none" stroke="#ffffff" stroke-opacity="0.26" stroke-width="2" stroke-linecap="round">
-          <path d="M506 494 C440 420 340 320 262 288"/>
-          <path d="M506 502 C430 460 300 400 196 372"/>
-          <path d="M506 508 C420 500 300 480 222 452"/>
-          <path d="M508 532 C456 570 380 630 340 700"/>
-          <path d="M508 540 C480 590 440 660 410 712"/>
-        </g>
-      </g>
-      <use href="#wingSide" transform="matrix(-1 0 0 1 1024 0)"/>
     </g>
-
 
     <!-- ── Ψ: cast shadow, extruded body, face, bevels ──────────────────── -->
     <use href="#psi" stroke="#0e0a3c" stroke-opacity="0.55" stroke-width="68" transform="translate(10 44)" filter="url(#soft30)"/>
