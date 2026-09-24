@@ -4,7 +4,7 @@
  * inactive service stays on old invoices but is no longer offered in new ones.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ClipboardList, Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { Archive, ArrowUpDown, ClipboardList, Euro, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { useServicesStore } from '@/stores/services'
 import { useToastStore } from '@/stores/toast'
 import type { CreateServiceInput, Service } from '@/types'
@@ -16,6 +16,7 @@ import FormField from '@/components/ui/FormField.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import StatTile from '@/components/ui/StatTile.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import type { SegmentOption } from '@/components/ui/types'
@@ -38,6 +39,25 @@ const FILTERS = computed<SegmentOption<Filter>[]>(() => [
   { value: 'active', label: 'Attive', count: activeCount.value },
   { value: 'all', label: 'Tutte', count: servicesStore.services.length },
 ])
+
+/** The price list at a glance, over the services still offered. */
+const stats = computed(() => {
+  const active = servicesStore.services.filter((service) => service.is_active)
+  const prices = active.map((service) => service.default_price)
+  return {
+    average: prices.length > 0 ? prices.reduce((sum, price) => sum + price, 0) / prices.length : 0,
+    min: prices.length > 0 ? Math.min(...prices) : 0,
+    max: prices.length > 0 ? Math.max(...prices) : 0,
+    archived: servicesStore.services.length - active.length,
+  }
+})
+
+/** Where a tariff sits between the cheapest and the dearest service: drawn as a short bar in its row. */
+function priceShare(price: number): number {
+  const { min, max } = stats.value
+  if (max === min) return 100
+  return 18 + ((price - min) / (max - min)) * 82
+}
 
 const visible = computed(() =>
   [...servicesStore.services]
@@ -132,16 +152,23 @@ async function confirmDelete(): Promise<void> {
 
 <template>
   <div>
-    <PageHeader title="Prestazioni" subtitle="Il tuo listino: nome, tariffa e IVA proposti quando scrivi una fattura.">
+    <PageHeader title="Prestazioni" subtitle="Il tuo listino: nome, tariffa e IVA proposti quando scrivi una fattura." :icon="ClipboardList">
       <AppButton variant="primary" :icon="Plus" @click="openCreate">Nuova prestazione</AppButton>
     </PageHeader>
 
-    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-12">
-      <div class="settle mb-3">
+    <div class="page pt-6 pb-12">
+      <div v-if="servicesStore.services.length > 0" class="settle mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatTile label="Prestazioni attive" :value="String(activeCount)" :icon="ClipboardList" tone="accent" hint="Proposte in fattura e in agenda" />
+        <StatTile label="Tariffa media" :value="formatCurrency(stats.average)" :icon="Euro" tone="safe" hint="Sulle prestazioni attive" />
+        <StatTile label="Fascia di tariffe" :value="`${Math.round(stats.min)} – ${Math.round(stats.max)} €`" :icon="ArrowUpDown" tone="warn" hint="Dalla più economica alla più alta" />
+        <StatTile label="Archiviate" :value="String(stats.archived)" :icon="Archive" tone="neutral" hint="Restano nello storico delle fatture" />
+      </div>
+
+      <div class="settle mb-3" style="--settle: 1">
         <SegmentedControl v-model="filter" :options="FILTERS" label="Mostra" size="sm" />
       </div>
 
-      <AppCard :padded="false" class="settle overflow-hidden" style="--settle: 1">
+      <AppCard :padded="false" class="settle overflow-hidden" style="--settle: 2">
         <SkeletonRows v-if="servicesStore.loading" variant="list" :count="6" label="Caricamento delle prestazioni" />
 
         <EmptyState
@@ -154,11 +181,12 @@ async function confirmDelete(): Promise<void> {
           <AppButton variant="primary" :icon="Plus" @click="openCreate">Nuova prestazione</AppButton>
         </EmptyState>
 
-        <table v-else class="w-full text-base">
-          <thead class="border-b border-border bg-surface text-left text-xs text-text-subtle">
-            <tr class="h-9">
+        <table v-else class="data-table text-base">
+          <thead>
+            <tr>
               <th class="pl-5 font-medium">Prestazione</th>
               <th class="w-24 font-medium">IVA</th>
+              <th class="hidden w-56 font-medium xl:table-cell">Nel listino</th>
               <th class="w-32 pr-8 text-right font-medium">Tariffa</th>
               <th class="w-24 font-medium">Attiva</th>
               <th class="w-24 pr-4"><span class="sr-only">Azioni</span></th>
@@ -168,14 +196,31 @@ async function confirmDelete(): Promise<void> {
             <tr
               v-for="service in visible"
               :key="service.id"
-              class="group h-14 cursor-pointer border-b border-border last:border-b-0 transition-colors hover:bg-surface-hover"
+              class="group h-14 cursor-pointer"
+              data-row
               @click="openEdit(service)"
             >
               <td class="pl-5">
-                <span class="block font-medium" :class="service.is_active ? 'text-text' : 'text-text-subtle'">{{ service.name }}</span>
-                <span v-if="service.description" class="block truncate text-xs text-text-subtle">{{ service.description }}</span>
+                <span class="flex items-center gap-3">
+                  <span class="icon-chip icon-chip-sm" :style="{ '--chip': service.is_active ? 'var(--accent)' : 'var(--text-subtle)' }" aria-hidden="true">
+                    <ClipboardList :size="13" :stroke-width="1.9" />
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block font-medium" :class="service.is_active ? 'text-text' : 'text-text-subtle'">{{ service.name }}</span>
+                    <span v-if="service.description" class="block truncate text-xs text-text-subtle">{{ service.description }}</span>
+                  </span>
+                </span>
               </td>
               <td class="text-sm text-text-muted">{{ service.vat_rate > 0 ? `${service.vat_rate}%` : 'Esente' }}</td>
+              <td class="hidden pr-6 xl:table-cell" aria-hidden="true">
+                <span class="block h-1.5 overflow-hidden rounded-full bg-surface-sunken">
+                  <span
+                    class="block h-full rounded-full bg-gradient-to-r transition-[width] duration-500 ease-out-expo"
+                    :class="service.is_active ? 'from-accent/40 to-accent' : 'from-border-strong to-border-strong'"
+                    :style="{ width: `${priceShare(service.default_price)}%` }"
+                  />
+                </span>
+              </td>
               <td class="tabular pr-8 text-right font-medium" :class="service.is_active ? 'text-text' : 'text-text-subtle'">{{ formatCurrency(service.default_price) }}</td>
               <td @click.stop>
                 <ToggleSwitch

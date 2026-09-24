@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { ArrowRight, CalendarRange, CircleCheck, FilePen, FileText, Hourglass, TriangleAlert } from 'lucide-vue-next'
+import { ArrowRight, BarChart3, Calculator, CalendarRange, CircleCheck, FilePen, FileText, Gauge, Hourglass, LayoutGrid, ListChecks, Receipt, TriangleAlert } from 'lucide-vue-next'
 import { getDashboard, listInvoices, previewMonthlyInvoices } from '@/api'
 import type { DashboardData, Invoice } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import PeriodStepper from '@/components/ui/PeriodStepper.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import CardHeader from '@/components/ui/CardHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
@@ -127,7 +128,7 @@ onMounted(load)
 
 <template>
   <div>
-    <PageHeader :title="`Panoramica ${selectedYear}`">
+    <PageHeader :title="`Panoramica ${selectedYear}`" :icon="LayoutGrid">
       <template #eyebrow>{{ greeting }}</template>
       <PeriodStepper
         :label="String(selectedYear)"
@@ -139,7 +140,7 @@ onMounted(load)
       />
     </PageHeader>
 
-    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-12">
+    <div class="page pt-6 pb-12">
       <!-- Loading: the same shapes the page will have. -->
       <div v-if="loading" class="space-y-5" role="status" aria-busy="true" aria-live="polite">
         <span class="sr-only">Caricamento della panoramica</span>
@@ -163,10 +164,13 @@ onMounted(load)
 
       <div v-else-if="data" class="space-y-5">
         <!-- ── The year in one sheet: the hero figure and its months ─────────── -->
-        <AppCard class="settle grid grid-cols-1 gap-8 lg:grid-cols-[17rem_1fr]" :padded="false">
-          <div class="flex flex-col p-6 pr-0">
-            <p class="label-quiet">Fatturato {{ selectedYear }}</p>
-            <p class="mt-1 whitespace-nowrap font-semibold tracking-[-0.025em] text-text" aria-live="polite">
+        <AppCard class="settle grid grid-cols-1 lg:grid-cols-[19rem_1fr]" :padded="false">
+          <div class="hero-figure relative flex flex-col overflow-hidden rounded-l-card p-6 lg:pr-6">
+            <p class="label-quiet flex items-center gap-2">
+              <span class="icon-chip icon-chip-sm" aria-hidden="true"><Receipt :size="13" :stroke-width="1.9" /></span>
+              Fatturato {{ selectedYear }}
+            </p>
+            <p class="mt-3 whitespace-nowrap font-semibold tracking-[-0.025em] text-text" aria-live="polite">
               <span class="text-[3.25rem] leading-none">{{ hero.whole }}</span><span class="text-2xl text-text-muted">{{ hero.fraction }}</span>
               <span class="ml-1 text-2xl text-text-subtle">{{ hero.symbol }}</span>
             </p>
@@ -192,43 +196,39 @@ onMounted(load)
             </dl>
           </div>
 
-          <div class="border-t border-border p-6 lg:border-t-0 lg:border-l">
-            <div class="mb-5 flex items-baseline justify-between gap-4">
-              <div>
-                <h2 class="text-lg font-medium text-text">Incassato per mese</h2>
-                <p class="text-sm text-text-subtle">Fatture pagate, per mese di emissione</p>
-              </div>
-            </div>
-            <MonthlyBars :months="data.monthly_revenue" :current-month="selectedYear === currentYear ? currentMonth : null" />
+          <div class="flex flex-col border-t border-border lg:border-t-0 lg:border-l">
+            <CardHeader title="Incassato per mese" subtitle="Fatture pagate, per mese di emissione" :icon="BarChart3" />
+            <MonthlyBars
+              class="flex-1 px-5 pb-5"
+              :months="data.monthly_revenue" :current-month="selectedYear === currentYear ? currentMonth : null" />
           </div>
         </AppCard>
 
         <!-- ── Three instruments: ceiling, tax, to-do ──────────────────────── -->
         <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          <AppCard v-if="isForfettario" class="settle" style="--settle: 1">
-            <h2 class="text-lg font-medium text-text">Soglia forfettario</h2>
-            <p class="mb-5 text-sm text-text-subtle">Compensi fatturati nel {{ selectedYear }}</p>
-            <ThresholdMeter :amount="data.total_net_revenue" :year="selectedYear" />
+          <AppCard v-if="isForfettario" class="settle" :padded="false" style="--settle: 1">
+            <CardHeader title="Soglia forfettario" :subtitle="`Compensi fatturati nel ${selectedYear}`" :icon="Gauge" />
+            <div class="px-5 pb-5">
+              <ThresholdMeter :amount="data.total_net_revenue" :year="selectedYear" />
+            </div>
           </AppCard>
 
-          <AppCard class="settle flex flex-col" style="--settle: 2">
-            <h2 class="text-lg font-medium text-text">Stima fiscale</h2>
-            <p class="mb-5 text-sm text-text-subtle">Su {{ formatCurrency(data.total_net_revenue) }} di compensi</p>
-            <template v-if="taxEstimate">
-              <TaxSplit v-bind="taxEstimate" />
-              <div v-if="isForfettario" class="mt-5">
-                <SegmentedControl v-model="firstFiveYears" :options="RATE_OPTIONS" label="Aliquota imposta sostitutiva" size="sm" block />
-              </div>
-              <p class="mt-auto pt-4 text-2xs text-text-subtle">Stima indicativa: non sostituisce il parere del commercialista.</p>
-            </template>
-            <p v-else class="text-sm text-text-muted">La stima appare con la prima fattura dell'anno.</p>
+          <AppCard class="settle flex flex-col" :padded="false" style="--settle: 2">
+            <CardHeader title="Stima fiscale" :subtitle="`Su ${formatCurrency(data.total_net_revenue)} di compensi`" :icon="Calculator" tone="safe" />
+            <div class="flex flex-1 flex-col px-5 pb-5">
+              <template v-if="taxEstimate">
+                <TaxSplit v-bind="taxEstimate" />
+                <div v-if="isForfettario" class="mt-5">
+                  <SegmentedControl v-model="firstFiveYears" :options="RATE_OPTIONS" label="Aliquota imposta sostitutiva" size="sm" block />
+                </div>
+                <p class="mt-auto pt-4 text-2xs text-text-subtle">Stima indicativa: non sostituisce il parere del commercialista.</p>
+              </template>
+              <p v-else class="text-sm text-text-muted">La stima appare con la prima fattura dell'anno.</p>
+            </div>
           </AppCard>
 
           <AppCard class="settle flex flex-col" :padded="false" style="--settle: 3">
-            <div class="px-5 pt-5 pb-3">
-              <h2 class="text-lg font-medium text-text">Da fare</h2>
-              <p class="text-sm text-text-subtle">Quello che aspetta te</p>
-            </div>
+            <CardHeader title="Da fare" subtitle="Quello che aspetta te" :icon="ListChecks" :tone="attention.overdue.count > 0 ? 'danger' : 'accent'" />
             <div v-if="nothingToDo" class="flex flex-1 flex-col items-center justify-center px-5 pb-8 pt-4 text-center">
               <CircleCheck :size="28" :stroke-width="1.5" class="text-safe" aria-hidden="true" />
               <p class="mt-2 text-base font-medium text-text">Tutto in ordine</p>
@@ -240,7 +240,7 @@ onMounted(load)
                   :to="{ path: '/invoices/monthly', query: { year: unbilled.year, month: unbilled.month } }"
                   class="group flex items-center gap-3 rounded-control px-3 py-2.5 transition-colors hover:bg-surface-hover focus-ring"
                 >
-                  <span class="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent"><CalendarRange :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
+                  <span class="icon-chip" style="--chip: var(--accent)"><CalendarRange :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
                   <span class="min-w-0 flex-1">
                     <span class="block text-base font-medium text-text">Fattura le sedute di {{ ITALIAN_MONTHS[unbilled.month - 1] }}</span>
                     <span class="block text-sm text-text-muted">{{ plural(unbilled.sessions, 'seduta svolta', 'sedute svolte') }} · {{ formatCurrency(unbilled.amount) }}</span>
@@ -253,7 +253,7 @@ onMounted(load)
                   :to="{ path: '/invoices', query: { status: 'overdue', year: selectedYear } }"
                   class="group flex items-center gap-3 rounded-control px-3 py-2.5 transition-colors hover:bg-surface-hover focus-ring"
                 >
-                  <span class="grid size-8 shrink-0 place-items-center rounded-full bg-danger-soft text-danger"><TriangleAlert :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
+                  <span class="icon-chip" style="--chip: var(--danger)"><TriangleAlert :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
                   <span class="min-w-0 flex-1">
                     <span class="block text-base font-medium text-text">{{ plural(attention.overdue.count, 'fattura scaduta', 'fatture scadute') }}</span>
                     <span class="block text-sm text-text-muted">{{ formatCurrency(attention.overdue.amount) }} da sollecitare</span>
@@ -266,7 +266,7 @@ onMounted(load)
                   :to="{ path: '/invoices', query: { status: 'draft', year: selectedYear } }"
                   class="group flex items-center gap-3 rounded-control px-3 py-2.5 transition-colors hover:bg-surface-hover focus-ring"
                 >
-                  <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-text-muted"><FilePen :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
+                  <span class="icon-chip" style="--chip: var(--text-muted)"><FilePen :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
                   <span class="min-w-0 flex-1">
                     <span class="block text-base font-medium text-text">{{ plural(attention.drafts.count, 'bozza da emettere', 'bozze da emettere') }}</span>
                     <span class="block text-sm text-text-muted">{{ formatCurrency(attention.drafts.amount) }} in totale</span>
@@ -279,7 +279,7 @@ onMounted(load)
                   :to="{ path: '/invoices', query: { status: 'issued', year: selectedYear } }"
                   class="group flex items-center gap-3 rounded-control px-3 py-2.5 transition-colors hover:bg-surface-hover focus-ring"
                 >
-                  <span class="grid size-8 shrink-0 place-items-center rounded-full bg-warn-soft text-warn"><Hourglass :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
+                  <span class="icon-chip" style="--chip: var(--warn)"><Hourglass :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
                   <span class="min-w-0 flex-1">
                     <span class="block text-base font-medium text-text">{{ plural(attention.awaiting.count, 'fattura in attesa', 'fatture in attesa') }}</span>
                     <span class="block text-sm text-text-muted">{{ formatCurrency(attention.awaiting.amount) }} non ancora scadute</span>
@@ -293,13 +293,9 @@ onMounted(load)
 
         <!-- ── Recent invoices ─────────────────────────────────────────────── -->
         <AppCard class="settle" :padded="false" style="--settle: 4">
-          <div class="flex items-center justify-between px-5 pt-5 pb-3">
-            <div>
-              <h2 class="text-lg font-medium text-text">Fatture recenti</h2>
-              <p class="text-sm text-text-subtle">Le ultime emesse nel {{ selectedYear }}</p>
-            </div>
+          <CardHeader title="Fatture recenti" :subtitle="`Le ultime emesse nel ${selectedYear}`" :icon="FileText">
             <AppButton variant="ghost" size="sm" :icon-right="ArrowRight" to="/invoices">Tutte le fatture</AppButton>
-          </div>
+          </CardHeader>
 
           <EmptyState
             v-if="data.recent_invoices.length === 0"
@@ -315,7 +311,7 @@ onMounted(load)
             <li v-for="invoice in data.recent_invoices" :key="invoice.id" class="border-b border-border last:border-b-0">
               <button
                 type="button"
-                class="grid h-row w-full grid-cols-[1.25rem_5.5rem_1fr_4.5rem_7rem_6.5rem] items-center gap-4 px-5 text-left transition-colors hover:bg-surface-hover focus-ring last:rounded-b-card"
+                class="grid h-row w-full grid-cols-[1.25rem_5.5rem_1fr_4.5rem_7rem_6.5rem] items-center gap-4 px-5 text-left transition-[background-color,box-shadow] hover:bg-surface-hover hover:shadow-[inset_2px_0_0_var(--accent)] focus-ring"
                 @click="router.push(`/invoices/${invoice.id}`)"
               >
                 <InvoiceSeal :status="invoice.status" :issue-date="invoice.issue_date" :due-date="invoice.due_date" :size="18" />
@@ -335,3 +331,12 @@ onMounted(load)
     </div>
   </div>
 </template>
+
+<style scoped>
+/* The year's figure sits on a faint wash of ink, rising from the bottom corner like a watermark. */
+.hero-figure {
+  background:
+    radial-gradient(120% 70% at 0% 100%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%),
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--surface-sunken) 35%, transparent));
+}
+</style>

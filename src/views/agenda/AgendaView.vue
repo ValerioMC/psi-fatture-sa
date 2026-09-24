@@ -16,6 +16,7 @@ import PeriodStepper from '@/components/ui/PeriodStepper.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
+import AppBadge from '@/components/ui/AppBadge.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import AppointmentModal from './AppointmentModal.vue'
 import { formatMonthYear, minutesBetween, parseIsoDate, toIsoDate, todayIso } from '@/utils/format'
@@ -83,7 +84,8 @@ const monthStats = computed(() => {
   const live = appointments.value.filter((item) => item.status !== 'cancelled' && item.date.startsWith(prefix))
   const heldNotBilled = live.filter((item) => item.status === 'completed' && item.invoice_id === undefined).length
   const toConfirm = live.filter((item) => item.status === 'scheduled' && item.date < today).length
-  return { total: live.length, heldNotBilled, toConfirm }
+  const completed = live.filter((item) => item.status === 'completed').length
+  return { total: live.length, heldNotBilled, toConfirm, completed }
 })
 
 async function load(): Promise<void> {
@@ -155,6 +157,13 @@ async function setStatus(appointment: Appointment, status: AppointmentStatus, an
   }
 }
 
+/** A session in a day cell: a soft slip of its status colour, so a busy week reads as texture at a glance. */
+const CHIP_SLIP: Record<AppointmentStatus, string> = {
+  scheduled: 'bg-accent-soft text-text-muted',
+  completed: 'bg-safe-soft text-text-muted',
+  cancelled: 'text-text-subtle line-through',
+}
+
 const CHIP_DOT: Record<AppointmentStatus, string> = {
   scheduled: 'bg-accent',
   completed: 'bg-safe',
@@ -167,19 +176,21 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
 
 <template>
   <div>
-    <PageHeader title="Agenda">
+    <PageHeader title="Agenda" :icon="CalendarDays">
       <AppButton variant="primary" :icon="Plus" @click="openCreate">Nuovo appuntamento</AppButton>
     </PageHeader>
 
-    <div class="mx-auto max-w-[80rem] px-8 pt-6 pb-12">
-      <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_22rem]">
+    <div class="page pt-6 pb-12">
+      <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_25rem]">
         <!-- ── Month ─────────────────────────────────────────────────────── -->
         <AppCard :padded="false" class="settle overflow-hidden">
           <div class="flex items-center justify-between gap-4 px-5 py-4">
             <div>
               <h2 class="display text-2xl text-text">{{ formatMonthYear(viewYear, viewMonth + 1) }}</h2>
-              <p class="text-sm text-text-subtle">
-                {{ plural(monthStats.total, 'seduta', 'sedute') }}<template v-if="monthStats.toConfirm > 0"> · {{ monthStats.toConfirm }} passate da confermare</template>
+              <p class="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-text-subtle">
+                <AppBadge tone="accent">{{ plural(monthStats.total, 'seduta', 'sedute') }}</AppBadge>
+                <AppBadge v-if="monthStats.completed > 0" tone="safe" dot>{{ monthStats.completed }} svolte</AppBadge>
+                <AppBadge v-if="monthStats.toConfirm > 0" tone="warn" dot>{{ monthStats.toConfirm }} da confermare</AppBadge>
               </p>
             </div>
             <div class="flex items-center gap-2">
@@ -195,8 +206,8 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
             </div>
           </div>
 
-          <div class="grid grid-cols-7 border-y border-border bg-surface text-xs text-text-subtle" aria-hidden="true">
-            <span v-for="weekday in WEEKDAYS" :key="weekday" class="px-2.5 py-2">{{ weekday }}</span>
+          <div class="grid grid-cols-7 border-y border-border bg-[color-mix(in_srgb,var(--surface-sunken)_55%,var(--surface-raised))] text-xs font-medium text-text-subtle" aria-hidden="true">
+            <span v-for="(weekday, index) in WEEKDAYS" :key="weekday" class="px-2.5 py-2" :class="index >= 5 ? 'text-text-subtle/70' : ''">{{ weekday }}</span>
           </div>
 
           <div class="grid grid-cols-7" :class="loading ? 'opacity-60 transition-opacity' : ''" role="grid" :aria-label="formatMonthYear(viewYear, viewMonth + 1)">
@@ -204,7 +215,7 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
               v-for="(cell, index) in cells"
               :key="cell.date"
               type="button"
-              class="group relative flex min-h-[6.25rem] flex-col items-stretch gap-1 border-border p-1.5 text-left transition-colors focus-ring focus-visible:z-[1]"
+              class="group relative flex min-h-[max(6.25rem,calc((100vh-18.5rem)/6))] flex-col items-stretch gap-1 border-border p-1.5 text-left transition-colors focus-ring focus-visible:z-[1]"
               :class="[
                 index % 7 !== 6 ? 'border-r' : '',
                 index < cells.length - 7 ? 'border-b' : '',
@@ -228,10 +239,11 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
               <span
                 v-for="appointment in (byDate.get(cell.date) ?? []).slice(0, 3)"
                 :key="appointment.id"
-                class="flex items-center gap-1.5 truncate rounded-[5px] px-1 text-2xs leading-[1.125rem]"
-                :class="[appointment.status === 'cancelled' ? 'text-text-subtle line-through' : cell.inMonth ? 'text-text-muted' : 'text-text-subtle']"
+                class="flex items-center gap-1.5 truncate rounded-[5px] px-1.5 text-2xs leading-[1.25rem]"
+                :class="[CHIP_SLIP[appointment.status], cell.inMonth ? '' : 'opacity-60']"
               >
                 <span class="size-1.5 shrink-0 rounded-full" :class="CHIP_DOT[appointment.status]" aria-hidden="true" />
+                <span class="tabular hidden shrink-0 text-text-subtle 2xl:inline">{{ appointment.start_time.slice(0, 5) }}</span>
                 <span class="truncate" :title="`${appointment.start_time.slice(0, 5)} ${appointment.client_name}`">{{ appointment.client_name.split(' ')[0] }}</span>
               </span>
               <span v-if="(byDate.get(cell.date) ?? []).length > 3" class="px-1 text-2xs text-text-subtle">
@@ -258,7 +270,7 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
             </div>
 
             <Transition name="swap" mode="out-in">
-              <ol v-if="dayList.length > 0" :key="selectedDate" class="max-h-[34rem] overflow-y-auto p-2" data-lenis-prevent>
+              <ol v-if="dayList.length > 0" :key="selectedDate" class="max-h-[calc(100vh-18rem)] overflow-y-auto p-2" data-lenis-prevent>
                 <li v-for="appointment in dayList" :key="appointment.id">
                   <div
                     class="group flex cursor-pointer gap-3 rounded-control px-3 py-3 transition-colors hover:bg-surface-hover"
