@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * A sheet on the desk. Resting cards are flat with a hairline; `interactive`
- * cards lift on hover (1px rise, border warms, shadow appears), so something
- * clickable is recognisable before the pointer reaches it.
+ * A sheet on the desk. Resting cards sit just off the canvas, with a lit top
+ * edge; `interactive` cards lift on hover (1px rise, border warms, shadow
+ * deepens), so something clickable is recognisable before the pointer arrives.
  */
 withDefaults(
   defineProps<{
@@ -17,7 +17,7 @@ withDefaults(
 <template>
   <component
     :is="as"
-    class="bg-surface-raised border border-border rounded-card"
+    class="sheet"
     :class="[
       padded ? 'p-5' : '',
       interactive

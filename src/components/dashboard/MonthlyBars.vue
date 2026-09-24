@@ -29,6 +29,13 @@ function niceCeiling(value: number): number {
 const axisMax = computed(() => niceCeiling(Math.max(...props.months.map((month) => month.revenue), 0)))
 const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map((share) => axisMax.value * share))
 
+/** Average of the months already lived that had any income: the line the bars are read against. */
+const average = computed(() => {
+  const lived = props.months.filter((month) => !isFuture(month.month) && month.revenue > 0)
+  if (lived.length < 2) return null
+  return lived.reduce((sum, month) => sum + month.revenue, 0) / lived.length
+})
+
 function isFuture(month: number): boolean {
   return props.currentMonth !== null && month > props.currentMonth
 }
@@ -42,8 +49,8 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
 </script>
 
 <template>
-  <div class="relative">
-    <div class="flex h-48 gap-3">
+  <div class="relative flex flex-col">
+    <div class="flex min-h-48 flex-1 gap-3">
       <!-- Y axis: clean ticks, right-aligned, recessive. -->
       <div class="tabular flex w-10 shrink-0 flex-col justify-between pb-6 text-right text-2xs text-text-subtle" aria-hidden="true">
         <span v-for="tick in ticks" :key="tick" class="-translate-y-1/2 leading-none">{{ formatCurrencyCompact(tick) }}</span>
@@ -53,6 +60,18 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
         <!-- Hairline, solid gridlines one step off the surface. -->
         <div class="absolute inset-x-0 top-0 bottom-6 flex flex-col justify-between" aria-hidden="true">
           <div v-for="tick in ticks" :key="tick" class="h-px bg-border" :class="tick === 0 ? 'bg-border-strong' : ''" />
+        </div>
+
+        <!-- The average: a dashed rule with its value, so a month reads as above or below the usual. -->
+        <div
+          v-if="average !== null"
+          class="pointer-events-none absolute inset-x-0 z-[1] border-t border-dashed border-accent/45"
+          :style="{ bottom: `calc(1.5rem + (100% - 1.5rem) * ${average / axisMax})` }"
+          aria-hidden="true"
+        >
+          <span class="tabular absolute right-0 -top-2.5 -translate-y-full rounded-full bg-surface-raised px-1.5 text-2xs text-accent ring-1 ring-accent-line">
+            media {{ formatCurrencyCompact(average) }}
+          </span>
         </div>
 
         <div class="absolute inset-0 flex items-stretch">
@@ -72,13 +91,13 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
               />
               <div
                 v-if="isFuture(month.month)"
-                class="relative h-1 w-[min(22px,62%)] rounded-full bg-surface-sunken"
+                class="relative h-1 w-[min(26px,58%)] rounded-full bg-surface-sunken"
                 aria-hidden="true"
               />
               <div
                 v-else
-                class="relative w-[min(22px,62%)] rounded-t-[4px] transition-[height,background-color] duration-500 ease-out-expo"
-                :class="month.month === currentMonth ? 'bg-accent' : hovered === month.month ? 'bg-accent/60' : 'bg-accent/35'"
+                class="bar relative w-[min(26px,58%)] rounded-t-[5px] transition-[height,opacity,filter] duration-500 ease-out-expo"
+                :class="month.month === currentMonth ? 'bar-current' : hovered === month.month ? 'bar-hover' : ''"
                 :style="{ height: heightOf(month) }"
                 aria-hidden="true"
               />
@@ -120,3 +139,18 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
     </table>
   </div>
 </template>
+
+<style scoped>
+/* Bars are lit from above: a lighter crown fading into the ink, with a hairline cap. */
+.bar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 48%, transparent), color-mix(in srgb, var(--accent) 26%, transparent));
+  box-shadow: inset 0 1.5px 0 color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.bar-hover {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 70%, transparent), color-mix(in srgb, var(--accent) 42%, transparent));
+}
+.bar-current {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 80%, white), var(--accent) 40%, var(--accent-strong));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 6px 16px -6px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+</style>

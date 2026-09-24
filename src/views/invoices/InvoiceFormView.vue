@@ -6,7 +6,7 @@
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Check, Plus, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { Check, ClipboardList, NotebookPen, Plus, Receipt, Trash2, TriangleAlert, UserRound } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/stores/invoices'
 import { useClientsStore } from '@/stores/clients'
 import { useServicesStore } from '@/stores/services'
@@ -17,6 +17,7 @@ import type { CreateInvoiceInput, InvoiceLineInput, InvoiceStatus, PaymentMethod
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
+import CardHeader from '@/components/ui/CardHeader.vue'
 import FormField from '@/components/ui/FormField.vue'
 import ComboBox from '@/components/ui/ComboBox.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
@@ -207,7 +208,7 @@ async function onSubmit(): Promise<void> {
       :back="isEdit ? { to: `/invoices/${editId}`, label: 'Fattura' } : { to: '/invoices', label: 'Fatture' }"
     />
 
-    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-12">
+    <div class="page pt-6 pb-12">
       <div v-if="loading" class="h-96 rounded-card border border-border bg-surface-raised p-6" role="status" aria-busy="true">
         <span class="sr-only">Caricamento della fattura</span>
         <div class="skeleton h-4 w-1/3" />
@@ -217,12 +218,12 @@ async function onSubmit(): Promise<void> {
         <AppButton to="/invoices">Torna alle fatture</AppButton>
       </EmptyState>
 
-      <form v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_19rem]" novalidate @submit.prevent="onSubmit">
+      <form v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]" novalidate @submit.prevent="onSubmit">
         <div class="space-y-5">
           <!-- ── Who and when ─────────────────────────────────────────────── -->
-          <AppCard class="settle">
-            <h2 class="mb-5 text-lg font-medium text-text">Intestazione</h2>
-            <div class="grid grid-cols-2 gap-x-4 gap-y-5">
+          <AppCard class="settle" :padded="false">
+            <CardHeader title="Intestazione" subtitle="A chi, quando e come viene pagata" :icon="UserRound" />
+            <div class="grid grid-cols-2 gap-x-4 gap-y-5 px-5 pb-5">
               <FormField v-slot="{ id, invalid, describedBy }" class="col-span-2" label="Paziente" required :error="errors.client">
                 <ComboBox
                   :id="id"
@@ -263,11 +264,10 @@ async function onSubmit(): Promise<void> {
 
           <!-- ── Lines ──────────────────────────────────────────────────────── -->
           <AppCard class="settle" :padded="false" style="--settle: 1">
-            <div class="flex items-center justify-between px-5 pt-5 pb-4">
-              <h2 class="text-lg font-medium text-text">Prestazioni</h2>
+            <CardHeader title="Prestazioni" :subtitle="`${form.lines.length} ${form.lines.length === 1 ? 'riga' : 'righe'} in fattura`" :icon="ClipboardList">
               <AppButton size="sm" :icon="Plus" @click="addLine">Aggiungi riga</AppButton>
-            </div>
-            <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2rem] gap-2 border-y border-border bg-surface px-5 py-2 text-xs font-medium text-text-subtle" aria-hidden="true">
+            </CardHeader>
+            <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2rem] gap-2 border-y border-border bg-[color-mix(in_srgb,var(--surface-sunken)_55%,var(--surface-raised))] px-5 py-2 text-xs font-medium text-text-subtle" aria-hidden="true">
               <span>Descrizione</span><span class="text-right">Qtà</span><span class="text-right">Prezzo €</span><span class="text-right">IVA %</span><span />
             </div>
             <TransitionGroup name="list" tag="div" class="relative">
@@ -310,40 +310,45 @@ async function onSubmit(): Promise<void> {
           </AppCard>
 
           <!-- ── Status and notes ─────────────────────────────────────────── -->
-          <AppCard class="settle space-y-5" style="--settle: 2">
-            <div>
-              <p class="mb-1.5 text-sm font-medium text-text-muted">Stato</p>
-              <SegmentedControl v-model="form.status" :options="STATUS_OPTIONS" label="Stato della fattura" />
+          <AppCard class="settle" :padded="false" style="--settle: 2">
+            <CardHeader title="Stato e note" subtitle="Come la fattura esce dallo studio" :icon="NotebookPen" tone="neutral" />
+            <div class="space-y-5 px-5 pb-5">
+              <div>
+                <p class="mb-1.5 text-sm font-medium text-text-muted">Stato</p>
+                <SegmentedControl v-model="form.status" :options="STATUS_OPTIONS" label="Stato della fattura" />
+              </div>
+              <FormField v-if="form.status === 'paid'" v-slot="{ id, describedBy }" label="Pagata il" hint="Se la lasci vuota vale la data di oggi." class="max-w-60">
+                <input :id="id" v-model="form.paid_date" type="date" class="field" :aria-describedby="describedBy" />
+              </FormField>
+              <ToggleSwitch v-model="form.apply_enpap" label="Contributo integrativo ENPAP 2%" description="Addebitato al paziente sull'imponibile, come previsto per gli psicologi." />
+              <FormField v-slot="{ id }" label="Note" optional>
+                <textarea :id="id" v-model="form.notes" rows="2" class="field" placeholder="Compaiono in fondo alla fattura" />
+              </FormField>
             </div>
-            <FormField v-if="form.status === 'paid'" v-slot="{ id, describedBy }" label="Pagata il" hint="Se la lasci vuota vale la data di oggi." class="max-w-60">
-              <input :id="id" v-model="form.paid_date" type="date" class="field" :aria-describedby="describedBy" />
-            </FormField>
-            <ToggleSwitch v-model="form.apply_enpap" label="Contributo integrativo ENPAP 2%" description="Addebitato al paziente sull'imponibile, come previsto per gli psicologi." />
-            <FormField v-slot="{ id }" label="Note" optional>
-              <textarea :id="id" v-model="form.notes" rows="2" class="field" placeholder="Compaiono in fondo alla fattura" />
-            </FormField>
           </AppCard>
         </div>
 
         <!-- ── Live summary and save ─────────────────────────────────────── -->
         <aside class="settle lg:sticky lg:top-30" style="--settle: 1">
-          <AppCard>
-            <h2 class="text-lg font-medium text-text">Riepilogo</h2>
-            <dl class="mt-4 space-y-2 text-base">
-              <div class="flex justify-between"><dt class="text-text-muted">Imponibile</dt><dd class="tabular text-text">{{ formatCurrency(totals.total_net) }}</dd></div>
-              <div v-if="totals.total_tax > 0" class="flex justify-between"><dt class="text-text-muted">IVA</dt><dd class="tabular text-text">{{ formatCurrency(totals.total_tax) }}</dd></div>
-              <div v-if="form.apply_enpap" class="flex justify-between"><dt class="text-text-muted">ENPAP 2%</dt><dd class="tabular text-text">{{ formatCurrency(totals.contributo_enpap) }}</dd></div>
-              <div v-if="totals.marca_da_bollo > 0" class="flex justify-between"><dt class="text-text-muted">Marca da bollo</dt><dd class="tabular text-text">{{ formatCurrency(totals.marca_da_bollo) }}</dd></div>
-              <div v-if="totals.ritenuta_acconto > 0" class="flex justify-between"><dt class="text-text-muted">Ritenuta 20%</dt><dd class="tabular text-text">−{{ formatCurrency(totals.ritenuta_acconto) }}</dd></div>
-            </dl>
-            <div class="mt-4 border-t border-border pt-4">
-              <p class="label-quiet">Totale dovuto</p>
-              <p class="mt-0.5 text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-text" aria-live="polite">{{ formatCurrency(totals.total_due) }}</p>
+          <AppCard :padded="false">
+            <CardHeader title="Riepilogo" subtitle="Si aggiorna mentre scrivi" :icon="Receipt" />
+            <div class="px-5 pb-5">
+              <dl class="space-y-2 text-base">
+                <div class="flex justify-between"><dt class="text-text-muted">Imponibile</dt><dd class="tabular text-text">{{ formatCurrency(totals.total_net) }}</dd></div>
+                <div v-if="totals.total_tax > 0" class="flex justify-between"><dt class="text-text-muted">IVA</dt><dd class="tabular text-text">{{ formatCurrency(totals.total_tax) }}</dd></div>
+                <div v-if="form.apply_enpap" class="flex justify-between"><dt class="text-text-muted">ENPAP 2%</dt><dd class="tabular text-text">{{ formatCurrency(totals.contributo_enpap) }}</dd></div>
+                <div v-if="totals.marca_da_bollo > 0" class="flex justify-between"><dt class="text-text-muted">Marca da bollo</dt><dd class="tabular text-text">{{ formatCurrency(totals.marca_da_bollo) }}</dd></div>
+                <div v-if="totals.ritenuta_acconto > 0" class="flex justify-between"><dt class="text-text-muted">Ritenuta 20%</dt><dd class="tabular text-text">−{{ formatCurrency(totals.ritenuta_acconto) }}</dd></div>
+              </dl>
+              <div class="receipt-total -mx-5 mt-4 px-5 py-4">
+                <p class="label-quiet">Totale dovuto</p>
+                <p class="tabular mt-0.5 text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-text" aria-live="polite">{{ formatCurrency(totals.total_due) }}</p>
+              </div>
+              <AppButton type="submit" variant="primary" class="mt-5" block :icon="Check" :loading="saving">
+                {{ isEdit ? 'Salva modifiche' : 'Crea fattura' }}
+              </AppButton>
+              <p v-if="Object.keys(errors).length > 0" class="mt-3 text-center text-xs text-danger" role="alert">Controlla i campi segnalati.</p>
             </div>
-            <AppButton type="submit" variant="primary" class="mt-5" block :icon="Check" :loading="saving">
-              {{ isEdit ? 'Salva modifiche' : 'Crea fattura' }}
-            </AppButton>
-            <p v-if="Object.keys(errors).length > 0" class="mt-3 text-center text-xs text-danger" role="alert">Controlla i campi segnalati.</p>
           </AppCard>
           <p class="mt-3 px-1 text-xs text-text-subtle">
             {{ taxRegime === 'forfettario' ? 'Regime forfettario: niente IVA né ritenuta; bollo da 2 € sopra i 77,47 €.' : 'Regime ordinario: la ritenuta d’acconto del 20% è calcolata in automatico.' }}
@@ -353,3 +358,11 @@ async function onSubmit(): Promise<void> {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* The total sits on a strip ruled top and bottom with a dotted line, like the foot of a receipt. */
+.receipt-total {
+  background: color-mix(in srgb, var(--surface-sunken) 45%, transparent);
+  border-block: 1px dashed var(--border-strong);
+}
+</style>

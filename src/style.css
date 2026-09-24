@@ -57,6 +57,12 @@
   --shadow-modal: 0 2px 6px rgb(40 34 20 / 0.08), 0 32px 72px -20px rgb(40 34 20 / 0.32);
   --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
     0 6px 20px -6px color-mix(in srgb, var(--accent) 45%, transparent);
+  /* A sheet at rest: barely off the desk, with a lit top edge like paper under a lamp. */
+  --shadow-rest: 0 1px 1px rgb(40 34 20 / 0.03), 0 2px 6px -2px rgb(40 34 20 / 0.06);
+  --sheet-highlight: inset 0 1px 0 rgb(255 255 255 / 0.9);
+  /* Paper grain: multiplied over the canvas so it reads as fibre, not noise. */
+  --grain-opacity: 0.035;
+  --grain-blend: multiply;
 
   /* The room: two very large, very faint lights so the canvas is not a flat plane. */
   --ambient-warm: rgb(214 170 110 / 0.10);
@@ -107,6 +113,10 @@
 
   --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.6);
   --shadow-modal: 0 2px 6px rgb(0 0 0 / 0.6), 0 40px 80px -24px rgb(0 0 0 / 0.85);
+  --shadow-rest: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px -4px rgb(0 0 0 / 0.35);
+  --sheet-highlight: inset 0 1px 0 rgb(255 255 255 / 0.045);
+  --grain-opacity: 0.05;
+  --grain-blend: screen;
 
   --ambient-warm: rgb(214 160 90 / 0.05);
   --ambient-cool: rgb(120 126 255 / 0.07);
@@ -176,12 +186,15 @@
   --shadow-lift: var(--shadow-lift);
   --shadow-modal: var(--shadow-modal);
   --shadow-glow: var(--shadow-glow);
+  --shadow-rest: var(--shadow-rest);
 
   /* One row height for lists, one control height for inputs and buttons. */
   --spacing-row: 2.75rem;      /* 44px */
   --spacing-control: 2.25rem;  /* 36px */
   --spacing-control-sm: 1.875rem; /* 30px */
-  --spacing-sidebar: 15rem;    /* 240px */
+  --spacing-sidebar: 15.5rem;  /* 248px */
+  /* The page gutter breathes with the window: tight on a laptop, generous on a display. */
+  --spacing-gutter: clamp(1.25rem, 2.4vw, 3rem);
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -210,6 +223,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+
+/*
+ * Paper grain over the whole window: a fixed, non-interactive layer of fractal
+ * noise at a few percent, so large surfaces read as stock rather than as flat
+ * screen. It sits under every stacking context that matters (z-index 0 on a
+ * fixed layer, the app above it) and costs one composited texture.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+#app { position: relative; z-index: 1; }
 
 ::selection { background: var(--color-accent-line); color: var(--text); }
 
@@ -338,6 +369,83 @@ input[type='checkbox'] {
 [data-titlebar='overlay'] .sidebar-top { padding-top: 3.25rem; }
 
 @layer components {
+/*
+ * ── Page: the working area fills the window ─────────────────────────────────
+ * Content stretches with the window instead of floating in a fixed column; the
+ * gutter scales with it. Only on very wide displays does it stop growing, at a
+ * width where a table row can still be read in one sweep of the eye.
+ */
+.page {
+  width: 100%;
+  max-width: 124rem;
+  margin-inline: auto;
+  padding-inline: var(--spacing-gutter);
+}
+
+/* ── Sheet: the card surface, with a lit top edge and a resting shadow ──────── */
+.sheet {
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--sheet-highlight), var(--shadow-rest);
+}
+
+/* ── Icon chip: a small tinted tile that names what a card or row is about ─── */
+.icon-chip {
+  --chip: var(--accent);
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  color: var(--chip);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--chip) 16%, transparent), color-mix(in srgb, var(--chip) 8%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip) 20%, transparent), var(--sheet-highlight);
+}
+.icon-chip-lg { width: 2.5rem; height: 2.5rem; border-radius: 11px; }
+.icon-chip-sm { width: 1.625rem; height: 1.625rem; border-radius: 7px; }
+
+/*
+ * ── Data table: the one list treatment ──────────────────────────────────────
+ * A quiet header on the sunken tone, hairline rows, and on hover a short ink
+ * edge at the row's start so the eye can follow a line across a wide window.
+ */
+.data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.data-table thead th {
+  height: 2.375rem;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-subtle);
+  text-align: left;
+  background: color-mix(in srgb, var(--surface-sunken) 55%, var(--surface-raised));
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table tbody tr { transition: background-color 120ms ease, box-shadow 120ms ease; }
+.data-table tbody td { border-bottom: 1px solid var(--border); }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table tbody tr[data-row]:hover { background: var(--surface-hover); box-shadow: inset 2px 0 0 var(--accent); }
+.data-table tbody tr[data-selected='true'] { background: var(--color-accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+
+/* ── Keycap ──────────────────────────────────────────────────────────────── */
+.keycap {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--text-subtle);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
 /* ── Glass: sticky chrome over the ambient room, content stays legibly present ─ */
 .glass {
   background: color-mix(in srgb, var(--canvas) 78%, transparent);

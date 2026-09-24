@@ -7,7 +7,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CalendarRange, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-vue-next'
+import { CalendarRange, CircleCheck, FileText, Hourglass, Pencil, Plus, Search, Sigma, Trash2, X } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/stores/invoices'
 import { useToastStore } from '@/stores/toast'
 import type { Invoice, InvoiceStatus } from '@/types'
@@ -19,11 +19,13 @@ import StatusBadge from '@/components/ui/StatusBadge.vue'
 import InvoiceSeal from '@/components/ui/InvoiceSeal.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import StatTile from '@/components/ui/StatTile.vue'
+import SparkLine from '@/components/ui/SparkLine.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import type { SegmentOption } from '@/components/ui/types'
 import { formatCurrency, formatDate, todayIso } from '@/utils/format'
-import { INVOICE_STATUS, INVOICE_STATUS_ORDER, isInvoiceStatus, plural } from '@/utils/labels'
+import { INVOICE_STATUS, INVOICE_STATUS_ORDER, PAYMENT_METHOD_LABEL, isInvoiceStatus, plural } from '@/utils/labels'
 
 type StatusFilter = InvoiceStatus | 'all'
 
@@ -96,7 +98,41 @@ const summary = computed(() => {
     total: sum(live),
     paid: sum(live.filter((invoice) => invoice.status === 'paid')),
     pending: sum(live.filter((invoice) => invoice.status === 'issued' || invoice.status === 'overdue')),
+    overdue: live.filter((invoice) => invoice.status === 'overdue').length,
   }
+})
+
+const paidShare = computed(() => (summary.value.total > 0 ? Math.round((summary.value.paid / summary.value.total) * 100) : 0))
+
+/** Invoiced amount per month of issue, for the trend under the total. Only a single year has months to show. */
+const monthlyTotals = computed(() => {
+  const totals = Array.from({ length: 12 }, () => 0)
+  for (const invoice of visible.value) {
+    if (invoice.status === 'cancelled') continue
+    totals[Number(invoice.issue_date.slice(5, 7)) - 1] += invoice.total_due
+  }
+  return totals
+})
+const lastMonthIndex = computed(() => (year.value === currentYear ? new Date().getMonth() : 11))
+
+/** How the listed invoices split across statuses, drawn as one segmented bar. */
+const STATUS_FILL: Record<InvoiceStatus, string> = {
+  draft: 'bg-text-subtle/40',
+  issued: 'bg-warn',
+  paid: 'bg-safe',
+  overdue: 'bg-danger',
+  cancelled: 'bg-border-strong',
+}
+const distribution = computed(() => {
+  const total = visible.value.length
+  if (total === 0) return []
+  return INVOICE_STATUS_ORDER.map((value) => ({
+    value,
+    label: INVOICE_STATUS[value].label,
+    count: visible.value.filter((invoice) => invoice.status === value).length,
+  }))
+    .filter((segment) => segment.count > 0)
+    .map((segment) => ({ ...segment, share: (segment.count / total) * 100 }))
 })
 
 async function load(): Promise<void> {
@@ -191,31 +227,42 @@ function clearFilters(): void {
 
 <template>
   <div>
-    <PageHeader title="Fatture">
+    <PageHeader title="Fatture" :icon="FileText">
       <AppButton :icon="CalendarRange" to="/invoices/monthly">Fatturazione mensile</AppButton>
       <AppButton variant="primary" :icon="Plus" to="/invoices/new">Nuova fattura</AppButton>
     </PageHeader>
 
-    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-28">
-      <!-- Summary of what the filters show. -->
-      <dl class="settle mb-5 grid grid-cols-4 divide-x divide-border rounded-card border border-border bg-surface-raised">
-        <div class="px-5 py-4">
-          <dt class="label-quiet">Fatture</dt>
-          <dd class="mt-0.5 text-xl font-semibold text-text">{{ summary.count }}</dd>
-        </div>
-        <div class="px-5 py-4">
-          <dt class="label-quiet">Totale</dt>
-          <dd class="mt-0.5 text-xl font-semibold text-text">{{ formatCurrency(summary.total) }}</dd>
-        </div>
-        <div class="px-5 py-4">
-          <dt class="label-quiet flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-safe" aria-hidden="true" />Incassato</dt>
-          <dd class="mt-0.5 text-xl font-semibold text-text">{{ formatCurrency(summary.paid) }}</dd>
-        </div>
-        <div class="px-5 py-4">
-          <dt class="label-quiet flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-warn" aria-hidden="true" />In attesa</dt>
-          <dd class="mt-0.5 text-xl font-semibold text-text">{{ formatCurrency(summary.pending) }}</dd>
-        </div>
-      </dl>
+    <div class="page pt-6 pb-28">
+      <!-- Summary of what the filters show: four instruments, each with its own shape. -->
+      <div class="settle mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatTile label="Fatture" :value="String(summary.count)" :icon="FileText" tone="accent">
+          <template #hint>{{ year === 0 ? 'Tutti gli anni' : `Nel ${year}` }}</template>
+          <div class="flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-surface-sunken" role="img" :aria-label="distribution.map((segment) => `${segment.label} ${segment.count}`).join(', ')">
+            <span
+              v-for="segment in distribution"
+              :key="segment.value"
+              class="h-full first:rounded-l-full last:rounded-r-full transition-[width] duration-500 ease-out-expo"
+              :class="STATUS_FILL[segment.value]"
+              :style="{ width: `${segment.share}%` }"
+              :title="`${segment.label}: ${segment.count}`"
+            />
+          </div>
+        </StatTile>
+        <StatTile label="Totale fatturato" :value="formatCurrency(summary.total)" :icon="Sigma" tone="accent" hint="Escluse le annullate">
+          <SparkLine v-if="year !== 0" :values="monthlyTotals" :last-index="lastMonthIndex" :height="28" />
+        </StatTile>
+        <StatTile label="Incassato" :value="formatCurrency(summary.paid)" :icon="CircleCheck" tone="safe" :hint="`${paidShare}% del totale`">
+          <div class="h-1.5 overflow-hidden rounded-full bg-safe-soft">
+            <div class="h-full rounded-full bg-gradient-to-r from-safe/70 to-safe transition-[width] duration-700 ease-out-expo" :style="{ width: `${paidShare}%` }" />
+          </div>
+        </StatTile>
+        <StatTile label="In attesa" :value="formatCurrency(summary.pending)" :icon="Hourglass" :tone="summary.overdue > 0 ? 'danger' : 'warn'">
+          <template #hint>
+            <span v-if="summary.overdue > 0" class="font-medium text-danger">{{ plural(summary.overdue, 'fattura scaduta', 'fatture scadute') }}</span>
+            <template v-else>Nessuna scadenza superata</template>
+          </template>
+        </StatTile>
+      </div>
 
       <!-- Filters: one row, above the list. -->
       <div class="settle mb-3 flex flex-wrap items-center gap-3" style="--settle: 1">
@@ -223,7 +270,7 @@ function clearFilters(): void {
           <option v-for="option in YEAR_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
         <SegmentedControl v-model="status" :options="statusOptions" label="Stato" size="sm" />
-        <div class="relative ml-auto w-52">
+        <div class="relative ml-auto w-full sm:w-64 2xl:w-80">
           <Search :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" aria-hidden="true" />
           <input v-model="search" type="search" class="field field-sm pl-8" placeholder="Numero o paziente" aria-label="Cerca fatture" />
         </div>
@@ -243,9 +290,9 @@ function clearFilters(): void {
           <AppButton v-else variant="primary" :icon="Plus" to="/invoices/new">Nuova fattura</AppButton>
         </EmptyState>
 
-        <table v-else class="w-full text-base">
-          <thead class="border-b border-border bg-surface text-left text-xs text-text-subtle">
-            <tr class="h-9">
+        <table v-else class="data-table text-base">
+          <thead>
+            <tr>
               <th class="w-12 pl-5 font-normal">
                 <input
                   type="checkbox"
@@ -259,6 +306,8 @@ function clearFilters(): void {
               <th class="w-24 font-medium">Numero</th>
               <th class="font-medium">Paziente</th>
               <th class="w-28 font-medium">Emessa</th>
+              <th class="hidden w-28 font-medium xl:table-cell">Scadenza</th>
+              <th class="hidden w-36 font-medium 2xl:table-cell">Pagamento</th>
               <th class="w-32 pr-6 text-right font-medium">Importo</th>
               <th class="w-28 font-medium">Stato</th>
               <th class="w-24 pr-4"><span class="sr-only">Azioni</span></th>
@@ -268,8 +317,9 @@ function clearFilters(): void {
             <tr
               v-for="invoice in visible"
               :key="invoice.id"
-              class="group h-row cursor-pointer border-b border-border last:border-b-0 transition-colors"
-              :class="selected.has(invoice.id) ? 'bg-accent-soft' : 'hover:bg-surface-hover'"
+              class="group h-row cursor-pointer"
+              data-row
+              :data-selected="selected.has(invoice.id)"
               @click="router.push(`/invoices/${invoice.id}`)"
             >
               <td class="pl-5" @click.stop>
@@ -289,6 +339,8 @@ function clearFilters(): void {
                 </span>
               </td>
               <td class="tabular text-sm text-text-muted">{{ formatDate(invoice.issue_date) }}</td>
+              <td class="tabular hidden text-sm xl:table-cell" :class="invoice.status === 'overdue' ? 'font-medium text-danger' : 'text-text-subtle'">{{ invoice.due_date ? formatDate(invoice.due_date) : '—' }}</td>
+              <td class="hidden text-sm text-text-muted 2xl:table-cell">{{ PAYMENT_METHOD_LABEL[invoice.payment_method] }}</td>
               <td class="tabular pr-6 text-right font-medium text-text">{{ formatCurrency(invoice.total_due) }}</td>
               <td><StatusBadge type="invoice" :status="invoice.status" /></td>
               <td class="pr-4" @click.stop>
@@ -308,7 +360,7 @@ function clearFilters(): void {
       <Transition name="rise">
         <div
           v-if="selected.size > 0"
-          class="fixed bottom-6 left-[calc(50%+7.5rem)] z-(--z-overlay) flex -translate-x-1/2 items-center gap-3 rounded-card border border-border bg-surface-raised py-2 pl-4 pr-2 shadow-modal"
+          class="fixed bottom-6 left-[calc(50%+var(--spacing-sidebar)/2)] z-(--z-overlay) flex -translate-x-1/2 items-center gap-3 rounded-card border border-border bg-surface-raised py-2 pl-4 pr-2 shadow-modal"
           role="region"
           aria-label="Azioni sulle fatture selezionate"
         >

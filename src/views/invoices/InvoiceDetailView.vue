@@ -131,7 +131,7 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
       </template>
     </PageHeader>
 
-    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-12">
+    <div class="page pt-6 pb-12">
       <div v-if="loading" class="grid grid-cols-[1fr_18rem] gap-5" role="status" aria-busy="true">
         <span class="sr-only">Caricamento della fattura</span>
         <div class="h-[28rem] rounded-card border border-border bg-surface-raised p-8"><div class="skeleton h-4 w-1/3" /></div>
@@ -142,7 +142,7 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
         <AppButton to="/invoices">Torna alle fatture</AppButton>
       </EmptyState>
 
-      <div v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_18rem]">
+      <div v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] 2xl:grid-cols-[minmax(0,1fr)_21rem]">
         <!-- ── The document ─────────────────────────────────────────────────── -->
         <AppCard as="article" :padded="false" class="settle overflow-hidden">
           <header class="flex items-start justify-between gap-6 px-8 pt-7 pb-6">

@@ -40,6 +40,17 @@ const sentence = computed(() => {
   if (projection > FORFETTARIO_THRESHOLD) return `A questo ritmo chiuderai l'anno a circa ${formatCurrency(projection)}, oltre la soglia.`
   return `A questo ritmo chiuderai l'anno a circa ${formatCurrency(projection)}.`
 })
+
+/** Three facts under the meter: what is left, where the pace leads, and the pace itself. */
+const facts = computed(() => {
+  const { amount, projection } = reading.value
+  const monthsElapsed = props.year === new Date().getFullYear() ? new Date().getMonth() + 1 : 12
+  return [
+    { label: 'Margine', value: formatCurrencyCompact(Math.max(0, FORFETTARIO_THRESHOLD - amount)) },
+    { label: 'Proiezione', value: projection === null ? '—' : formatCurrencyCompact(projection) },
+    { label: 'Media mensile', value: formatCurrencyCompact(amount / monthsElapsed) },
+  ]
+})
 </script>
 
 <template>
@@ -76,6 +87,13 @@ const sentence = computed(() => {
     </div>
 
     <p class="mt-3 text-sm text-text-muted">{{ sentence }}</p>
+
+    <dl class="mt-5 grid grid-cols-3 divide-x divide-border rounded-control bg-surface-sunken/60 py-2.5 ring-1 ring-inset ring-border">
+      <div v-for="fact in facts" :key="fact.label" class="px-3 text-center">
+        <dt class="text-2xs text-text-subtle">{{ fact.label }}</dt>
+        <dd class="tabular mt-0.5 text-md font-semibold text-text">{{ fact.value }}</dd>
+      </div>
+    </dl>
   </div>
 </template>
 

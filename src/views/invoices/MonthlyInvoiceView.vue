@@ -13,6 +13,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import PeriodStepper from '@/components/ui/PeriodStepper.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
+import CardHeader from '@/components/ui/CardHeader.vue'
 import FormField from '@/components/ui/FormField.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -125,7 +126,7 @@ async function generate(): Promise<void> {
       />
     </PageHeader>
 
-    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-12">
+    <div class="page pt-6 pb-12">
       <!-- Done: the stamp lands once. -->
       <AppCard v-if="generated !== null" class="settle flex flex-col items-center py-14 text-center">
         <div class="stamp grid size-16 place-items-center rounded-full bg-safe text-white shadow-lift">
@@ -139,18 +140,14 @@ async function generate(): Promise<void> {
         </div>
       </AppCard>
 
-      <div v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_19rem]">
+      <div v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
         <AppCard :padded="false" class="settle overflow-hidden">
-          <div class="flex items-center justify-between gap-4 px-5 pt-5 pb-4">
-            <div>
-              <h2 class="text-lg font-medium text-text">Sedute da fatturare</h2>
-              <p class="text-sm text-text-subtle">Svolte a {{ label.toLocaleLowerCase('it-IT') }} e non ancora in fattura</p>
-            </div>
+          <CardHeader title="Sedute da fatturare" :subtitle="`Svolte a ${label.toLocaleLowerCase('it-IT')} e non ancora in fattura`" :icon="CalendarCheck">
             <label v-if="previews.length > 0" class="flex cursor-pointer items-center gap-2 text-sm text-text-muted">
               <input type="checkbox" :checked="allSelected" :indeterminate="!allSelected && selected.size > 0" @change="toggleAll" />
               Tutti
             </label>
-          </div>
+          </CardHeader>
 
           <SkeletonRows v-if="loading" variant="list" :count="6" label="Caricamento delle sedute" />
 
