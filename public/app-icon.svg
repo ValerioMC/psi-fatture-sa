@@ -33,29 +33,33 @@
     </linearGradient>
 
     <!--
-      The wings: ψυχή is the Greek for both "soul" and "butterfly", and Psyche is
-      drawn with butterfly wings. Here the Ψ is the butterfly's body and two
-      pairs of wings open behind it, carved tone-on-tone: the soul the discipline is
-      named after, and the metamorphosis that is the work of therapy.
+      The moth: ψυχή is the Greek for both "soul" and "butterfly" (moths
+      included). The outline is Acherontia atropos, the death's-head hawkmoth:
+      long swept forewings, small hindwings, a heavy abdomen, carved
+      tone-on-tone behind the Ψ, which stands for its body.
     -->
     <!-- One side of the butterfly; the other is its mirror. -->
     <g id="wingPair">
-      <path id="wingU" d="M512 494 C474 420 386 302 296 270 C224 244 166 282 170 352 C174 432 262 494 400 508 C452 513 492 512 512 510 Z"/>
-      <path id="wingL" d="M512 526 C452 532 360 560 320 618 C286 668 300 728 356 730 C418 732 478 646 512 554 Z"/>
+      <path id="wingU" d="M506 408 C420 376 300 346 180 340 C160 340 152 356 164 370 C204 430 258 500 316 544 C380 566 462 542 506 500 Z"/>
+      <path id="wingL" d="M506 508 C466 536 400 566 352 596 C316 618 318 668 362 676 C420 686 482 636 506 584 Z"/>
     </g>
     <g id="wings">
       <use href="#wingPair"/>
       <use href="#wingPair" transform="matrix(-1 0 0 1 1024 0)"/>
+      <!-- The hawkmoth's heavy abdomen, just wider than the Ψ's stem, so its edges show beside it. -->
+      <ellipse cx="512" cy="612" rx="46" ry="154"/>
     </g>
     <g id="veins" fill="none" stroke-linecap="round">
+      <!-- The wavy cross-bands of a hawkmoth's forewing, and one arc on the hindwing. -->
       <g id="veinSide">
-        <path d="M506 494 C440 420 340 320 262 288"/>
-        <path d="M506 502 C430 460 300 400 196 372"/>
-        <path d="M508 532 C456 570 380 630 340 700"/>
+        <path d="M462 400 C436 428 452 460 424 492 C412 506 404 520 400 540"/>
+        <path d="M372 374 C346 404 366 436 334 470 C320 486 304 500 290 508"/>
+        <path d="M270 356 C252 380 266 404 240 428"/>
+        <path d="M486 572 C446 596 404 620 378 648"/>
       </g>
       <use href="#veinSide" transform="matrix(-1 0 0 1 1024 0)"/>
     </g>
-    <clipPath id="wingsClip"><use href="#wingU"/><use href="#wingL"/><use href="#wingU" transform="matrix(-1 0 0 1 1024 0)"/><use href="#wingL" transform="matrix(-1 0 0 1 1024 0)"/></clipPath>
+    <clipPath id="wingsClip"><use href="#wingU"/><use href="#wingL"/><use href="#wingU" transform="matrix(-1 0 0 1 1024 0)"/><use href="#wingL" transform="matrix(-1 0 0 1 1024 0)"/><ellipse cx="512" cy="612" rx="46" ry="154"/></clipPath>
 
     <!--
       Bas-relief: the wings are cut from the same ink as the ground. Only their
