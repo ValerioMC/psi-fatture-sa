@@ -209,6 +209,39 @@ Dati generati:
 
 Il caricamento è rapido (~2 s) perché scrive direttamente nel SQLite bypassando l'app.
 
+## Interfaccia
+
+Il sistema visivo si chiama "Carta e inchiostro": fondo carta caldo, testo inchiostro
+e un solo colore d'accento (indaco inchiostro) per selezione, azione primaria e focus.
+
+- **Token**: `src/style.css` definisce una volta sola colori, tipografia, due raggi,
+  tre ombre, la scala z-index e le transizioni. La palette standard di Tailwind è
+  disattivata (`--color-*: initial`): una classe come `text-slate-500` non produce nulla.
+- **Componenti base**: `src/components/ui/` (AppButton, AppCard, FormField, ComboBox,
+  SegmentedControl, ToggleSwitch, AppDialog, ConfirmDialog, ToastHost, SkeletonRows,
+  EmptyState, InvoiceSeal…). Le schermate usano solo questi.
+- **Sigillo della fattura**: `InvoiceSeal.vue` disegna lo stato di una fattura
+  (bozza, emessa con l'arco verso la scadenza, pagata, scaduta, annullata); la logica
+  sta in `src/utils/invoiceSeal.ts`.
+- **Tema**: chiaro, scuro o come il sistema, da Impostazioni. La scelta è salvata in
+  `localStorage` (chiave `psi-fatture.theme`).
+- **Scorciatoie**: ⌘K (Ctrl K su Windows) apre la ricerca di pazienti, azioni e sezioni.
+- **Finestra macOS**: `titleBarStyle: "Overlay"` in `tauri.conf.json`; i semafori stanno
+  sopra la barra laterale e intestazioni e barra laterale trascinano la finestra
+  (permesso `core:window:allow-start-dragging`).
+
+## Screenshot per il sito vetrina
+
+`scripts/screenshots/capture.mjs` genera le immagini WebP di psifatture.it dal dev
+server, con l'IPC di Tauri sostituito da dati demo (`mock-tauri.js`). Non pilota la
+finestra nativa, quindi macOS non chiede permessi di registrazione schermo.
+
+```bash
+npm run dev -- --port 1421        # in un altro terminale
+npm install --no-save playwright sharp
+node scripts/screenshots/capture.mjs ../psi-fatture-brochure/public/screenshots
+```
+
 ## Struttura del progetto
 
 ```
@@ -216,10 +249,16 @@ psi-fatture-sa/
 ├── src/                    # Frontend Vue 3 + TypeScript
 │   ├── api.ts              # Wrapper chiamate Tauri invoke
 │   ├── types.ts            # Tipi condivisi frontend
+│   ├── style.css           # Token del design system, campi, movimenti
 │   ├── views/              # Pagine dell'applicazione
-│   ├── components/         # Componenti UI riutilizzabili
-│   ├── stores/             # State management (Pinia)
-│   └── utils/              # Utility (formattazione, ecc.)
+│   ├── components/
+│   │   ├── ui/             # Componenti base (bottoni, campi, dialoghi, sigillo…)
+│   │   ├── layout/         # Barra laterale, layout, palette ⌘K
+│   │   ├── dashboard/      # Grafico mensile, soglia forfettario, stima fiscale
+│   │   └── profile/        # Sezioni del profilo (impostazioni e primo avvio)
+│   ├── composables/        # Tema, focus trap, form profilo, smooth scroll
+│   ├── stores/             # State management (Pinia), notifiche
+│   └── utils/              # Formattazione, fisco, validazione, stato fatture
 ├── src-tauri/              # Backend Rust + Tauri
 │   ├── src/
 │   │   ├── app/
@@ -237,7 +276,8 @@ psi-fatture-sa/
 ## Test
 
 ```bash
-# Frontend (vitest): logica fiscale e validazione (codice fiscale, P.IVA, IBAN…)
+# Frontend (vitest): logica fiscale, validazione (codice fiscale, P.IVA, IBAN…),
+# sigillo delle fatture, soglia forfettario, date locali, ricorrenze, tema, notifiche
 npm test
 
 # Backend (cargo): calcolo totali fattura e validazione input
@@ -297,5 +337,5 @@ Il file `.vscode/settings.json` già presente nel repo configura:
 - **Build**: Tauri CLI, Vite, vue-tsc
 - **Test**: Vitest (frontend), cargo test (backend)
 
-I font (Lexend, Crimson Pro) sono self-hosted via `@fontsource`: l'app rende
-correttamente anche offline, senza dipendere da Google Fonts.
+I font (Geist, Geist Mono, Newsreader) sono self-hosted via `@fontsource-variable`:
+l'app rende correttamente anche offline, senza dipendere da Google Fonts.

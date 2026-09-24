@@ -1,544 +1,327 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, CheckCircle2, Clock } from 'lucide-vue-next'
-import { listAppointments } from '@/api'
+/**
+ * The month on the left, the chosen day on the right. A session that has
+ * happened is marked "svolta" with one click from the day list: that is what
+ * makes it appear in the monthly invoicing, so it must never take a dialog.
+ */
+import { computed, onMounted, ref, watch } from 'vue'
+import { CalendarDays, Check, Clock, Plus, Repeat } from 'lucide-vue-next'
+import { listAppointments, updateAppointment } from '@/api'
 import { useClientsStore } from '@/stores/clients'
 import { useServicesStore } from '@/stores/services'
-import type { Appointment } from '@/types'
+import { useToastStore } from '@/stores/toast'
+import type { Appointment, AppointmentStatus } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import PeriodStepper from '@/components/ui/PeriodStepper.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import StatusBadge from '@/components/ui/StatusBadge.vue'
+import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import AppointmentModal from './AppointmentModal.vue'
-import { useSmoothScrollInstance } from '@/composables/useSmoothScroll'
+import { formatMonthYear, minutesBetween, parseIsoDate, toIsoDate, todayIso } from '@/utils/format'
+import { plural } from '@/utils/labels'
 
 const clientsStore = useClientsStore()
 const servicesStore = useServicesStore()
+const toast = useToastStore()
 
-const today = new Date()
-const todayStr = today.toISOString().slice(0, 10)
-const viewYear = ref(today.getFullYear())
-const viewMonth = ref(today.getMonth())
+const today = todayIso()
+const viewYear = ref(new Date().getFullYear())
+const viewMonth = ref(new Date().getMonth())
+const selectedDate = ref(today)
 const appointments = ref<Appointment[]>([])
 const loading = ref(false)
-const selectedDate = ref(todayStr)
 
-const showModal = ref(false)
+const modalOpen = ref(false)
 const modalDate = ref<string | undefined>(undefined)
-const editingAppointment = ref<Appointment | null>(null)
-const dayPanelRef = ref<HTMLElement | null>(null)
-const lenis = useSmoothScrollInstance()
+const editing = ref<Appointment | null>(null)
 
-const MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-]
-const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
+const WEEKDAYS = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
 
-function padDate(y: number, m: number, d: number): string {
-  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+interface CalendarCell {
+  date: string
+  day: number
+  inMonth: boolean
+  weekend: boolean
 }
 
-const calendarDays = computed(() => {
-  const year = viewYear.value
-  const month = viewMonth.value
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const startDow = (firstDay.getDay() + 6) % 7
-  const days: Array<{ date: string; day: number; currentMonth: boolean }> = []
-
-  for (let i = startDow - 1; i >= 0; i--) {
-    const d = new Date(year, month, -i)
-    days.push({ date: padDate(d.getFullYear(), d.getMonth(), d.getDate()), day: d.getDate(), currentMonth: false })
-  }
-  for (let d = 1; d <= lastDay.getDate(); d++) {
-    days.push({ date: padDate(year, month, d), day: d, currentMonth: true })
-  }
-  const remainder = days.length % 7
-  if (remainder !== 0) {
-    for (let i = 1; i <= 7 - remainder; i++) {
-      const d = new Date(year, month + 1, i)
-      days.push({ date: padDate(d.getFullYear(), d.getMonth(), d.getDate()), day: d.getDate(), currentMonth: false })
-    }
-  }
-  return days
+/** Six-by-seven or five-by-seven grid, Monday first, padded with the neighbouring months. */
+const cells = computed<CalendarCell[]>(() => {
+  const first = new Date(viewYear.value, viewMonth.value, 1)
+  const leading = (first.getDay() + 6) % 7
+  const daysInMonth = new Date(viewYear.value, viewMonth.value + 1, 0).getDate()
+  const total = Math.ceil((leading + daysInMonth) / 7) * 7
+  return Array.from({ length: total }, (_, index) => {
+    const date = new Date(viewYear.value, viewMonth.value, index - leading + 1)
+    const weekday = (date.getDay() + 6) % 7
+    return { date: toIsoDate(date), day: date.getDate(), inMonth: date.getMonth() === viewMonth.value, weekend: weekday >= 5 }
+  })
 })
 
-const appointmentsByDate = computed(() => {
-  const map: Record<string, Appointment[]> = {}
-  for (const appt of appointments.value) {
-    if (!map[appt.date]) map[appt.date] = []
-    map[appt.date].push(appt)
+const byDate = computed(() => {
+  const map = new Map<string, Appointment[]>()
+  for (const appointment of appointments.value) {
+    const list = map.get(appointment.date) ?? []
+    list.push(appointment)
+    map.set(appointment.date, list)
   }
+  for (const list of map.values()) list.sort((a, b) => a.start_time.localeCompare(b.start_time))
   return map
 })
 
-const selectedDayAppointments = computed(() =>
-  [...(appointmentsByDate.value[selectedDate.value] ?? [])].sort((a, b) =>
-    a.start_time.localeCompare(b.start_time),
-  ),
+const dayList = computed(() => byDate.value.get(selectedDate.value) ?? [])
+const dayLabel = computed(() => {
+  const label = parseIsoDate(selectedDate.value).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+})
+const dayMinutes = computed(() =>
+  dayList.value.filter((item) => item.status !== 'cancelled').reduce((sum, item) => sum + minutesBetween(item.start_time, item.end_time), 0),
 )
 
 const monthStats = computed(() => {
-  const all = appointments.value
-  return {
-    total: all.length,
-    completed: all.filter(a => a.status === 'completed').length,
-    todayCount: (appointmentsByDate.value[todayStr] ?? []).length,
-  }
+  const prefix = `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}`
+  const live = appointments.value.filter((item) => item.status !== 'cancelled' && item.date.startsWith(prefix))
+  const heldNotBilled = live.filter((item) => item.status === 'completed' && item.invoice_id === undefined).length
+  const toConfirm = live.filter((item) => item.status === 'scheduled' && item.date < today).length
+  return { total: live.length, heldNotBilled, toConfirm }
 })
 
-const selectedDayStats = computed(() => {
-  const appts = selectedDayAppointments.value
-  return {
-    total: appts.length,
-    completed: appts.filter(a => a.status === 'completed').length,
-    scheduled: appts.filter(a => a.status === 'scheduled').length,
-  }
-})
-
-const selectedDayLabel = computed(() =>
-  new Date(selectedDate.value + 'T00:00:00').toLocaleDateString('it-IT', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }),
-)
-
-function prevMonth() {
-  if (viewMonth.value === 0) { viewMonth.value = 11; viewYear.value-- }
-  else viewMonth.value--
-}
-
-function nextMonth() {
-  if (viewMonth.value === 11) { viewMonth.value = 0; viewYear.value++ }
-  else viewMonth.value++
-}
-
-async function loadAppointments() {
+async function load(): Promise<void> {
   loading.value = true
-  const year = viewYear.value
-  const month = viewMonth.value
-  const dateFrom = padDate(year, month, 1)
-  const dateTo = padDate(year, month, new Date(year, month + 1, 0).getDate())
+  const from = toIsoDate(new Date(viewYear.value, viewMonth.value, -6))
+  const to = toIsoDate(new Date(viewYear.value, viewMonth.value + 1, 7))
   try {
-    appointments.value = await listAppointments(dateFrom, dateTo)
+    appointments.value = await listAppointments(from, to)
+  } catch (error) {
+    toast.notifyError(error, 'Agenda non disponibile')
   } finally {
     loading.value = false
   }
 }
 
-function selectDate(date: string) {
-  selectedDate.value = date
-  nextTick(() => {
-    if (dayPanelRef.value === null) return
-    // scroll-mt-6 on the panel is honored by scrollIntoView but not by Lenis, hence the offset
-    if (lenis.value !== null) lenis.value.scrollTo(dayPanelRef.value, { offset: -24 })
-    else dayPanelRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  })
+function shiftMonth(delta: number): void {
+  const next = new Date(viewYear.value, viewMonth.value + delta, 1)
+  viewYear.value = next.getFullYear()
+  viewMonth.value = next.getMonth()
 }
 
-function openCreate(date: string) {
-  editingAppointment.value = null
-  modalDate.value = date
-  showModal.value = true
+function goToday(): void {
+  const now = new Date()
+  viewYear.value = now.getFullYear()
+  viewMonth.value = now.getMonth()
+  selectedDate.value = today
 }
 
-function openEdit(appt: Appointment) {
-  editingAppointment.value = appt
-  modalDate.value = appt.date
-  showModal.value = true
+function selectCell(cell: CalendarCell): void {
+  selectedDate.value = cell.date
+  if (!cell.inMonth) shiftMonth(cell.date < toIsoDate(new Date(viewYear.value, viewMonth.value, 1)) ? -1 : 1)
 }
 
-function onModalSaved() {
-  loadAppointments()
+function openCreate(): void {
+  editing.value = null
+  modalDate.value = selectedDate.value
+  modalOpen.value = true
 }
 
-function statusDotClass(status: string): string {
-  const map: Record<string, string> = {
-    scheduled: 'bg-ocean-400 border-ocean-300',
-    completed: 'bg-emerald-500 border-emerald-300',
-    cancelled: 'bg-warm-300 border-warm-200',
+function openEdit(appointment: Appointment): void {
+  editing.value = appointment
+  modalDate.value = appointment.date
+  modalOpen.value = true
+}
+
+async function setStatus(appointment: Appointment, status: AppointmentStatus, announce = true): Promise<void> {
+  const previous = appointment.status
+  try {
+    const updated = await updateAppointment({
+      id: appointment.id,
+      client_id: appointment.client_id,
+      service_id: appointment.service_id,
+      date: appointment.date,
+      start_time: appointment.start_time,
+      end_time: appointment.end_time,
+      status,
+      notes: appointment.notes,
+      recurrence_group_id: appointment.recurrence_group_id,
+    })
+    appointments.value = appointments.value.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
+    if (announce) {
+      toast.notify(`Seduta con ${appointment.client_name} segnata come svolta`, {
+        label: 'Annulla',
+        run: () => setStatus({ ...appointment, status }, previous, false),
+      })
+    }
+  } catch (error) {
+    toast.notifyError(error, 'Aggiornamento non riuscito')
   }
-  return map[status] ?? 'bg-sage-300'
 }
 
-function statusPillClass(status: string): string {
-  const map: Record<string, string> = {
-    scheduled: 'bg-ocean-50 text-ocean-700 border border-ocean-100',
-    completed: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
-    cancelled: 'bg-warm-50 text-warm-500 border border-warm-100 line-through',
-  }
-  return map[status] ?? 'bg-sage-50 text-sage-500'
+const CHIP_DOT: Record<AppointmentStatus, string> = {
+  scheduled: 'bg-accent',
+  completed: 'bg-safe',
+  cancelled: 'bg-text-subtle',
 }
 
-function statusAccentClass(status: string): string {
-  const map: Record<string, string> = {
-    scheduled: 'bg-ocean-400',
-    completed: 'bg-emerald-500',
-    cancelled: 'bg-warm-300',
-  }
-  return map[status] ?? 'bg-sage-300'
-}
-
-function statusBorderClass(status: string): string {
-  const map: Record<string, string> = {
-    scheduled: 'border-ocean-100',
-    completed: 'border-emerald-100',
-    cancelled: 'border-warm-100',
-  }
-  return map[status] ?? 'border-sage-100'
-}
-
-function statusLabel(status: string): string {
-  const map: Record<string, string> = {
-    scheduled: 'Programmato',
-    completed: 'Completato',
-    cancelled: 'Annullato',
-  }
-  return map[status] ?? status
-}
-
-function apptDuration(appt: Appointment): string {
-  const [sh, sm] = appt.start_time.split(':').map(Number)
-  const [eh, em] = appt.end_time.split(':').map(Number)
-  const mins = (eh * 60 + em) - (sh * 60 + sm)
-  return mins > 0 ? `${mins} min` : ''
-}
-
-function calendarCellAppts(date: string): Appointment[] {
-  return appointmentsByDate.value[date] ?? []
-}
-
-function cellDotColor(status: string): string {
-  const map: Record<string, string> = {
-    scheduled: 'bg-ocean-400',
-    completed: 'bg-emerald-500',
-    cancelled: 'bg-warm-300',
-  }
-  return map[status] ?? 'bg-sage-300'
-}
-
-const isToday = (dateStr: string) => dateStr === todayStr
-
-watch([viewYear, viewMonth], loadAppointments)
-onMounted(async () => {
-  await Promise.all([
-    clientsStore.fetchClients(),
-    servicesStore.fetchServices(false),
-    loadAppointments(),
-  ])
-})
+watch([viewYear, viewMonth], load)
+onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchServices(false), load()]))
 </script>
 
 <template>
-  <div class="p-8">
-    <div class="max-w-6xl mx-auto">
-      <PageHeader title="Agenda" subtitle="Gestisci i tuoi appuntamenti.">
-        <button
-          type="button"
-          class="group relative overflow-hidden text-white font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 cursor-pointer focus:outline-none"
-          style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
-          @click="openCreate(selectedDate)"
-        >
-          <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
-          <Plus class="w-4 h-4 relative z-10" />
-          <span class="relative z-10">Nuovo Appuntamento</span>
-        </button>
-      </PageHeader>
+  <div>
+    <PageHeader title="Agenda">
+      <AppButton variant="primary" :icon="Plus" @click="openCreate">Nuovo appuntamento</AppButton>
+    </PageHeader>
 
-      <!-- Stats strip -->
-      <div class="grid grid-cols-3 gap-4 mb-6 animate-in">
-        <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
-            <CalendarDays class="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <p class="text-[10px] text-sage-400 uppercase tracking-wider">Questo mese</p>
-            <p class="text-xl font-bold text-sage-900 leading-tight">{{ monthStats.total }}</p>
-          </div>
-        </div>
-        <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #6366f1, #4f46e5)">
-            <Clock class="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <p class="text-[10px] text-sage-400 uppercase tracking-wider">Oggi</p>
-            <p class="text-xl font-bold text-sage-900 leading-tight">{{ monthStats.todayCount }}</p>
-          </div>
-        </div>
-        <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
-            <CheckCircle2 class="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <p class="text-[10px] text-sage-400 uppercase tracking-wider">Completati</p>
-            <p class="text-xl font-bold text-sage-900 leading-tight">{{ monthStats.completed }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Calendar (full width) -->
-      <div class="glass-card rounded-2xl shadow-sm overflow-hidden animate-in-d1">
-        <!-- Month nav -->
-        <div class="flex items-center justify-between px-5 py-4 border-b border-sage-100/60">
-          <button
-            type="button"
-            class="p-1.5 text-sage-500 hover:bg-sage-100 rounded-lg transition-colors cursor-pointer"
-            @click="prevMonth"
-          >
-            <ChevronLeft class="w-4 h-4" />
-          </button>
-          <h2 class="text-sm font-semibold text-sage-900">
-            {{ MONTH_NAMES[viewMonth] }} {{ viewYear }}
-          </h2>
-          <button
-            type="button"
-            class="p-1.5 text-sage-500 hover:bg-sage-100 rounded-lg transition-colors cursor-pointer"
-            @click="nextMonth"
-          >
-            <ChevronRight class="w-4 h-4" />
-          </button>
-        </div>
-
-        <!-- Day name headers -->
-        <div class="grid grid-cols-7 border-b border-sage-100/60">
-          <div
-            v-for="dayName in DAY_NAMES"
-            :key="dayName"
-            class="text-center text-[10px] font-semibold text-sage-400 uppercase tracking-wider py-2"
-          >
-            {{ dayName }}
-          </div>
-        </div>
-
-        <!-- Loading overlay -->
-        <div v-if="loading" class="flex items-center justify-center py-16">
-          <div class="w-6 h-6 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
-        </div>
-
-        <!-- Calendar grid -->
-        <div v-else class="grid grid-cols-7 divide-x divide-y divide-sage-100/40">
-          <div
-            v-for="cell in calendarDays"
-            :key="cell.date"
-            class="min-h-[80px] p-2 cursor-pointer transition-all duration-200 active:scale-95 relative"
-            :class="[
-              cell.date === selectedDate
-                ? 'bg-sage-50/80 ring-2 ring-inset ring-sage-400/50'
-                : 'hover:bg-sage-50/40',
-              !cell.currentMonth ? 'opacity-35' : '',
-            ]"
-            @click="selectDate(cell.date)"
-          >
-            <!-- Day number -->
-            <div class="flex items-start justify-between mb-1.5">
-              <span
-                class="text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full leading-none"
-                :class="isToday(cell.date)
-                  ? 'bg-gradient-to-br from-sage-600 to-ocean-500 text-white'
-                  : cell.date === selectedDate
-                    ? 'text-sage-800'
-                    : 'text-sage-600'"
-              >
-                {{ cell.day }}
-              </span>
-              <!-- Count badge -->
-              <span
-                v-if="calendarCellAppts(cell.date).length > 0"
-                class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                :class="calendarCellAppts(cell.date).length >= 6
-                  ? 'bg-ocean-100 text-ocean-700'
-                  : 'bg-sage-100 text-sage-600'"
-              >
-                {{ calendarCellAppts(cell.date).length }}
-              </span>
+    <div class="mx-auto max-w-[80rem] px-8 pt-6 pb-12">
+      <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_22rem]">
+        <!-- ── Month ─────────────────────────────────────────────────────── -->
+        <AppCard :padded="false" class="settle overflow-hidden">
+          <div class="flex items-center justify-between gap-4 px-5 py-4">
+            <div>
+              <h2 class="display text-2xl text-text">{{ formatMonthYear(viewYear, viewMonth + 1) }}</h2>
+              <p class="text-sm text-text-subtle">
+                {{ plural(monthStats.total, 'seduta', 'sedute') }}<template v-if="monthStats.toConfirm > 0"> · {{ monthStats.toConfirm }} passate da confermare</template>
+              </p>
             </div>
-
-            <!-- Status dot row -->
-            <div v-if="calendarCellAppts(cell.date).length > 0" class="flex flex-wrap gap-0.5 mb-1">
-              <div
-                v-for="appt in calendarCellAppts(cell.date).slice(0, 6)"
-                :key="appt.id"
-                class="w-1.5 h-1.5 rounded-full"
-                :class="cellDotColor(appt.status)"
+            <div class="flex items-center gap-2">
+              <AppButton size="sm" @click="goToday">Oggi</AppButton>
+              <PeriodStepper
+                :label="''"
+                min-width="0"
+                previous-label="Mese precedente"
+                next-label="Mese successivo"
+                @previous="shiftMonth(-1)"
+                @next="shiftMonth(1)"
               />
-              <div
-                v-if="calendarCellAppts(cell.date).length > 6"
-                class="text-[8px] text-sage-400 leading-none mt-px"
-              >
-                +{{ calendarCellAppts(cell.date).length - 6 }}
-              </div>
-            </div>
-
-            <!-- First appointment preview -->
-            <div
-              v-if="calendarCellAppts(cell.date).length > 0"
-              class="text-[9px] text-sage-500 truncate leading-tight"
-            >
-              {{ calendarCellAppts(cell.date)[0].start_time.slice(0, 5) }}
-              {{ calendarCellAppts(cell.date)[0].client_name.split(' ')[0] }}
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Day panel (below calendar, full width) -->
-      <div ref="dayPanelRef" class="glass-card rounded-2xl shadow-sm overflow-hidden mt-5 animate-in-d2 scroll-mt-6">
-        <!-- Day panel header -->
-        <div class="px-5 py-4 border-b border-sage-100/60">
-          <div class="flex items-center justify-between gap-4">
-            <Transition name="header-fade" mode="out-in">
-              <div :key="selectedDate" class="flex items-center gap-4">
-                <div>
-                  <p class="text-[10px] text-sage-400 uppercase tracking-wider mb-0.5">Giornata</p>
-                  <h3 class="text-sm font-semibold text-sage-900 capitalize leading-tight">
-                    {{ selectedDayLabel }}
-                  </h3>
-                </div>
-                <!-- Day stats pills -->
-                <div v-if="selectedDayStats.total > 0" class="flex gap-2">
-                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-100 text-sage-600">
-                    {{ selectedDayStats.total }} appunt.
-                  </span>
-                  <span v-if="selectedDayStats.completed > 0" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-50 text-sage-500">
-                    {{ selectedDayStats.completed }} completati
-                  </span>
-                  <span v-if="selectedDayStats.scheduled > 0" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-ocean-50 text-ocean-600">
-                    {{ selectedDayStats.scheduled }} da fare
-                  </span>
-                </div>
-              </div>
-            </Transition>
+          <div class="grid grid-cols-7 border-y border-border bg-surface text-xs text-text-subtle" aria-hidden="true">
+            <span v-for="weekday in WEEKDAYS" :key="weekday" class="px-2.5 py-2">{{ weekday }}</span>
+          </div>
+
+          <div class="grid grid-cols-7" :class="loading ? 'opacity-60 transition-opacity' : ''" role="grid" :aria-label="formatMonthYear(viewYear, viewMonth + 1)">
             <button
+              v-for="(cell, index) in cells"
+              :key="cell.date"
               type="button"
-              class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sage-50 hover:bg-sage-100 text-sage-600 hover:text-sage-800 text-xs font-medium transition-colors cursor-pointer"
-              title="Aggiungi appuntamento"
-              @click="openCreate(selectedDate)"
+              class="group relative flex min-h-[6.25rem] flex-col items-stretch gap-1 border-border p-1.5 text-left transition-colors focus-ring focus-visible:z-[1]"
+              :class="[
+                index % 7 !== 6 ? 'border-r' : '',
+                index < cells.length - 7 ? 'border-b' : '',
+                cell.date === selectedDate ? 'bg-accent-soft' : cell.weekend || !cell.inMonth ? 'bg-surface hover:bg-surface-hover' : 'hover:bg-surface-hover',
+              ]"
+              :aria-pressed="cell.date === selectedDate"
+              :aria-label="`${parseIsoDate(cell.date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}, ${plural((byDate.get(cell.date) ?? []).length, 'appuntamento', 'appuntamenti')}`"
+              @click="selectCell(cell)"
             >
-              <Plus class="w-3.5 h-3.5" />
-              Aggiungi
+              <span
+                v-if="cell.date === selectedDate"
+                class="pointer-events-none absolute inset-0 ring-1 ring-inset ring-accent-line"
+                aria-hidden="true"
+              />
+              <span
+                class="tabular grid size-6 place-items-center rounded-full text-sm"
+                :class="cell.date === today
+                  ? 'bg-accent font-semibold text-accent-ink'
+                  : cell.inMonth ? 'text-text' : 'text-text-subtle/70'"
+              >{{ cell.day }}</span>
+              <span
+                v-for="appointment in (byDate.get(cell.date) ?? []).slice(0, 3)"
+                :key="appointment.id"
+                class="flex items-center gap-1.5 truncate rounded-[5px] px-1 text-2xs leading-[1.125rem]"
+                :class="[appointment.status === 'cancelled' ? 'text-text-subtle line-through' : cell.inMonth ? 'text-text-muted' : 'text-text-subtle']"
+              >
+                <span class="size-1.5 shrink-0 rounded-full" :class="CHIP_DOT[appointment.status]" aria-hidden="true" />
+                <span class="truncate" :title="`${appointment.start_time.slice(0, 5)} ${appointment.client_name}`">{{ appointment.client_name.split(' ')[0] }}</span>
+              </span>
+              <span v-if="(byDate.get(cell.date) ?? []).length > 3" class="px-1 text-2xs text-text-subtle">
+                +{{ (byDate.get(cell.date) ?? []).length - 3 }} {{ (byDate.get(cell.date) ?? []).length - 3 === 1 ? 'altro' : 'altri' }}
+              </span>
             </button>
           </div>
-        </div>
+        </AppCard>
 
-        <!-- Body: transitions on date change -->
-        <Transition name="day-content" mode="out-in">
-          <div :key="selectedDate">
-
-        <!-- Empty state -->
-        <div v-if="selectedDayAppointments.length === 0" class="flex flex-col items-center justify-center py-14 text-center px-5">
-          <div class="w-12 h-12 rounded-2xl bg-sage-50 flex items-center justify-center mb-3">
-            <CalendarDays class="w-6 h-6 text-sage-300" />
-          </div>
-          <p class="text-sm font-medium text-sage-500">Nessun appuntamento</p>
-          <p class="text-xs text-sage-400 mt-1">Clicca Aggiungi per inserirne uno.</p>
-        </div>
-
-        <!-- Appointments grid -->
-        <div v-else class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          <div
-            v-for="(appt, idx) in selectedDayAppointments"
-            :key="appt.id"
-            :style="{ '--i': idx }"
-            class="appt-card rounded-xl border bg-white/80 shadow-sm overflow-hidden cursor-pointer transition-all hover:shadow-md hover:bg-white group"
-            :class="[
-              appt.status === 'cancelled' ? 'opacity-50' : '',
-              statusBorderClass(appt.status),
-            ]"
-            @click="openEdit(appt)"
-          >
-            <div class="flex h-full">
-              <!-- Left accent strip -->
-              <div class="w-[3px] shrink-0 self-stretch" :class="statusAccentClass(appt.status)" />
-
-              <div class="flex-1 min-w-0 px-3 py-3">
-                <!-- Time + status badge -->
-                <div class="flex items-start justify-between gap-2 mb-2">
-                  <div class="flex items-center gap-1.5">
-                    <div
-                      class="w-2 h-2 rounded-full shrink-0 border-2 transition-transform group-hover:scale-125"
-                      :class="statusDotClass(appt.status)"
-                    />
-                    <span class="text-[11px] font-mono font-semibold text-sage-600 tabular-nums">
-                      {{ appt.start_time.slice(0, 5) }}
-                    </span>
-                  </div>
-                  <span
-                    class="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
-                    :class="statusPillClass(appt.status)"
-                  >
-                    {{ statusLabel(appt.status) }}
-                  </span>
+        <!-- ── Day ───────────────────────────────────────────────────────── -->
+        <aside class="settle xl:sticky xl:top-24" style="--settle: 1">
+          <AppCard :padded="false">
+            <div class="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+              <Transition name="swap" mode="out-in">
+                <div :key="selectedDate">
+                  <h2 class="text-lg font-medium text-text">{{ dayLabel }}</h2>
+                  <p class="text-sm text-text-subtle">
+                    <template v-if="dayList.length > 0">{{ plural(dayList.length, 'appuntamento', 'appuntamenti') }} · {{ Math.floor(dayMinutes / 60) }} h {{ dayMinutes % 60 > 0 ? `${dayMinutes % 60} min` : '' }}</template>
+                    <template v-else>Giornata libera</template>
+                  </p>
                 </div>
-
-                <!-- Client name -->
-                <p class="text-sm font-semibold text-sage-900 truncate leading-tight">{{ appt.client_name }}</p>
-
-                <!-- Service name -->
-                <p v-if="appt.service_name" class="text-xs text-sage-500 truncate mt-0.5 leading-tight">{{ appt.service_name }}</p>
-
-                <!-- Time range + duration -->
-                <div class="flex items-center gap-1.5 mt-2">
-                  <Clock class="w-3 h-3 text-sage-300 shrink-0" />
-                  <span class="text-[10px] text-sage-400 tabular-nums">{{ appt.start_time.slice(0, 5) }} – {{ appt.end_time.slice(0, 5) }}</span>
-                  <span v-if="apptDuration(appt)" class="text-[10px] text-sage-300">·</span>
-                  <span v-if="apptDuration(appt)" class="text-[10px] text-sage-400">{{ apptDuration(appt) }}</span>
-                </div>
-
-                <!-- Notes -->
-                <p v-if="appt.notes" class="text-[10px] text-sage-400 mt-1.5 italic truncate">{{ appt.notes }}</p>
-              </div>
+              </Transition>
+              <AppButton size="sm" variant="ghost" :icon="Plus" label="Aggiungi appuntamento in questa data" @click="openCreate" />
             </div>
-          </div>
-        </div>
 
-          </div>
-        </Transition>
+            <Transition name="swap" mode="out-in">
+              <ol v-if="dayList.length > 0" :key="selectedDate" class="max-h-[34rem] overflow-y-auto p-2" data-lenis-prevent>
+                <li v-for="appointment in dayList" :key="appointment.id">
+                  <div
+                    class="group flex cursor-pointer gap-3 rounded-control px-3 py-3 transition-colors hover:bg-surface-hover"
+                    :class="appointment.status === 'cancelled' ? 'opacity-60' : ''"
+                    role="button"
+                    tabindex="0"
+                    @click="openEdit(appointment)"
+                    @keydown.enter="openEdit(appointment)"
+                  >
+                    <div class="tabular w-11 shrink-0 pt-0.5 text-right">
+                      <p class="text-base font-medium text-text">{{ appointment.start_time.slice(0, 5) }}</p>
+                      <p class="text-2xs text-text-subtle">{{ appointment.end_time.slice(0, 5) }}</p>
+                    </div>
+                    <span class="w-0.5 shrink-0 self-stretch rounded-full" :class="CHIP_DOT[appointment.status]" aria-hidden="true" />
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <PatientMonogram :name="appointment.client_name" size="sm" />
+                        <p class="truncate text-base font-medium text-text" :class="appointment.status === 'cancelled' ? 'line-through' : ''">{{ appointment.client_name }}</p>
+                      </div>
+                      <p v-if="appointment.service_name" class="mt-1 truncate text-sm text-text-muted">{{ appointment.service_name }}</p>
+                      <div class="mt-1.5 flex items-center gap-2 text-xs text-text-subtle">
+                        <span class="inline-flex items-center gap-1"><Clock :size="12" aria-hidden="true" />{{ minutesBetween(appointment.start_time, appointment.end_time) }} min</span>
+                        <span v-if="appointment.recurrence_group_id" class="inline-flex items-center gap-1"><Repeat :size="12" aria-hidden="true" />ricorrente</span>
+                        <span v-if="appointment.invoice_id" class="text-safe">fatturata</span>
+                      </div>
+                      <p v-if="appointment.notes" class="mt-1 truncate text-xs italic text-text-subtle">{{ appointment.notes }}</p>
+                    </div>
+                    <div class="flex shrink-0 flex-col items-end gap-2" @click.stop>
+                      <StatusBadge v-if="appointment.status !== 'scheduled'" type="appointment" :status="appointment.status" />
+                      <AppButton
+                        v-if="appointment.status === 'scheduled' && appointment.date <= today"
+                        size="sm"
+                        :icon="Check"
+                        @click="setStatus(appointment, 'completed')"
+                      >
+                        Svolta
+                      </AppButton>
+                    </div>
+                  </div>
+                </li>
+              </ol>
+              <div v-else :key="`${selectedDate}-empty`" class="flex flex-col items-center px-6 py-12 text-center">
+                <CalendarDays :size="24" :stroke-width="1.5" class="text-text-subtle" aria-hidden="true" />
+                <p class="mt-2 text-sm text-text-muted">Nessun appuntamento in questa data.</p>
+                <AppButton class="mt-4" size="sm" :icon="Plus" @click="openCreate">Aggiungi</AppButton>
+              </div>
+            </Transition>
+          </AppCard>
+
+          <p v-if="monthStats.heldNotBilled > 0" class="mt-3 px-1 text-xs text-text-subtle">
+            {{ plural(monthStats.heldNotBilled, 'seduta svolta', 'sedute svolte') }} ancora da fatturare questo mese.
+            <RouterLink :to="{ path: '/invoices/monthly', query: { year: viewYear, month: viewMonth + 1 } }" class="font-medium text-accent hover:underline underline-offset-2">Fatturazione mensile</RouterLink>
+          </p>
+        </aside>
       </div>
-
     </div>
+
+    <AppointmentModal
+      :open="modalOpen"
+      :date="modalDate"
+      :appointment="editing"
+      @close="modalOpen = false"
+      @saved="load"
+    />
   </div>
-
-  <AppointmentModal
-    :open="showModal"
-    :date="modalDate"
-    :appointment="editingAppointment"
-    @close="showModal = false"
-    @saved="onModalSaved"
-  />
 </template>
-
-<style scoped>
-/* Header date label: fade + tiny slide */
-.header-fade-enter-active { transition: opacity 0.18s ease, transform 0.18s ease; }
-.header-fade-leave-active  { transition: opacity 0.1s ease,  transform 0.1s ease;  }
-.header-fade-enter-from    { opacity: 0; transform: translateY(4px);  }
-.header-fade-leave-to      { opacity: 0; transform: translateY(-4px); }
-
-/* Day panel body: fade + slide up */
-.day-content-enter-active { transition: opacity 0.22s ease, transform 0.22s ease; }
-.day-content-leave-active { transition: opacity 0.12s ease, transform 0.12s ease; }
-.day-content-enter-from   { opacity: 0; transform: translateY(10px); }
-.day-content-leave-to     { opacity: 0; transform: translateY(-6px); }
-
-/* Appointment cards: staggered slide-up on enter */
-.appt-card {
-  animation: appt-in 0.32s ease both;
-  animation-delay: calc(var(--i, 0) * 45ms);
-}
-
-@keyframes appt-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0);    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .header-fade-enter-active,
-  .header-fade-leave-active,
-  .day-content-enter-active,
-  .day-content-leave-active { transition: opacity 0.1s ease; }
-  .header-fade-enter-from,
-  .header-fade-leave-to,
-  .day-content-enter-from,
-  .day-content-leave-to { transform: none; }
-  .appt-card { animation: none; }
-}
-</style>

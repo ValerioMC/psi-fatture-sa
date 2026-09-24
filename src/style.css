@@ -1,77 +1,192 @@
-/* Self-hosted fonts: the app must render identically offline. */
-@import "@fontsource/lexend/300.css";
-@import "@fontsource/lexend/400.css";
-@import "@fontsource/lexend/500.css";
-@import "@fontsource/lexend/600.css";
-@import "@fontsource/lexend/700.css";
-@import "@fontsource/crimson-pro/400.css";
-@import "@fontsource/crimson-pro/600.css";
-@import "@fontsource/crimson-pro/400-italic.css";
+/*
+ * PSI Fatture — design system: "Carta e inchiostro".
+ *
+ * The app is where a psychologist writes the one official document of their
+ * practice, so the interface borrows from paper and ink: a warm paper canvas,
+ * near-black ink for text, and a single deep ink-indigo for everything that
+ * means "you are here / this is the action". Every colour, radius, shadow and
+ * z-index is named once below; components reference the name, never a hex.
+ *
+ * Self-hosted fonts: the app must render identically offline.
+ */
+@import "@fontsource-variable/geist/index.css";
+@import "@fontsource-variable/geist-mono/index.css";
+@import "@fontsource-variable/newsreader/opsz.css";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
 @import "lenis/dist/lenis.css";
 @import "tailwindcss";
 
-@theme {
-  /* ── Slate (neutral base — replaces Sage) ── */
-  --color-sage-50:  #f8fafc;
-  --color-sage-100: #f1f5f9;
-  --color-sage-200: #e2e8f0;
-  --color-sage-300: #cbd5e1;
-  --color-sage-400: #94a3b8;
-  --color-sage-500: #64748b;
-  --color-sage-600: #475569;
-  --color-sage-700: #334155;
-  --color-sage-800: #1e293b;
-  --color-sage-900: #0f172a;
+/* ── Raw tokens: light is the default, dark overrides the same names ─────────── */
+:root {
+  color-scheme: light;
 
-  /* ── Indigo (primary accent — replaces Ocean) ── */
-  --color-ocean-50:  #eef2ff;
-  --color-ocean-100: #e0e7ff;
-  --color-ocean-200: #c7d2fe;
-  --color-ocean-300: #a5b4fc;
-  --color-ocean-400: #818cf8;
-  --color-ocean-500: #6366f1;
-  --color-ocean-600: #4f46e5;
-  --color-ocean-700: #4338ca;
-  --color-ocean-800: #3730a3;
-  --color-ocean-900: #312e81;
+  /* Surfaces, back to front. */
+  --canvas: #f5f3ee;          /* the desk: warm paper behind everything */
+  --surface: #fbfaf7;         /* a pane: sidebar, sticky header */
+  --surface-raised: #ffffff;  /* a sheet: card, row group, dialog */
+  --surface-sunken: #edeae3;  /* a well: segmented track, table head, code */
+  --surface-hover: #f3f1ec;   /* a row or control under the pointer */
+  --border: #e4e0d7;          /* hairline between things of equal rank */
+  --border-strong: #cfc9bc;   /* a control's edge, a divider that must be seen */
 
-  /* ── Emerald (success / active / paid — new) ── */
-  --color-emerald-50:  #ecfdf5;
-  --color-emerald-100: #d1fae5;
-  --color-emerald-200: #a7f3d0;
-  --color-emerald-300: #6ee7b7;
-  --color-emerald-400: #34d399;
-  --color-emerald-500: #10b981;
-  --color-emerald-600: #059669;
-  --color-emerald-700: #047857;
-  --color-emerald-800: #065f46;
-  --color-emerald-900: #064e3b;
+  /* Text: three tiers, each with a job. Ratios measured on --canvas. */
+  --text: #1d1b24;            /* 15.3:1 — headings, values, anything read first */
+  --text-muted: #56525e;      /* 6.9:1 — body copy and labels live here */
+  --text-subtle: #6e6a77;     /* 4.8:1 — chrome only: counts, hints, timestamps */
 
-  /* ── Stone (neutral accent — replaces Warm) ── */
-  --color-warm-50:  #fafaf9;
-  --color-warm-100: #f5f5f4;
-  --color-warm-200: #e7e5e4;
-  --color-warm-300: #d6d3d1;
-  --color-warm-400: #a8a29e;
-  --color-warm-500: #78716c;
-  --color-warm-600: #57534e;
-  --color-warm-700: #44403c;
-  --color-warm-800: #292524;
-  --color-warm-900: #1c1917;
+  /* Ink: the ONE colour for selection, primary action and focus. */
+  --accent: #3a3e9f;          /* 8.0:1 on canvas */
+  --accent-strong: #2c2f80;   /* pressed / hover of a filled accent surface */
+  --accent-ink: #ffffff;      /* text on a filled accent surface, 8.9:1 */
 
-  /* ── Amber (warning / highlight — replaces Gold) ── */
-  --color-gold-50:  #fffbeb;
-  --color-gold-100: #fef3c7;
-  --color-gold-200: #fde68a;
-  --color-gold-300: #fcd34d;
-  --color-gold-400: #fbbf24;
-  --color-gold-500: #f59e0b;
-  --color-gold-600: #d97706;
-  --color-gold-700: #b45309;
-  --color-gold-800: #92400e;
-  --color-gold-900: #78350f;
+  /* Status: used for state only, never as decoration. */
+  --safe: #2a7550;            /* paid, completed */
+  --warn: #9a5d0c;            /* issued and waiting for money */
+  --danger: #b03a2b;          /* overdue, destructive */
+
+  /* Monogram tints for patient avatars: muted, never louder than the accent. */
+  --tint-1: #6b5b95;
+  --tint-2: #3f7a73;
+  --tint-3: #8a5a44;
+  --tint-4: #5b6f8f;
+  --tint-5: #7a6a3a;
+  --tint-6: #8f4f6b;
+
+  /* Elevation: the only three shadows in the app. */
+  --shadow-lift: 0 1px 2px rgb(40 34 20 / 0.06), 0 8px 24px -12px rgb(40 34 20 / 0.16);
+  --shadow-modal: 0 2px 6px rgb(40 34 20 / 0.08), 0 32px 72px -20px rgb(40 34 20 / 0.32);
+  --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 6px 20px -6px color-mix(in srgb, var(--accent) 45%, transparent);
+
+  /* The room: two very large, very faint lights so the canvas is not a flat plane. */
+  --ambient-warm: rgb(214 170 110 / 0.10);
+  --ambient-cool: rgb(90 96 200 / 0.06);
+  --backdrop: rgb(29 27 36 / 0.32);
+
+  /* The entire z-index scale. Used as z-(--z-modal); nothing else stacks. */
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-toast: 50;
 }
 
+/*
+ * Dark is "the studio at night": the same room with the lamp on. Surfaces get
+ * lighter as they come forward, the ink turns to a pale periwinkle so it keeps
+ * its 8:1 contrast, and status colours lift in value by the same amount.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --canvas: #121117;
+  --surface: #17161d;
+  --surface-raised: #1e1d26;
+  --surface-sunken: #0e0d12;
+  --surface-hover: #24232e;
+  --border: #2a2834;
+  --border-strong: #3b3947;
+
+  --text: #eeecf3;            /* 16.0:1 */
+  --text-muted: #b3afbf;      /* 8.8:1 */
+  --text-subtle: #8b8799;     /* 5.4:1 */
+
+  --accent: #a5a9ff;          /* 8.7:1 */
+  --accent-strong: #c3c6ff;
+  --accent-ink: #15163a;      /* 8.1:1 on accent */
+
+  --safe: #5fc795;
+  --warn: #e1a54c;
+  --danger: #f0826f;
+
+  --tint-1: #a898d6;
+  --tint-2: #7cc2b8;
+  --tint-3: #d39a80;
+  --tint-4: #93a8cc;
+  --tint-5: #c9b577;
+  --tint-6: #d78fae;
+
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  --shadow-modal: 0 2px 6px rgb(0 0 0 / 0.6), 0 40px 80px -24px rgb(0 0 0 / 0.85);
+
+  --ambient-warm: rgb(214 160 90 / 0.05);
+  --ambient-cool: rgb(120 126 255 / 0.07);
+  --backdrop: rgb(4 4 8 / 0.6);
+}
+
+/* ── Tailwind theme: utilities resolve to the raw tokens above ──────────────── */
+@theme inline {
+  /* No stock palette: a class like `text-slate-500` must fail loudly by doing nothing. */
+  --color-*: initial;
+  --color-white: #ffffff;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-safe: var(--safe);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+
+  /*
+   * Every semantic colour has a -soft wash (backgrounds) and a -line (hairlines,
+   * rings), derived rather than hand-picked so they stay right if the base moves.
+   */
+  --color-accent-soft: color-mix(in srgb, var(--accent) 11%, transparent);
+  --color-accent-line: color-mix(in srgb, var(--accent) 28%, transparent);
+  --color-safe-soft: color-mix(in srgb, var(--safe) 12%, transparent);
+  --color-safe-line: color-mix(in srgb, var(--safe) 30%, transparent);
+  --color-warn-soft: color-mix(in srgb, var(--warn) 12%, transparent);
+  --color-warn-line: color-mix(in srgb, var(--warn) 30%, transparent);
+  --color-danger-soft: color-mix(in srgb, var(--danger) 10%, transparent);
+  --color-danger-line: color-mix(in srgb, var(--danger) 30%, transparent);
+
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /*
+   * Type scale. Body is 14px: an administrative tool read at arm's length on a
+   * laptop, dense enough to show a month of invoices without scrolling.
+   */
+  --text-*: initial;
+  --text-2xs: 0.6875rem;  --text-2xs--line-height: 1rem;       /* 11px chrome */
+  --text-xs: 0.75rem;     --text-xs--line-height: 1.1rem;      /* 12px hints */
+  --text-sm: 0.8125rem;   --text-sm--line-height: 1.25rem;     /* 13px secondary */
+  --text-base: 0.875rem;  --text-base--line-height: 1.375rem;  /* 14px body */
+  --text-md: 0.9375rem;   --text-md--line-height: 1.4rem;      /* 15px emphasis */
+  --text-lg: 1.0625rem;   --text-lg--line-height: 1.5rem;      /* 17px card title */
+  --text-xl: 1.25rem;     --text-xl--line-height: 1.6rem;      /* 20px */
+  --text-2xl: 1.5rem;     --text-2xl--line-height: 1.85rem;    /* 24px figure */
+  --text-3xl: 1.875rem;   --text-3xl--line-height: 2.2rem;     /* 30px page title */
+  --text-4xl: 2.5rem;     --text-4xl--line-height: 2.75rem;    /* 40px hero figure */
+
+  /* Two radii only: a sheet, and a thing you press or type into. */
+  --radius-card: 14px;
+  --radius-control: 9px;
+
+  --shadow-lift: var(--shadow-lift);
+  --shadow-modal: var(--shadow-modal);
+  --shadow-glow: var(--shadow-glow);
+
+  /* One row height for lists, one control height for inputs and buttons. */
+  --spacing-row: 2.75rem;      /* 44px */
+  --spacing-control: 2.25rem;  /* 36px */
+  --spacing-control-sm: 1.875rem; /* 30px */
+  --spacing-sidebar: 15rem;    /* 240px */
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body, #app {
@@ -81,87 +196,223 @@ html, body, #app {
 }
 
 body {
-  font-family: 'Lexend', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--text);
+  background-color: var(--canvas);
+  background-image:
+    radial-gradient(1200px 800px at 100% -10%, var(--ambient-warm), transparent 60%),
+    radial-gradient(1000px 700px at -10% 110%, var(--ambient-cool), transparent 60%);
+  background-attachment: fixed;
+  font-feature-settings: 'ss01', 'cv11';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f1f5f9; /* slate-100 — page canvas */
+  text-rendering: optimizeLegibility;
 }
 
-/* ── Glass card ── */
-.glass-card {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(226, 232, 240, 0.7);
+::selection { background: var(--color-accent-line); color: var(--text); }
+
+@layer base {
+  input, select, textarea, button { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
 }
 
-/* ── Gradient text (logo) ── */
-.gradient-text {
-  background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/*
+ * Component classes live in the components layer, so a Tailwind utility on the
+ * same element (a `pl-8` on a `.field`) still wins, as it would over any class.
+ */
+@layer components {
+/* Digits that sit in columns or update live never change width. */
+.tabular { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+/*
+ * Display headings: Newsreader at its display optical size, tightened. Section
+ * headings use size, weight and colour steps rather than tracked uppercase.
+ */
+.display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 500;
+  letter-spacing: -0.018em;
 }
 
-/* ── Hover lift ── */
-.hover-lift {
-  transition: transform 0.22s ease, box-shadow 0.22s ease;
-}
-.hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -3px rgba(15, 23, 42, 0.06);
-}
-
-/* ── Animations ── */
-@keyframes slideInUp {
-  from { opacity: 0; transform: translateY(18px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes shimmer {
-  0%   { background-position: -1000px 0; }
-  100% { background-position:  1000px 0; }
+/* Small labels that name a value ("Incassato") — ordinary case, subtle, never shouted. */
+.label-quiet {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--text-subtle);
+  font-weight: 500;
 }
 
-.animate-in    { animation: slideInUp 0.5s ease-out forwards; }
-.animate-in-d1 { animation: slideInUp 0.5s ease-out 0.08s both; }
-.animate-in-d2 { animation: slideInUp 0.5s ease-out 0.16s both; }
-.animate-in-d3 { animation: slideInUp 0.5s ease-out 0.24s both; }
-.animate-in-d4 { animation: slideInUp 0.5s ease-out 0.32s both; }
-
-/* ── Custom scrollbar ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; } /* slate-300 */
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; } /* slate-400 */
-
-/* ── Focus ring ── */
-:focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.5); /* indigo-500 */
+/* ── Focus: one definition of "this has keyboard focus", used by everything ─── */
+.focus-ring:focus-visible,
+a:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
+[role='switch']:focus-visible,
+[role='option']:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+:focus:not(:focus-visible) { outline: none; }
 
-/* ── Form inputs ── */
-input, select, textarea {
-  font-family: inherit;
+/* ── Field: the one treatment shared by input, select and textarea ──────────── */
+/*
+ * Recessed rather than raised: a hairline and a faint inner shadow sit the
+ * value slightly below the surface, like a slot on a form. Focus recolours the
+ * hairline and opens a soft halo in one box-shadow; it never stacks a second
+ * outline on the border, which reads as a rendering glitch rather than emphasis.
+ */
+.field {
+  --field-tint: var(--accent);
+  display: block;
+  width: 100%;
+  min-height: var(--spacing-control);
+  padding: 0.5rem 0.75rem;
+  font-size: var(--text-base);
+  line-height: 1.25rem;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 1px 2px rgb(40 34 20 / 0.06);
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+  outline: none;
 }
+.field::placeholder { color: var(--text-subtle); opacity: 1; }
+.field:hover:not(:disabled):not(:focus) { border-color: color-mix(in srgb, var(--text-subtle) 55%, var(--border-strong)); }
+.field:focus {
+  border-color: color-mix(in srgb, var(--field-tint) 62%, transparent);
+  box-shadow: inset 0 1px 2px rgb(40 34 20 / 0.06),
+    0 0 0 3px color-mix(in srgb, var(--field-tint) 16%, transparent);
+}
+.field[aria-invalid='true'] { --field-tint: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+.field:disabled { opacity: 0.55; cursor: not-allowed; }
+.field-mono { font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: 0.02em; }
+.field-sm { min-height: var(--spacing-control-sm); padding: 0.3rem 0.6rem; font-size: var(--text-sm); }
+textarea.field { resize: vertical; min-height: 4.5rem; }
 
-/* ── Select arrow ── */
-select {
+select.field {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  padding-right: 2.25rem;
+  cursor: pointer;
+  /* Neutral mid-grey chevron: legible on both themes, a token cannot enter a data URI. */
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%238b8799' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.6' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 0.6rem center;
   background-repeat: no-repeat;
-  background-size: 1.25em 1.25em;
-  padding-right: 2.25rem;
-  line-height: 1.5;
+  background-size: 1.1rem;
 }
 
-/* ── Heading serif ── */
-.heading-serif {
-  font-family: 'Crimson Pro', Georgia, serif;
+/* Number spinners are noise next to a currency value. */
+input[type='number'].field::-webkit-inner-spin-button,
+input[type='number'].field::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type='number'].field { -moz-appearance: textfield; }
+
+input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+}
+
+/* ── Scrollbar: thin, inset, in the palette ─────────────────────────────────── */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--text-subtle); }
+
+/* With the macOS overlay title bar the traffic lights sit on the sidebar: make room. */
+[data-titlebar='overlay'] .sidebar-top { padding-top: 3.25rem; }
+
+@layer components {
+/* ── Glass: sticky chrome over the ambient room, content stays legibly present ─ */
+.glass {
+  background: color-mix(in srgb, var(--canvas) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+}
+
+}
+
+/* ── Motion vocabulary: one named transition per structural context ─────────── */
+
+/* A routed page replacing another: cross-fade with a 4px drift. */
+.pane-enter-active { transition: opacity 180ms ease, transform 180ms var(--ease-out-expo); }
+.pane-leave-active { transition: opacity 90ms ease; }
+.pane-enter-from { opacity: 0; transform: translateY(4px); }
+.pane-leave-to { opacity: 0; }
+
+/* A dialog: the backdrop fades, the panel rises 8px and settles from .98. */
+.dialog-enter-active, .dialog-leave-active { transition: opacity 180ms ease; }
+.dialog-enter-active .dialog-panel { transition: transform 220ms var(--ease-out-expo), opacity 180ms ease; }
+.dialog-leave-active .dialog-panel { transition: transform 120ms ease, opacity 120ms ease; }
+.dialog-enter-from, .dialog-leave-to { opacity: 0; }
+.dialog-enter-from .dialog-panel { opacity: 0; transform: translateY(8px) scale(0.98); }
+.dialog-leave-to .dialog-panel { opacity: 0; transform: translateY(4px) scale(0.99); }
+
+/* An anchored popover (no backdrop): rises 4px from .98. */
+.popover-enter-active { transition: opacity 140ms ease, transform 140ms var(--ease-out-expo); }
+.popover-leave-active { transition: opacity 90ms ease; }
+.popover-enter-from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+.popover-leave-to { opacity: 0; }
+
+/* A list item entering, leaving or reordering; neighbours resettle with `move`. */
+.list-enter-active, .list-leave-active { transition: opacity 180ms ease, transform 180ms ease; }
+.list-move { transition: transform 200ms ease; }
+.list-enter-from { opacity: 0; transform: translateY(-4px); }
+.list-leave-to { opacity: 0; transform: scale(0.98); }
+.list-leave-active { position: absolute; width: 100%; }
+
+/* Content swapped in place (a date's appointments, a total): opacity only. */
+.swap-enter-active, .swap-leave-active { transition: opacity 110ms ease; }
+.swap-enter-from, .swap-leave-to { opacity: 0; }
+
+/* A bottom bar or toast arriving from below. */
+.rise-enter-active { transition: opacity 200ms ease, transform 240ms var(--ease-out-expo); }
+.rise-leave-active { transition: opacity 140ms ease, transform 140ms ease; }
+.rise-enter-from { opacity: 0; transform: translateY(12px); }
+.rise-leave-to { opacity: 0; transform: translateY(6px); }
+
+/* First paint of a page: sections arrive in reading order, once. */
+@keyframes settle-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.settle { animation: settle-in 360ms var(--ease-out-expo) both; animation-delay: calc(var(--settle, 0) * 50ms); }
+
+/* Skeleton sweep. */
+@keyframes sweep {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+.skeleton {
+  background-color: var(--surface-sunken);
+  background-image: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--surface-raised) 70%, transparent) 50%, transparent 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: sweep 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* Reduced motion collapses every animation and transition, with no per-component special case. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

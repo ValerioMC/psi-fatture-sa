@@ -1,129 +1,110 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import {
-  CalendarRange,
-  FileText,
-  Check,
-  Loader2,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-} from 'lucide-vue-next'
-import { previewMonthlyInvoices, generateMonthlyInvoices } from '@/api'
+/**
+ * End-of-month invoicing: every session held and not yet invoiced becomes one
+ * invoice per patient. Pick the month, untick who should wait, generate. The
+ * preview loads as soon as the month changes; there is no "load" step.
+ */
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { CalendarCheck, FileText, Sparkles } from 'lucide-vue-next'
+import { generateMonthlyInvoices, previewMonthlyInvoices } from '@/api'
 import type { MonthlyInvoicePreview, PaymentMethod } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import { formatCurrency } from '@/utils/format'
+import PeriodStepper from '@/components/ui/PeriodStepper.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import FormField from '@/components/ui/FormField.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
+import PatientMonogram from '@/components/ui/PatientMonogram.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import { useToastStore } from '@/stores/toast'
+import { formatCurrency, formatMonthYear } from '@/utils/format'
+import { PAYMENT_METHOD_LABEL, PAYMENT_METHOD_ORDER, plural } from '@/utils/labels'
 
-const router = useRouter()
-
-const MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-]
-
-const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
-  { value: 'bonifico', label: 'Bonifico bancario' },
-  { value: 'contanti', label: 'Contanti' },
-  { value: 'pos', label: 'POS / Carta' },
-  { value: 'altro', label: 'Altro' },
-]
+const route = useRoute()
+const toast = useToastStore()
 
 const now = new Date()
-const selectedYear = ref(now.getFullYear())
-const selectedMonth = ref(now.getMonth() + 1)
+/** Default to last month: invoices are written once a month has closed. */
+const defaultMonth = now.getMonth() === 0 ? { year: now.getFullYear() - 1, month: 12 } : { year: now.getFullYear(), month: now.getMonth() }
+const queryYear = Number(route.query.year)
+const queryMonth = Number(route.query.month)
+const year = ref(Number.isInteger(queryYear) && queryYear > 2000 ? queryYear : defaultMonth.year)
+const month = ref(Number.isInteger(queryMonth) && queryMonth >= 1 && queryMonth <= 12 ? queryMonth : defaultMonth.month)
+
 const paymentMethod = ref<PaymentMethod>('bonifico')
 const applyEnpap = ref(true)
-
 const previews = ref<MonthlyInvoicePreview[]>([])
-const selectedClients = ref<Set<number>>(new Set())
+const selected = ref<Set<number>>(new Set())
 const loading = ref(false)
 const generating = ref(false)
-const error = ref<string | null>(null)
-const generatedCount = ref(0)
-const step = ref<'select' | 'preview' | 'done'>('select')
+const confirmOpen = ref(false)
+const generated = ref<number | null>(null)
 
-const monthLabel = computed(() =>
-  `${MONTH_NAMES[selectedMonth.value - 1]} ${selectedYear.value}`,
-)
+const label = computed(() => formatMonthYear(year.value, month.value))
+const isFutureMonth = computed(() => year.value > now.getFullYear() || (year.value === now.getFullYear() && month.value > now.getMonth() + 1))
 
-const selectedPreviews = computed(() =>
-  previews.value.filter(p => selectedClients.value.has(p.client_id)),
-)
-
-const totalDue = computed(() =>
-  selectedPreviews.value.reduce((sum, p) => sum + p.estimated_due, 0),
-)
-
-const allSelected = computed(() =>
-  previews.value.length > 0 && selectedClients.value.size === previews.value.length,
-)
-
-/** Navigate between months. */
-function shiftMonth(delta: number): void {
-  let m = selectedMonth.value + delta
-  let y = selectedYear.value
-  if (m < 1) { m = 12; y-- }
-  if (m > 12) { m = 1; y++ }
-  selectedMonth.value = m
-  selectedYear.value = y
-  step.value = 'select'
-  previews.value = []
+function shift(delta: number): void {
+  let nextMonth = month.value + delta
+  let nextYear = year.value
+  if (nextMonth < 1) { nextMonth = 12; nextYear-- }
+  if (nextMonth > 12) { nextMonth = 1; nextYear++ }
+  month.value = nextMonth
+  year.value = nextYear
 }
 
-/** Toggle all clients. */
-function toggleAll(): void {
-  if (allSelected.value) {
-    selectedClients.value = new Set()
-  } else {
-    selectedClients.value = new Set(previews.value.map(p => p.client_id))
-  }
-}
-
-/** Toggle a single client. */
-function toggleClient(clientId: number): void {
-  const next = new Set(selectedClients.value)
-  if (next.has(clientId)) {
-    next.delete(clientId)
-  } else {
-    next.add(clientId)
-  }
-  selectedClients.value = next
-}
-
-/** Load the preview for the selected month. */
 async function loadPreview(): Promise<void> {
   loading.value = true
-  error.value = null
+  generated.value = null
   try {
-    previews.value = await previewMonthlyInvoices(selectedYear.value, selectedMonth.value)
-    selectedClients.value = new Set(previews.value.map(p => p.client_id))
-    step.value = 'preview'
-  } catch (e) {
-    error.value = String(e)
+    previews.value = await previewMonthlyInvoices(year.value, month.value)
+    selected.value = new Set(previews.value.map((preview) => preview.client_id))
+  } catch (error) {
+    previews.value = []
+    toast.notifyError(error, 'Anteprima non disponibile')
   } finally {
     loading.value = false
   }
 }
 
-/** Generate invoices for selected clients. */
+watch([year, month], loadPreview)
+onMounted(loadPreview)
+
+const chosen = computed(() => previews.value.filter((preview) => selected.value.has(preview.client_id)))
+const totals = computed(() => ({
+  sessions: chosen.value.reduce((sum, preview) => sum + preview.appointment_count, 0),
+  due: chosen.value.reduce((sum, preview) => sum + preview.estimated_due, 0),
+}))
+const allSelected = computed(() => previews.value.length > 0 && selected.value.size === previews.value.length)
+
+function toggle(clientId: number): void {
+  const next = new Set(selected.value)
+  if (next.has(clientId)) next.delete(clientId)
+  else next.add(clientId)
+  selected.value = next
+}
+
+function toggleAll(): void {
+  selected.value = allSelected.value ? new Set() : new Set(previews.value.map((preview) => preview.client_id))
+}
+
 async function generate(): Promise<void> {
-  if (selectedClients.value.size === 0) return
   generating.value = true
-  error.value = null
   try {
     const result = await generateMonthlyInvoices({
-      year: selectedYear.value,
-      month: selectedMonth.value,
-      client_ids: [...selectedClients.value],
+      year: year.value,
+      month: month.value,
+      client_ids: [...selected.value],
       payment_method: paymentMethod.value,
       apply_enpap: applyEnpap.value,
     })
-    generatedCount.value = result.length
-    step.value = 'done'
-  } catch (e) {
-    error.value = String(e)
+    confirmOpen.value = false
+    generated.value = result.length
+    previews.value = []
+  } catch (error) {
+    toast.notifyError(error, 'Generazione non riuscita')
   } finally {
     generating.value = false
   }
@@ -131,231 +112,120 @@ async function generate(): Promise<void> {
 </script>
 
 <template>
-  <div class="p-8">
-    <div class="max-w-3xl mx-auto">
-      <PageHeader
-        title="Genera fatture mensili"
-        subtitle="Crea fatture automatiche dagli appuntamenti completati del mese."
+  <div>
+    <PageHeader title="Fatturazione mensile" :back="{ to: '/invoices', label: 'Fatture' }">
+      <PeriodStepper
+        :label="label"
+        previous-label="Mese precedente"
+        next-label="Mese successivo"
+        :can-next="!isFutureMonth"
+        min-width="9.5rem"
+        @previous="shift(-1)"
+        @next="shift(1)"
       />
+    </PageHeader>
 
-      <!-- ── Month selector ── -->
-      <div class="glass-card rounded-2xl p-5 mb-5 animate-in">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-sage-50">
-              <CalendarRange class="w-5 h-5 text-sage-500" />
-            </div>
+    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-12">
+      <!-- Done: the stamp lands once. -->
+      <AppCard v-if="generated !== null" class="settle flex flex-col items-center py-14 text-center">
+        <div class="stamp grid size-16 place-items-center rounded-full bg-safe text-white shadow-lift">
+          <CalendarCheck :size="28" :stroke-width="1.75" aria-hidden="true" />
+        </div>
+        <h2 class="display mt-5 text-3xl text-text">{{ plural(generated, 'fattura creata', 'fatture create') }}</h2>
+        <p class="mt-1.5 text-base text-text-muted">Sono già emesse e aspettano il pagamento.</p>
+        <div class="mt-7 flex gap-2">
+          <AppButton variant="primary" :icon="FileText" :to="{ path: '/invoices', query: { status: 'issued', year } }">Vedi le fatture</AppButton>
+          <AppButton @click="shift(-1)">Un altro mese</AppButton>
+        </div>
+      </AppCard>
+
+      <div v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_19rem]">
+        <AppCard :padded="false" class="settle overflow-hidden">
+          <div class="flex items-center justify-between gap-4 px-5 pt-5 pb-4">
             <div>
-              <div class="text-xs font-semibold text-sage-400 uppercase tracking-wider">Periodo</div>
-              <div class="text-lg font-semibold text-sage-800">{{ monthLabel }}</div>
+              <h2 class="text-lg font-medium text-text">Sedute da fatturare</h2>
+              <p class="text-sm text-text-subtle">Svolte a {{ label.toLocaleLowerCase('it-IT') }} e non ancora in fattura</p>
             </div>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="p-2 rounded-lg text-sage-400 hover:text-sage-700 hover:bg-sage-50 transition-all"
-              @click="shiftMonth(-1)"
-            >
-              <ChevronLeft class="w-5 h-5" />
-            </button>
-            <button
-              type="button"
-              class="p-2 rounded-lg text-sage-400 hover:text-sage-700 hover:bg-sage-50 transition-all"
-              @click="shiftMonth(1)"
-            >
-              <ChevronRight class="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        <!-- Settings row -->
-        <div class="flex items-end gap-4 mt-4 pt-4 border-t border-sage-100/60">
-          <div class="flex-1 max-w-xs">
-            <label class="text-xs font-medium text-sage-500 block mb-1">Metodo di pagamento</label>
-            <select
-              v-model="paymentMethod"
-              class="w-full bg-white/60 border border-sage-200/70 rounded-xl px-3 py-2 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40"
-            >
-              <option v-for="opt in PAYMENT_OPTIONS" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <label class="flex items-center gap-2 cursor-pointer pb-2">
-            <input
-              v-model="applyEnpap"
-              type="checkbox"
-              class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
-            />
-            <span class="text-sm text-sage-700">Applica ENPAP 2%</span>
-          </label>
-          <button
-            v-if="step === 'select'"
-            type="button"
-            :disabled="loading"
-            class="ml-auto group relative overflow-hidden text-white font-semibold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all disabled:opacity-60"
-            style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
-            @click="loadPreview"
-          >
-            <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-            <Loader2 v-if="loading" class="w-4 h-4 animate-spin relative z-10" />
-            <CalendarRange v-else class="w-4 h-4 relative z-10" />
-            <span class="relative z-10">{{ loading ? 'Caricamento...' : 'Carica anteprima' }}</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- ── Error ── -->
-      <div
-        v-if="error"
-        class="flex items-center gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-5"
-      >
-        <AlertCircle class="w-4 h-4 shrink-0" />
-        {{ error }}
-      </div>
-
-      <!-- ── Preview step ── -->
-      <template v-if="step === 'preview'">
-        <!-- Empty state -->
-        <div
-          v-if="previews.length === 0"
-          class="glass-card rounded-2xl p-12 text-center animate-in-d1"
-        >
-          <div class="w-14 h-14 rounded-2xl bg-sage-50 flex items-center justify-center mx-auto mb-3">
-            <CalendarRange class="w-7 h-7 text-sage-300" />
-          </div>
-          <p class="text-sm font-semibold text-sage-600">Nessun appuntamento da fatturare</p>
-          <p class="text-xs text-sage-400 mt-1">
-            Non ci sono appuntamenti completati e non ancora fatturati per {{ monthLabel }}.
-          </p>
-        </div>
-
-        <!-- Client cards -->
-        <div v-else class="space-y-3 animate-in-d1">
-          <!-- Select all -->
-          <div class="flex items-center justify-between px-1 mb-2">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                :checked="allSelected"
-                class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
-                @change="toggleAll"
-              />
-              <span class="text-sm font-medium text-sage-600">
-                Seleziona tutti ({{ previews.length }} pazienti)
-              </span>
+            <label v-if="previews.length > 0" class="flex cursor-pointer items-center gap-2 text-sm text-text-muted">
+              <input type="checkbox" :checked="allSelected" :indeterminate="!allSelected && selected.size > 0" @change="toggleAll" />
+              Tutti
             </label>
-            <div class="text-sm text-sage-500">
-              Totale stimato: <span class="font-semibold text-sage-800">{{ formatCurrency(totalDue) }}</span>
-            </div>
           </div>
 
-          <!-- Per-client card -->
-          <div
-            v-for="preview in previews"
-            :key="preview.client_id"
-            class="glass-card rounded-xl p-4 transition-all cursor-pointer"
-            :class="selectedClients.has(preview.client_id)
-              ? 'ring-2 ring-sage-400/50'
-              : 'opacity-60'"
-            @click="toggleClient(preview.client_id)"
-          >
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  :checked="selectedClients.has(preview.client_id)"
-                  class="rounded border-sage-300 text-sage-600 focus:ring-sage-400"
-                  @click.stop
-                  @change="toggleClient(preview.client_id)"
-                />
-                <div>
-                  <div class="text-sm font-semibold text-sage-800">{{ preview.client_name }}</div>
-                  <div class="text-xs text-sage-400">
-                    {{ preview.appointment_count }} {{ preview.appointment_count === 1 ? 'seduta' : 'sedute' }}
-                  </div>
-                </div>
-              </div>
-              <div class="text-right">
-                <div class="text-xs text-sage-400">Imponibile</div>
-                <div class="text-sm font-semibold text-sage-800">{{ formatCurrency(preview.estimated_net) }}</div>
-              </div>
-            </div>
+          <SkeletonRows v-if="loading" variant="list" :count="6" label="Caricamento delle sedute" />
 
-            <!-- Lines detail -->
-            <div
-              v-if="selectedClients.has(preview.client_id) && preview.lines.length > 0"
-              class="mt-3 pt-3 border-t border-sage-100/60 space-y-1"
-            >
-              <div
-                v-for="(line, i) in preview.lines"
-                :key="i"
-                class="flex items-center justify-between text-xs"
+          <EmptyState
+            v-else-if="previews.length === 0"
+            :icon="CalendarCheck"
+            :bordered="false"
+            :title="`Niente da fatturare per ${label.toLocaleLowerCase('it-IT')}`"
+            description="Tutte le sedute svolte hanno già una fattura, oppure nessuna è segnata come svolta in agenda."
+          >
+            <AppButton to="/agenda">Apri l'agenda</AppButton>
+          </EmptyState>
+
+          <ul v-else class="border-t border-border">
+            <li v-for="preview in previews" :key="preview.client_id" class="border-b border-border last:border-b-0">
+              <label
+                class="flex cursor-pointer items-start gap-3.5 px-5 py-3.5 transition-colors"
+                :class="selected.has(preview.client_id) ? 'hover:bg-surface-hover' : 'bg-surface text-text-subtle'"
               >
-                <span class="text-sage-500 truncate mr-4">{{ line.description }}</span>
-                <span class="text-sage-700 font-medium shrink-0">
-                  {{ line.quantity }} &times; {{ formatCurrency(line.unit_price) }}
+                <input type="checkbox" class="mt-2" :checked="selected.has(preview.client_id)" @change="toggle(preview.client_id)" />
+                <PatientMonogram :name="preview.client_name" size="md" />
+                <span class="min-w-0 flex-1">
+                  <span class="block text-base font-medium" :class="selected.has(preview.client_id) ? 'text-text' : 'text-text-muted'">{{ preview.client_name }}</span>
+                  <span v-for="(line, index) in preview.lines" :key="index" class="block truncate text-sm text-text-subtle">
+                    {{ line.quantity }} × {{ line.description }} · {{ formatCurrency(line.unit_price) }}
+                  </span>
                 </span>
-              </div>
+                <span class="text-right">
+                  <span class="tabular block text-base font-medium" :class="selected.has(preview.client_id) ? 'text-text' : 'text-text-subtle line-through'">{{ formatCurrency(preview.estimated_due) }}</span>
+                  <span class="block text-xs text-text-subtle">{{ plural(preview.appointment_count, 'seduta', 'sedute') }}</span>
+                </span>
+              </label>
+            </li>
+          </ul>
+        </AppCard>
+
+        <aside class="settle lg:sticky lg:top-30" style="--settle: 1">
+          <AppCard class="space-y-5">
+            <FormField v-slot="{ id }" label="Metodo di pagamento">
+              <select :id="id" v-model="paymentMethod" class="field">
+                <option v-for="method in PAYMENT_METHOD_ORDER" :key="method" :value="method">{{ PAYMENT_METHOD_LABEL[method] }}</option>
+              </select>
+            </FormField>
+            <ToggleSwitch v-model="applyEnpap" label="ENPAP 2%" description="Contributo integrativo su ogni fattura." />
+            <div class="border-t border-border pt-4">
+              <p class="label-quiet">{{ plural(chosen.length, 'fattura', 'fatture') }} · {{ plural(totals.sessions, 'seduta', 'sedute') }}</p>
+              <p class="mt-0.5 text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-text">{{ formatCurrency(totals.due) }}</p>
+              <p class="text-xs text-text-subtle">Stima, calcolata con ENPAP e bollo</p>
             </div>
-          </div>
-
-          <!-- Generate button -->
-          <div class="flex justify-end pt-3">
-            <button
-              type="button"
-              :disabled="generating || selectedClients.size === 0"
-              class="group relative overflow-hidden text-white font-semibold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all disabled:opacity-60"
-              style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
-              @click="generate"
-            >
-              <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-              <Loader2 v-if="generating" class="w-4 h-4 animate-spin relative z-10" />
-              <Sparkles v-else class="w-4 h-4 relative z-10" />
-              <span class="relative z-10">
-                {{ generating ? 'Generazione...' : `Genera ${selectedClients.size} fattur${selectedClients.size === 1 ? 'a' : 'e'}` }}
-              </span>
-            </button>
-          </div>
-        </div>
-      </template>
-
-      <!-- ── Done step ── -->
-      <div
-        v-if="step === 'done'"
-        class="glass-card rounded-2xl p-10 text-center animate-in"
-      >
-        <div
-          class="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-          style="background: linear-gradient(135deg, #dcfce7, #d1fae5)"
-        >
-          <Check class="w-8 h-8 text-green-600" />
-        </div>
-        <p class="text-lg font-semibold text-sage-800">
-          {{ generatedCount }} fattur{{ generatedCount === 1 ? 'a creata' : 'e create' }}
-        </p>
-        <p class="text-sm text-sage-400 mt-1">
-          Le fatture per {{ monthLabel }} sono state generate con successo.
-        </p>
-        <div class="flex items-center justify-center gap-3 mt-6">
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl text-sm font-medium text-sage-600 border border-sage-200 hover:bg-sage-50 transition-all"
-            @click="router.push('/invoices')"
-          >
-            <FileText class="w-4 h-4 inline mr-1.5 -mt-0.5" />
-            Vai alle fatture
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-xl text-sm font-medium text-sage-600 border border-sage-200 hover:bg-sage-50 transition-all"
-            @click="step = 'select'; previews = []"
-          >
-            Genera altro mese
-          </button>
-        </div>
+            <AppButton variant="primary" block :icon="Sparkles" :disabled="chosen.length === 0" @click="confirmOpen = true">
+              Genera {{ plural(chosen.length, 'fattura', 'fatture') }}
+            </AppButton>
+          </AppCard>
+        </aside>
       </div>
     </div>
+
+    <ConfirmDialog
+      :open="confirmOpen"
+      title="Generare le fatture?"
+      :blast-radius="`${plural(chosen.length, 'nuova fattura emessa', 'nuove fatture emesse')} per ${label.toLocaleLowerCase('it-IT')}, ${formatCurrency(totals.due)} in totale. Le sedute incluse non compariranno più tra quelle da fatturare.`"
+      confirm-label="Genera"
+      tone="accent"
+      :loading="generating"
+      @confirm="generate"
+      @cancel="confirmOpen = false"
+    />
   </div>
 </template>
+
+<style scoped>
+.stamp { animation: stamp-land 560ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes stamp-land {
+  0% { transform: scale(1.5) rotate(-12deg); opacity: 0; }
+  55% { transform: scale(0.92) rotate(2deg); opacity: 1; }
+  100% { transform: none; }
+}
+</style>

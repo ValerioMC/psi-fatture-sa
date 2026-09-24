@@ -1,29 +1,48 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, computed } from 'vue'
+/**
+ * A patient's record: identity for the invoice, address for the PDF, contacts,
+ * and the Sistema Tessera Sanitaria consent. Codice fiscale, P.IVA, CAP,
+ * provincia and email are checked when the field is left, and again on save.
+ */
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Check, FilePlus, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { useClientsStore } from '@/stores/clients'
+import { errorMessage, useToastStore } from '@/stores/toast'
 import { getClient } from '@/api'
-import type { CreateClientInput, UpdateClientInput } from '@/types'
+import type { ClientType, CreateClientInput } from '@/types'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import FormField from '@/components/ui/FormField.vue'
+import FormSection from '@/components/ui/FormSection.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import type { SegmentOption } from '@/components/ui/types'
+import { clientDisplayName } from '@/utils/client'
 import {
   validateCap,
   validateCodiceFiscale,
   validateEmail,
   validatePartitaIva,
   validateProvincia,
+  type ValidationResult,
 } from '@/utils/validation'
-import { User, Building2, MapPin, Phone, ShieldCheck, ArrowLeft, Check, X } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 const clientsStore = useClientsStore()
+const toast = useToastStore()
 
-const editId = computed(() =>
-  route.params.id ? Number(route.params.id) : null,
-)
-const isEdit = computed(() => editId.value !== null)
-const loading = ref(false)
+const editId = route.params.id ? Number(route.params.id) : null
+const isEdit = editId !== null
+const loading = ref(isEdit)
+const loadError = ref<string | null>(null)
 const saving = ref(false)
-const error = ref<string | null>(null)
+const deleteOpen = ref(false)
+const deleting = ref(false)
 
 const form = reactive<CreateClientInput>({
   client_type: 'persona_fisica',
@@ -43,43 +62,48 @@ const form = reactive<CreateClientInput>({
   sts_authorization: false,
 })
 
-type ValidatedField = 'fiscal_code' | 'vat_number' | 'email' | 'zip_code' | 'province'
+const TYPE_OPTIONS: SegmentOption<ClientType>[] = [
+  { value: 'persona_fisica', label: 'Persona fisica' },
+  { value: 'azienda', label: 'Azienda o ente' },
+]
 
-const fieldErrors = reactive<Partial<Record<ValidatedField, string>>>({})
+type Field = 'first_name' | 'last_name' | 'fiscal_code' | 'vat_number' | 'email' | 'zip_code' | 'province'
+const errors = reactive<Partial<Record<Field, string>>>({})
 
-const FIELD_VALIDATORS: Record<ValidatedField, () => { valid: boolean; message?: string }> = {
-  fiscal_code: () => validateCodiceFiscale(form.fiscal_code),
-  vat_number: () => validatePartitaIva(form.vat_number ?? ''),
+function required(value: string | undefined, message: string): ValidationResult {
+  return value && value.trim() !== '' ? { valid: true } : { valid: false, message }
+}
+
+const VALIDATORS: Record<Field, () => ValidationResult> = {
+  first_name: () => (form.client_type === 'azienda' ? { valid: true } : required(form.first_name, 'Serve il nome.')),
+  last_name: () => required(form.last_name, form.client_type === 'azienda' ? 'Serve la ragione sociale.' : 'Serve il cognome.'),
+  fiscal_code: () => {
+    const presence = required(form.fiscal_code, 'Serve il codice fiscale.')
+    return presence.valid ? validateCodiceFiscale(form.fiscal_code) : presence
+  },
+  vat_number: () => (form.client_type === 'azienda' ? validatePartitaIva(form.vat_number ?? '') : { valid: true }),
   email: () => validateEmail(form.email ?? ''),
   zip_code: () => validateCap(form.zip_code),
   province: () => validateProvincia(form.province),
 }
 
-function validateField(field: ValidatedField) {
-  const result = FIELD_VALIDATORS[field]()
-  if (result.valid) {
-    delete fieldErrors[field]
-  } else {
-    fieldErrors[field] = result.message
-  }
+function check(field: Field): void {
+  const result = VALIDATORS[field]()
+  if (result.valid) delete errors[field]
+  else errors[field] = result.message
 }
 
-function validateAllFields(): boolean {
-  ;(Object.keys(FIELD_VALIDATORS) as ValidatedField[]).forEach(validateField)
-  return Object.keys(fieldErrors).length === 0
+function checkAll(): boolean {
+  ;(Object.keys(VALIDATORS) as Field[]).forEach(check)
+  return Object.keys(errors).length === 0
 }
 
-const patientDisplayName = computed(() => {
-  if (!isEdit.value) return null
-  const parts = [form.last_name, form.first_name].filter(Boolean)
-  return parts.length > 0 ? parts.join(' ') : null
-})
+const displayName = computed(() => clientDisplayName(form))
 
 onMounted(async () => {
-  if (!isEdit.value) return
-  loading.value = true
+  if (editId === null) return
   try {
-    const client = await getClient(editId.value!)
+    const client = await getClient(editId)
     Object.assign(form, {
       client_type: client.client_type,
       first_name: client.first_name,
@@ -97,354 +121,176 @@ onMounted(async () => {
       notes: client.notes,
       sts_authorization: client.sts_authorization,
     })
-  } catch (e) {
-    error.value = String(e)
+  } catch (error) {
+    loadError.value = errorMessage(error)
   } finally {
     loading.value = false
   }
 })
 
-async function onSubmit() {
-  if (!validateAllFields()) {
-    error.value = 'Correggi i campi evidenziati prima di salvare.'
+async function onSubmit(): Promise<void> {
+  if (!checkAll()) {
+    toast.notifyError('Alcuni campi vanno corretti prima di salvare.')
     return
   }
   saving.value = true
-  error.value = null
   try {
-    if (isEdit.value) {
-      const input: UpdateClientInput = { id: editId.value!, ...form }
-      await clientsStore.editClient(input)
+    if (editId !== null) {
+      await clientsStore.editClient({ id: editId, ...form })
+      toast.notify(`${displayName.value} aggiornato`)
     } else {
-      await clientsStore.addClient(form)
+      await clientsStore.addClient({ ...form })
+      toast.notify(`${displayName.value} aggiunto ai pazienti`)
     }
-    router.push('/clients')
-  } catch (e) {
-    error.value = String(e)
+    void router.push('/clients')
+  } catch (error) {
+    toast.notifyError(error, 'Salvataggio non riuscito')
   } finally {
     saving.value = false
+  }
+}
+
+async function confirmDelete(): Promise<void> {
+  if (editId === null) return
+  deleting.value = true
+  try {
+    await clientsStore.removeClient(editId)
+    toast.notify(`${displayName.value} eliminato dall'anagrafica`)
+    void router.push('/clients')
+  } catch (error) {
+    toast.notifyError(error, 'Eliminazione non riuscita')
+    deleteOpen.value = false
+  } finally {
+    deleting.value = false
   }
 }
 </script>
 
 <template>
-  <div class="p-8">
-    <div class="max-w-2xl mx-auto">
-      <!-- Breadcrumb bar -->
-      <div class="flex items-center gap-2 mb-6 animate-in">
-        <button
-          type="button"
-          class="flex items-center gap-1.5 text-sm text-sage-500 hover:text-sage-800 transition-colors cursor-pointer group"
-          @click="router.push('/clients')"
-        >
-          <ArrowLeft class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-          <span>Pazienti</span>
-        </button>
-        <template v-if="patientDisplayName">
-          <span class="text-sage-300 text-sm">/</span>
-          <span class="text-sm font-semibold text-sage-800 truncate max-w-[220px]">{{ patientDisplayName }}</span>
-        </template>
+  <div>
+    <PageHeader
+      :title="isEdit ? (displayName || 'Paziente') : 'Nuovo paziente'"
+      :back="{ to: '/clients', label: 'Pazienti' }"
+    >
+      <AppButton v-if="isEdit" :icon="FilePlus" :to="{ path: '/invoices/new', query: { client: editId } }">Nuova fattura</AppButton>
+      <AppButton variant="primary" type="submit" form="client-form" :icon="Check" :loading="saving">
+        {{ isEdit ? 'Salva' : 'Aggiungi paziente' }}
+      </AppButton>
+    </PageHeader>
+
+    <div class="mx-auto max-w-[60rem] px-8 pt-6 pb-12">
+      <div v-if="loading" class="h-96 rounded-card border border-border bg-surface-raised p-6" role="status" aria-busy="true">
+        <span class="sr-only">Caricamento del paziente</span>
+        <div class="skeleton h-4 w-1/3" />
       </div>
 
-      <!-- Loading -->
-      <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3">
-        <div class="w-8 h-8 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
-        <p class="text-sm text-sage-400">Caricamento dati…</p>
-      </div>
+      <EmptyState v-else-if="loadError" :icon="TriangleAlert" title="Paziente non trovato" :description="loadError">
+        <AppButton to="/clients">Torna ai pazienti</AppButton>
+      </EmptyState>
 
-      <form v-else class="space-y-5" @submit.prevent="onSubmit">
-
-        <!-- Tipo cliente: segment control -->
-        <div class="glass-card rounded-2xl p-5 animate-in">
-          <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
-              <User class="w-3.5 h-3.5 text-white" />
-            </div>
-            <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Tipo cliente</h2>
-          </div>
-
-          <div class="flex rounded-xl border border-sage-200 p-1 bg-sage-50/50 gap-1">
-            <button
-              type="button"
-              class="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer"
-              :class="form.client_type === 'persona_fisica'
-                ? 'bg-white shadow-sm text-sage-900'
-                : 'text-sage-500 hover:text-sage-700'"
-              @click="form.client_type = 'persona_fisica'"
-            >
-              <User class="w-4 h-4" />
-              Persona Fisica
-            </button>
-            <button
-              type="button"
-              class="flex-1 flex items-center justify-center gap-2 py-2 px-4 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer"
-              :class="form.client_type === 'azienda'
-                ? 'bg-white shadow-sm text-sage-900'
-                : 'text-sage-500 hover:text-sage-700'"
-              @click="form.client_type = 'azienda'"
-            >
-              <Building2 class="w-4 h-4" />
-              Azienda
-            </button>
-          </div>
-        </div>
-
-        <!-- Dati anagrafici -->
-        <div class="glass-card rounded-2xl p-5 animate-in-d1">
-          <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
-              <User class="w-3.5 h-3.5 text-white" />
-            </div>
-            <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Dati anagrafici</h2>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">
-                {{ form.client_type === 'azienda' ? 'Ragione Sociale' : 'Nome' }}
-              </label>
-              <input
-                v-model="form.first_name"
-                type="text"
-                :required="form.client_type === 'persona_fisica'"
-                :placeholder="form.client_type === 'azienda' ? 'Studio Medico…' : 'Mario'"
-                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
-              />
-            </div>
-            <div>
-              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Cognome</label>
-              <input
-                v-model="form.last_name"
-                type="text"
-                required
-                placeholder="Rossi"
-                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
-              />
-            </div>
-
-            <template v-if="form.client_type === 'persona_fisica'">
-              <div>
-                <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Data di nascita</label>
+      <AppCard v-else class="settle px-8 py-4">
+        <form id="client-form" novalidate @submit.prevent="onSubmit">
+          <FormSection title="Chi è" description="Nome e codice fiscale compaiono in fattura come intestatario.">
+            <SegmentedControl v-model="form.client_type" :options="TYPE_OPTIONS" label="Tipo di paziente" class="mb-5" />
+            <div class="grid grid-cols-2 gap-x-4 gap-y-5">
+              <template v-if="form.client_type === 'persona_fisica'">
+                <FormField v-slot="{ id, invalid, describedBy }" label="Nome" required :error="errors.first_name">
+                  <input :id="id" v-model="form.first_name" type="text" class="field" autocomplete="off" :aria-invalid="invalid" :aria-describedby="describedBy" @blur="check('first_name')" />
+                </FormField>
+                <FormField v-slot="{ id, invalid, describedBy }" label="Cognome" required :error="errors.last_name">
+                  <input :id="id" v-model="form.last_name" type="text" class="field" autocomplete="off" :aria-invalid="invalid" :aria-describedby="describedBy" @blur="check('last_name')" />
+                </FormField>
+                <FormField v-slot="{ id }" label="Data di nascita" optional>
+                  <input :id="id" v-model="form.birth_date" type="date" class="field" />
+                </FormField>
+                <FormField v-slot="{ id }" label="Sesso" optional>
+                  <select :id="id" v-model="form.gender" class="field">
+                    <option :value="undefined">Non indicato</option>
+                    <option value="F">Femmina</option>
+                    <option value="M">Maschio</option>
+                  </select>
+                </FormField>
+              </template>
+              <template v-else>
+                <FormField v-slot="{ id, invalid, describedBy }" class="col-span-2" label="Ragione sociale" required :error="errors.last_name">
+                  <input :id="id" v-model="form.last_name" type="text" class="field" :aria-invalid="invalid" :aria-describedby="describedBy" @blur="check('last_name')" />
+                </FormField>
+                <FormField v-slot="{ id, invalid, describedBy }" label="Partita IVA" required :error="errors.vat_number">
+                  <input :id="id" v-model="form.vat_number" type="text" inputmode="numeric" class="field field-mono" :aria-invalid="invalid" :aria-describedby="describedBy" @blur="check('vat_number')" />
+                </FormField>
+              </template>
+              <FormField v-slot="{ id, invalid, describedBy }" :class="form.client_type === 'azienda' ? '' : 'col-span-2'" label="Codice fiscale" required :error="errors.fiscal_code">
                 <input
-                  v-model="form.birth_date"
-                  type="date"
-                  class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
-                />
-              </div>
-              <div>
-                <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Sesso</label>
-                <select
-                  v-model="form.gender"
-                  class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow appearance-none cursor-pointer"
-                >
-                  <option value="">— Seleziona —</option>
-                  <option value="M">Maschio</option>
-                  <option value="F">Femmina</option>
-                </select>
-              </div>
-            </template>
-
-            <div>
-              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Codice Fiscale</label>
-              <input
-                v-model="form.fiscal_code"
-                type="text"
-                required
-                placeholder="RSSMRA80A01H501U"
-                class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 font-mono uppercase focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
-                :class="fieldErrors.fiscal_code
-                  ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
-                  : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
-                @input="form.fiscal_code = form.fiscal_code.toUpperCase()"
-                @blur="validateField('fiscal_code')"
-              />
-              <p v-if="fieldErrors.fiscal_code" class="text-xs text-red-500 mt-1">{{ fieldErrors.fiscal_code }}</p>
-            </div>
-            <div v-if="form.client_type === 'azienda'">
-              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Partita IVA</label>
-              <input
-                v-model="form.vat_number"
-                type="text"
-                placeholder="01234567890"
-                class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
-                :class="fieldErrors.vat_number
-                  ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
-                  : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
-                @blur="validateField('vat_number')"
-              />
-              <p v-if="fieldErrors.vat_number" class="text-xs text-red-500 mt-1">{{ fieldErrors.vat_number }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Indirizzo -->
-        <div class="glass-card rounded-2xl p-5 animate-in-d2">
-          <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #78716c, #57534e)">
-              <MapPin class="w-3.5 h-3.5 text-white" />
-            </div>
-            <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Indirizzo</h2>
-          </div>
-
-          <div class="space-y-3">
-            <div>
-              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Via / Indirizzo</label>
-              <input
-                v-model="form.address"
-                type="text"
-                placeholder="Via Roma 1"
-                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
-              />
-            </div>
-            <div class="grid grid-cols-5 gap-3">
-              <div class="col-span-3">
-                <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Città</label>
-                <input
-                  v-model="form.city"
+                  :id="id"
+                  v-model="form.fiscal_code"
                   type="text"
-                  placeholder="Roma"
-                  class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
+                  class="field field-mono uppercase"
+                  maxlength="16"
+                  autocomplete="off"
+                  spellcheck="false"
+                  :aria-invalid="invalid"
+                  :aria-describedby="describedBy"
+                  @input="form.fiscal_code = form.fiscal_code.toUpperCase()"
+                  @blur="check('fiscal_code')"
                 />
-              </div>
-              <div>
-                <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Prov.</label>
-                <input
-                  v-model="form.province"
-                  type="text"
-                  maxlength="2"
-                  placeholder="RM"
-                  class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 uppercase text-center focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
-                  :class="fieldErrors.province
-                    ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
-                    : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
-                  @input="form.province = form.province.toUpperCase()"
-                  @blur="validateField('province')"
-                />
-                <p v-if="fieldErrors.province" class="text-xs text-red-500 mt-1">{{ fieldErrors.province }}</p>
-              </div>
-              <div>
-                <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">CAP</label>
-                <input
-                  v-model="form.zip_code"
-                  type="text"
-                  maxlength="5"
-                  placeholder="00100"
-                  class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
-                  :class="fieldErrors.zip_code
-                    ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
-                    : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
-                  @blur="validateField('zip_code')"
-                />
-                <p v-if="fieldErrors.zip_code" class="text-xs text-red-500 mt-1">{{ fieldErrors.zip_code }}</p>
-              </div>
+              </FormField>
             </div>
-          </div>
-        </div>
+          </FormSection>
 
-        <!-- Contatti -->
-        <div class="glass-card rounded-2xl p-5 animate-in-d3">
-          <div class="flex items-center gap-2.5 mb-4">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d97706, #b45309)">
-              <Phone class="w-3.5 h-3.5 text-white" />
+          <FormSection title="Indirizzo" description="Richiesto in fattura per i pazienti residenti in Italia.">
+            <div class="grid grid-cols-[1fr_5rem_6.5rem] gap-x-4 gap-y-5">
+              <FormField v-slot="{ id }" class="col-span-3" label="Via e numero civico">
+                <input :id="id" v-model="form.address" type="text" class="field" autocomplete="off" />
+              </FormField>
+              <FormField v-slot="{ id }" label="Città">
+                <input :id="id" v-model="form.city" type="text" class="field" autocomplete="off" />
+              </FormField>
+              <FormField v-slot="{ id, invalid, describedBy }" label="Prov." :error="errors.province">
+                <input :id="id" v-model="form.province" type="text" maxlength="2" class="field uppercase" :aria-invalid="invalid" :aria-describedby="describedBy" @input="form.province = form.province.toUpperCase()" @blur="check('province')" />
+              </FormField>
+              <FormField v-slot="{ id, invalid, describedBy }" label="CAP" :error="errors.zip_code">
+                <input :id="id" v-model="form.zip_code" type="text" inputmode="numeric" maxlength="5" class="field tabular" :aria-invalid="invalid" :aria-describedby="describedBy" @blur="check('zip_code')" />
+              </FormField>
             </div>
-            <h2 class="text-xs font-semibold text-sage-500 uppercase tracking-wider">Contatti</h2>
-          </div>
+          </FormSection>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Email</label>
-              <input
-                v-model="form.email"
-                type="email"
-                placeholder="mario.rossi@email.it"
-                class="w-full border rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 bg-white/80 transition-shadow"
-                :class="fieldErrors.email
-                  ? 'border-red-300 focus:ring-red-400/40 focus:border-red-400'
-                  : 'border-sage-200 focus:ring-sage-400/40 focus:border-sage-400'"
-                @blur="validateField('email')"
-              />
-              <p v-if="fieldErrors.email" class="text-xs text-red-500 mt-1">{{ fieldErrors.email }}</p>
+          <FormSection title="Contatti" description="Per ritrovare il paziente e mandargli la fattura.">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-5">
+              <FormField v-slot="{ id, invalid, describedBy }" label="Email" optional :error="errors.email">
+                <input :id="id" v-model="form.email" type="email" class="field" autocomplete="off" :aria-invalid="invalid" :aria-describedby="describedBy" @blur="check('email')" />
+              </FormField>
+              <FormField v-slot="{ id }" label="Telefono" optional>
+                <input :id="id" v-model="form.phone" type="tel" class="field tabular" autocomplete="off" />
+              </FormField>
+              <FormField v-slot="{ id }" class="col-span-2" label="Note" optional hint="Restano nell'app: non compaiono in fattura.">
+                <textarea :id="id" v-model="form.notes" rows="3" class="field" />
+              </FormField>
             </div>
-            <div>
-              <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Telefono</label>
-              <input
-                v-model="form.phone"
-                type="tel"
-                placeholder="+39 06 1234567"
-                class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow"
-              />
-            </div>
-          </div>
+          </FormSection>
 
-          <div class="mt-4">
-            <label class="text-xs font-semibold text-sage-600 uppercase tracking-wider block mb-1.5">Note</label>
-            <textarea
-              v-model="form.notes"
-              rows="3"
-              placeholder="Note aggiuntive sul paziente…"
-              class="w-full border border-sage-200 rounded-xl px-3.5 py-2.5 text-sm text-sage-900 placeholder-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 focus:border-sage-400 bg-white/80 transition-shadow resize-none"
+          <FormSection title="Sistema Tessera Sanitaria" description="Le spese sanitarie vanno trasmesse per la dichiarazione precompilata, salvo opposizione del paziente.">
+            <ToggleSwitch
+              v-model="form.sts_authorization"
+              label="Il paziente autorizza la trasmissione"
+              description="In fattura comparirà la casella “Autorizza” spuntata; altrimenti “Non autorizza”."
             />
-          </div>
+          </FormSection>
+        </form>
+      </AppCard>
 
-          <!-- STS toggle -->
-          <label class="mt-4 flex items-center gap-3 cursor-pointer group/sts p-3.5 rounded-xl border border-sage-100/60 hover:bg-sage-50/60 transition-colors">
-            <div
-              class="w-9 h-5 rounded-full transition-colors duration-200 relative shrink-0"
-              :class="form.sts_authorization ? 'bg-amber-500' : 'bg-sage-200'"
-            >
-              <div
-                class="absolute top-[3px] w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform duration-200"
-                :class="form.sts_authorization ? 'translate-x-[17px]' : 'translate-x-[3px]'"
-              />
-            </div>
-            <input v-model="form.sts_authorization" type="checkbox" class="sr-only" />
-            <div class="flex items-center gap-2 flex-1">
-              <ShieldCheck
-                class="w-4 h-4 transition-colors"
-                :class="form.sts_authorization ? 'text-amber-500' : 'text-sage-300'"
-              />
-              <div>
-                <p class="text-sm font-medium text-sage-800">Autorizzazione STS</p>
-                <p class="text-xs text-sage-400">Consenso all'invio dati al Sistema Tessera Sanitaria</p>
-              </div>
-            </div>
-            <span
-              v-if="form.sts_authorization"
-              class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 shrink-0"
-            >
-              Autorizzato
-            </span>
-          </label>
-        </div>
-
-        <!-- Error + Submit card -->
-        <div class="glass-card rounded-2xl p-5 animate-in-d4">
-          <div v-if="error" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center gap-2 mb-4">
-            <X class="w-4 h-4 shrink-0 text-red-400" />
-            {{ error }}
-          </div>
-          <div class="flex justify-between items-center">
-            <button
-              type="button"
-              class="flex items-center gap-1.5 text-sm text-sage-500 hover:text-sage-700 transition-colors cursor-pointer group"
-              @click="router.push('/clients')"
-            >
-              <ArrowLeft class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-              Annulla
-            </button>
-            <button
-              type="submit"
-              :disabled="saving"
-              class="group relative overflow-hidden text-white font-semibold px-6 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 disabled:opacity-60 cursor-pointer focus:outline-none"
-              style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
-            >
-              <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
-              <Check class="w-4 h-4 relative z-10" />
-              <span class="relative z-10">{{ saving ? 'Salvataggio…' : isEdit ? 'Aggiorna paziente' : 'Crea paziente' }}</span>
-            </button>
-          </div>
-        </div>
-      </form>
+      <div v-if="isEdit && !loading && !loadError" class="mt-4 flex justify-end">
+        <AppButton variant="danger-quiet" :icon="Trash2" @click="deleteOpen = true">Elimina paziente</AppButton>
+      </div>
     </div>
+
+    <ConfirmDialog
+      :open="deleteOpen"
+      title="Eliminare il paziente?"
+      message="L'operazione non si può annullare."
+      :blast-radius="`${displayName} verrà tolto dall'anagrafica. Se ha fatture o appuntamenti, l'eliminazione verrà rifiutata per non lasciarli senza intestatario.`"
+      :loading="deleting"
+      @confirm="confirmDelete"
+      @cancel="deleteOpen = false"
+    />
   </div>
 </template>

@@ -1,88 +1,97 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import {
-  TrendingUp, Euro, Clock, FileText,
-  ChevronLeft, ChevronRight,
-  Plus, Users, CalendarDays, ArrowRight,
-  CheckCircle2,
-} from 'lucide-vue-next'
-import { getDashboard } from '@/api'
-import type { DashboardData, MonthlyRevenue } from '@/types'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { ArrowRight, CalendarRange, CircleCheck, FilePen, FileText, Hourglass, TriangleAlert } from 'lucide-vue-next'
+import { getDashboard, listInvoices, previewMonthlyInvoices } from '@/api'
+import type { DashboardData, Invoice } from '@/types'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import PeriodStepper from '@/components/ui/PeriodStepper.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
+import InvoiceSeal from '@/components/ui/InvoiceSeal.vue'
+import PatientMonogram from '@/components/ui/PatientMonogram.vue'
+import MonthlyBars from '@/components/dashboard/MonthlyBars.vue'
+import ThresholdMeter from '@/components/dashboard/ThresholdMeter.vue'
+import TaxSplit from '@/components/dashboard/TaxSplit.vue'
 import { useConfigStore } from '@/stores/config'
-import { formatCurrency, formatDate } from '@/utils/format'
+import { errorMessage } from '@/stores/toast'
+import { formatCurrency, formatDateShort, splitCurrency, ITALIAN_MONTHS } from '@/utils/format'
 import { estimateForfettarioTax, estimateOrdinarioTax } from '@/utils/tax'
+import { summariseAttention, type Attention } from '@/utils/attention'
+import { plural } from '@/utils/labels'
 
 const router = useRouter()
 const configStore = useConfigStore()
-const currentYear  = new Date().getFullYear()
-const currentMonth = new Date().getMonth() + 1
-const currentHour  = new Date().getHours()
+
+const now = new Date()
+const currentYear = now.getFullYear()
+const currentMonth = now.getMonth() + 1
+
 const selectedYear = ref(currentYear)
-const data         = ref<DashboardData | null>(null)
-const loading      = ref(false)
-const error        = ref<string | null>(null)
+const data = ref<DashboardData | null>(null)
+const yearInvoices = ref<Invoice[]>([])
+const unbilled = ref<{ month: number; year: number; sessions: number; amount: number } | null>(null)
+const loading = ref(true)
+const error = ref<string | null>(null)
 const firstFiveYears = ref(false)
-const hoveredMonth = ref<number | null>(null)
 
 const greeting = computed(() => {
-  if (currentHour < 12) return 'Buongiorno'
-  if (currentHour < 18) return 'Buon pomeriggio'
-  return 'Buonasera'
+  const hour = now.getHours()
+  const name = configStore.config?.first_name
+  const salutation = hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
+  return name ? `${salutation}, ${name}` : salutation
 })
 
-async function loadDashboard() {
+/**
+ * The sessions of last month that were held but never invoiced: the most
+ * common thing left undone at the start of a month.
+ */
+async function loadUnbilled(): Promise<void> {
+  unbilled.value = null
+  if (selectedYear.value !== currentYear) return
+  const month = currentMonth === 1 ? 12 : currentMonth - 1
+  const year = currentMonth === 1 ? currentYear - 1 : currentYear
+  const previews = await previewMonthlyInvoices(year, month)
+  const sessions = previews.reduce((sum, preview) => sum + preview.appointment_count, 0)
+  if (sessions === 0) return
+  const amount = previews.reduce((sum, preview) => sum + preview.estimated_due, 0)
+  unbilled.value = { month, year, sessions, amount }
+}
+
+async function load(): Promise<void> {
   loading.value = true
-  error.value   = null
+  error.value = null
   try {
-    data.value = await getDashboard(selectedYear.value)
-  } catch (e) {
-    error.value = String(e)
-    data.value  = null
+    const [dashboard, invoices] = await Promise.all([
+      getDashboard(selectedYear.value),
+      listInvoices({ year: selectedYear.value }),
+      loadUnbilled(),
+    ])
+    data.value = dashboard
+    yearInvoices.value = invoices
+  } catch (cause) {
+    error.value = errorMessage(cause)
+    data.value = null
   } finally {
     loading.value = false
   }
 }
 
-function prevYear() { selectedYear.value--; loadDashboard() }
-function nextYear() { selectedYear.value++; loadDashboard() }
+function shiftYear(delta: number): void {
+  selectedYear.value += delta
+  void load()
+}
 
-const maxRevenue = computed(() => {
-  if (!data.value) return 1
-  return Math.max(...data.value.monthly_revenue.map(m => m.revenue), 1)
+const hero = computed(() => splitCurrency(data.value?.total_revenue ?? 0))
+const collectionRate = computed(() => {
+  if (!data.value || data.value.total_revenue === 0) return 0
+  return Math.round((data.value.paid_revenue / data.value.total_revenue) * 100)
 })
 
-function barHeight(revenue: number): string {
-  if (revenue === 0) return '2%'
-  return `${Math.max((revenue / maxRevenue.value) * 100, 5)}%`
-}
-
-function isCurrentMonth(month: number): boolean {
-  return selectedYear.value === currentYear && month === currentMonth
-}
-
-function barGradient(month: MonthlyRevenue): string {
-  if (month.revenue === 0) return 'rgba(203,213,225,0.3)'
-  const hovered = hoveredMonth.value === month.month
-  if (isCurrentMonth(month.month)) {
-    return hovered
-      ? 'linear-gradient(to top, #312e81, #4338ca, #818cf8)'
-      : 'linear-gradient(to top, #3730a3, #4f46e5, #6366f1)'
-  }
-  return hovered
-    ? 'linear-gradient(to top, #065f46, #059669, #34d399)'
-    : 'linear-gradient(to top, #047857, #059669, #10b981)'
-}
-
-const peakMonth = computed((): MonthlyRevenue | null => {
-  if (!data.value) return null
-  const months = data.value.monthly_revenue.filter(m => m.revenue > 0)
-  if (!months.length) return null
-  return months.reduce((a, b) => a.revenue > b.revenue ? a : b)
-})
-
-const isForfettario = computed(() => configStore.config?.tax_regime === 'forfettario')
+const isForfettario = computed(() => configStore.config?.tax_regime !== 'ordinario')
 
 const taxEstimate = computed(() => {
   if (!data.value || !configStore.config) return null
@@ -90,504 +99,239 @@ const taxEstimate = computed(() => {
   if (revenue <= 0) return null
   const { coefficient } = configStore.config
   if (isForfettario.value) {
-    return { type: 'forfettario' as const, ...estimateForfettarioTax(revenue, coefficient, firstFiveYears.value) }
+    const estimate = estimateForfettarioTax(revenue, coefficient, firstFiveYears.value)
+    return { revenue, net: estimate.netIncome, contributions: estimate.inpsContribution, tax: estimate.substituteTax, taxLabel: `Imposta sostitutiva ${estimate.substituteTaxRate}%` }
   }
-  return { type: 'ordinario' as const, ...estimateOrdinarioTax(revenue, coefficient) }
+  const estimate = estimateOrdinarioTax(revenue, coefficient)
+  return {
+    revenue,
+    net: estimate.netIncome,
+    contributions: estimate.inpsContribution,
+    tax: estimate.irpef + estimate.addizionaleRegionale + estimate.addizionaleComunale,
+    taxLabel: 'IRPEF e addizionali',
+  }
 })
 
-const netPercentage = computed(() => {
-  if (!taxEstimate.value || taxEstimate.value.annualRevenue === 0) return 100
-  return Math.round((taxEstimate.value.netIncome / taxEstimate.value.annualRevenue) * 100)
-})
+const attention = computed<Attention>(() => summariseAttention(yearInvoices.value))
+const nothingToDo = computed(
+  () => attention.value.overdue.count === 0 && attention.value.drafts.count === 0 && unbilled.value === null,
+)
 
-const collectionRate = computed(() => {
-  if (!data.value || data.value.total_revenue === 0) return 0
-  return Math.round((data.value.paid_revenue / data.value.total_revenue) * 100)
-})
+const RATE_OPTIONS = [
+  { value: true, label: '5% (primi 5 anni)' },
+  { value: false, label: '15%' },
+] as const
 
-const issuedUnpaid = computed(() => {
-  if (!data.value) return 0
-  return Math.max(0, data.value.total_invoices - data.value.paid_invoices - data.value.draft_invoices)
-})
-
-const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg, #059669, #047857)',
-  'linear-gradient(135deg, #4f46e5, #4338ca)',
-  'linear-gradient(135deg, #78716c, #57534e)',
-  'linear-gradient(135deg, #10b981, #059669)',
-  'linear-gradient(135deg, #d97706, #b45309)',
-]
-
-function clientInitials(name: string): string {
-  return name.split(' ').slice(0, 2).map(w => w[0] ?? '').join('').toUpperCase()
-}
-
-function clientAvatarGradient(id: number): string {
-  return AVATAR_GRADIENTS[id % AVATAR_GRADIENTS.length]
-}
-
-onMounted(loadDashboard)
+onMounted(load)
 </script>
 
 <template>
-  <div class="p-8">
-    <div class="max-w-5xl mx-auto">
+  <div>
+    <PageHeader :title="`Panoramica ${selectedYear}`">
+      <template #eyebrow>{{ greeting }}</template>
+      <PeriodStepper
+        :label="String(selectedYear)"
+        previous-label="Anno precedente"
+        next-label="Anno successivo"
+        :can-next="selectedYear < currentYear"
+        @previous="shiftYear(-1)"
+        @next="shiftYear(1)"
+      />
+    </PageHeader>
 
-      <!-- ── Header ──────────────────────────────────────────────────────── -->
-      <div class="flex items-start justify-between mb-8 animate-in">
-        <div>
-          <p class="text-[10px] font-bold text-sage-400 uppercase tracking-widest mb-1">{{ greeting }}</p>
-          <h1 class="text-2xl font-bold text-sage-900 tracking-tight">
-            {{ configStore.config?.first_name || 'Dashboard' }}
-          </h1>
-          <p class="text-sm text-sage-500 mt-0.5">Panoramica anno fiscale {{ selectedYear }}</p>
+    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-12">
+      <!-- Loading: the same shapes the page will have. -->
+      <div v-if="loading" class="space-y-5" role="status" aria-busy="true" aria-live="polite">
+        <span class="sr-only">Caricamento della panoramica</span>
+        <div class="grid grid-cols-[18rem_1fr] gap-5 rounded-card border border-border bg-surface-raised p-6">
+          <div class="space-y-3"><div class="skeleton h-3 w-24" /><div class="skeleton h-12 w-48" /><div class="skeleton h-3 w-32" /></div>
+          <div class="skeleton h-48" />
         </div>
-        <!-- Year picker -->
-        <div class="glass-card flex items-center gap-0.5 rounded-xl px-1.5 py-1.5 shadow-sm">
-          <button
-            type="button"
-            class="p-1.5 text-sage-400 hover:text-sage-700 rounded-lg hover:bg-sage-50/60 transition-all cursor-pointer"
-            @click="prevYear"
-          >
-            <ChevronLeft class="w-4 h-4" />
-          </button>
-          <span class="text-sm font-bold text-sage-800 min-w-[3.5rem] text-center tabular-nums">
-            {{ selectedYear }}
-          </span>
-          <button
-            type="button"
-            class="p-1.5 text-sage-400 hover:text-sage-700 rounded-lg hover:bg-sage-50/60 transition-all cursor-pointer"
-            @click="nextYear"
-          >
-            <ChevronRight class="w-4 h-4" />
-          </button>
+        <div class="grid grid-cols-3 gap-5">
+          <div v-for="index in 3" :key="index" class="h-52 rounded-card border border-border bg-surface-raised p-5"><div class="skeleton h-3 w-24" /></div>
         </div>
       </div>
 
-      <!-- ── Loading ─────────────────────────────────────────────────────── -->
-      <div v-if="loading" class="flex items-center justify-center h-64">
-        <div class="flex flex-col items-center gap-3">
-          <div class="w-8 h-8 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
-          <p class="text-sm text-sage-400">Caricamento...</p>
-        </div>
-      </div>
+      <EmptyState
+        v-else-if="error"
+        :icon="TriangleAlert"
+        title="Non è stato possibile caricare la panoramica"
+        :description="error"
+      >
+        <AppButton @click="load">Riprova</AppButton>
+      </EmptyState>
 
-      <!-- ── Error ───────────────────────────────────────────────────────── -->
-      <div v-else-if="error" class="flex items-center justify-center h-64">
-        <div class="glass-card rounded-2xl px-6 py-5 max-w-md text-center shadow-sm">
-          <p class="text-sm font-semibold text-red-700 mb-1">Errore nel caricamento</p>
-          <p class="text-xs text-red-500 font-mono break-all">{{ error }}</p>
-          <button
-            type="button"
-            class="mt-4 text-white font-medium px-4 py-1.5 rounded-xl text-sm cursor-pointer transition-all"
-            style="background: linear-gradient(135deg, #1e1b4b, #4338ca);"
-            @click="loadDashboard"
-          >
-            Riprova
-          </button>
-        </div>
-      </div>
+      <div v-else-if="data" class="space-y-5">
+        <!-- ── The year in one sheet: the hero figure and its months ─────────── -->
+        <AppCard class="settle grid grid-cols-1 gap-8 lg:grid-cols-[17rem_1fr]" :padded="false">
+          <div class="flex flex-col p-6 pr-0">
+            <p class="label-quiet">Fatturato {{ selectedYear }}</p>
+            <p class="mt-1 whitespace-nowrap font-semibold tracking-[-0.025em] text-text" aria-live="polite">
+              <span class="text-[3.25rem] leading-none">{{ hero.whole }}</span><span class="text-2xl text-text-muted">{{ hero.fraction }}</span>
+              <span class="ml-1 text-2xl text-text-subtle">{{ hero.symbol }}</span>
+            </p>
+            <p class="mt-2 text-sm text-text-muted">
+              {{ plural(data.total_invoices, 'fattura', 'fatture') }}<template v-if="data.draft_invoices > 0">, di cui {{ plural(data.draft_invoices, 'bozza', 'bozze') }}</template>
+            </p>
 
-      <template v-else-if="data">
-
-        <!-- ── KPI cards ───────────────────────────────────────────────── -->
-        <div class="grid grid-cols-4 gap-4 mb-4">
-
-          <!-- Fatturato totale -->
-          <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d1 cursor-default">
-            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #059669, #047857)" />
-            <div class="p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Fatturato</span>
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
-                  <TrendingUp class="w-3.5 h-3.5 text-white" />
-                </div>
-              </div>
-              <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ formatCurrency(data.total_revenue) }}</p>
-              <p class="text-[11px] text-sage-400 mt-1.5">{{ data.total_invoices }} fatture emesse</p>
-            </div>
-          </div>
-
-          <!-- Incassato + collection rate bar -->
-          <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d2 cursor-default">
-            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #4f46e5, #4338ca)" />
-            <div class="p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Incassato</span>
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
-                  <CheckCircle2 class="w-3.5 h-3.5 text-white" />
-                </div>
-              </div>
-              <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ formatCurrency(data.paid_revenue) }}</p>
-              <div class="mt-2">
-                <div class="flex justify-between items-center mb-1">
-                  <span class="text-[11px] text-sage-400">{{ data.paid_invoices }} pagate</span>
-                  <span
-                    class="text-[11px] font-bold tabular-nums"
-                    :class="collectionRate >= 75 ? 'text-emerald-600' : 'text-amber-500'"
-                  >{{ collectionRate }}%</span>
-                </div>
-                <div class="h-1 rounded-full bg-sage-100 overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all duration-700"
-                    :style="{ width: collectionRate + '%', background: 'linear-gradient(90deg, #059669, #047857)' }"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Da incassare -->
-          <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d3 cursor-default">
-            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #d97706, #b45309)" />
-            <div class="p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Da incassare</span>
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d97706, #b45309)">
-                  <Clock class="w-3.5 h-3.5 text-white" />
-                </div>
-              </div>
-              <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ formatCurrency(data.unpaid_revenue) }}</p>
-              <div class="flex items-center gap-2 mt-1.5">
-                <span v-if="issuedUnpaid > 0" class="text-[11px] text-amber-500">{{ issuedUnpaid }} emesse</span>
-                <span v-if="issuedUnpaid > 0 && data.draft_invoices > 0" class="text-sage-200 text-xs">·</span>
-                <span v-if="data.draft_invoices > 0" class="text-[11px] text-sage-400">{{ data.draft_invoices }} bozze</span>
-                <span v-if="issuedUnpaid === 0 && data.draft_invoices === 0" class="text-[11px] text-sage-400">Tutto incassato</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- N. Fatture con status dots -->
-          <div class="glass-card rounded-2xl overflow-hidden shadow-sm hover-lift animate-in-d4 cursor-default">
-            <div class="h-0.5 w-full" style="background: linear-gradient(90deg, #78716c, #57534e)" />
-            <div class="p-5">
-              <div class="flex items-center justify-between mb-3">
-                <span class="text-[10px] font-bold text-sage-400 uppercase tracking-widest">Fatture</span>
-                <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #78716c, #57534e)">
-                  <FileText class="w-3.5 h-3.5 text-white" />
-                </div>
-              </div>
-              <p class="text-2xl font-bold text-sage-900 tracking-tight tabular-nums">{{ data.total_invoices }}</p>
-              <div class="flex items-center gap-3 mt-1.5">
-                <span class="flex items-center gap-1 text-[11px] text-emerald-600">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
-                  {{ data.paid_invoices }} pag.
-                </span>
-                <span v-if="data.draft_invoices" class="flex items-center gap-1 text-[11px] text-warm-500">
-                  <span class="w-1.5 h-1.5 rounded-full bg-warm-400 inline-block shrink-0" />
-                  {{ data.draft_invoices }} bozze
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Quick actions strip ─────────────────────────────────────── -->
-        <div class="flex gap-2 mb-5 animate-in-d1">
-          <button
-            type="button"
-            class="flex items-center gap-1.5 text-xs font-semibold text-sage-600 hover:text-sage-900 bg-white/60 hover:bg-white border border-sage-200 hover:border-sage-300 px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-sm hover:shadow"
-            @click="router.push('/invoices/new')"
-          >
-            <Plus class="w-3.5 h-3.5" />
-            Nuova fattura
-          </button>
-          <button
-            type="button"
-            class="flex items-center gap-1.5 text-xs font-semibold text-sage-600 hover:text-sage-900 bg-white/60 hover:bg-white border border-sage-200 hover:border-sage-300 px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-sm hover:shadow"
-            @click="router.push('/clients/new')"
-          >
-            <Users class="w-3.5 h-3.5" />
-            Nuovo paziente
-          </button>
-          <button
-            type="button"
-            class="flex items-center gap-1.5 text-xs font-semibold text-sage-600 hover:text-sage-900 bg-white/60 hover:bg-white border border-sage-200 hover:border-sage-300 px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-sm hover:shadow"
-            @click="router.push('/agenda')"
-          >
-            <CalendarDays class="w-3.5 h-3.5" />
-            Agenda
-          </button>
-        </div>
-
-        <!-- ── Chart + Tax ─────────────────────────────────────────────── -->
-        <div class="grid grid-cols-5 gap-4 mb-5">
-
-          <!-- Monthly bar chart -->
-          <div class="col-span-3 glass-card rounded-2xl p-5 shadow-sm animate-in-d2 flex flex-col gap-4">
-            <div class="flex items-start justify-between">
+            <dl class="mt-auto space-y-4 pt-8">
               <div>
-                <h2 class="text-sm font-semibold text-sage-800">Andamento mensile</h2>
-                <p class="text-xs text-sage-400 mt-0.5">Fatturato netto · {{ selectedYear }}</p>
-              </div>
-              <div v-if="peakMonth" class="shrink-0 ml-4 text-right">
-                <p class="text-[10px] uppercase tracking-wider text-sage-400">Mese migliore</p>
-                <p class="text-xs font-semibold text-sage-700 mt-0.5">
-                  {{ peakMonth.month_name }} &middot; {{ formatCurrency(peakMonth.revenue) }}
-                </p>
-              </div>
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <div class="h-48 flex items-end gap-1 relative overflow-visible">
-                <!-- Guide lines -->
-                <div class="absolute inset-0 flex flex-col justify-between pointer-events-none" style="z-index: -1">
-                  <div class="h-px w-full bg-sage-200/40" />
-                  <div class="h-px w-full bg-sage-200/35" />
-                  <div class="h-px w-full bg-sage-200/30" />
-                  <div class="h-px w-full bg-sage-200/25" />
-                  <div />
+                <div class="flex items-baseline justify-between">
+                  <dt class="label-quiet">Incassato</dt>
+                  <dd class="tabular text-xs text-text-subtle">{{ collectionRate }}%</dd>
                 </div>
-
-                <div
-                  v-for="month in data.monthly_revenue"
-                  :key="month.month"
-                  class="flex-1 h-full flex items-end relative rounded-sm transition-colors duration-150 cursor-default"
-                  :class="hoveredMonth === month.month ? 'bg-sage-50/50' : 'bg-transparent'"
-                  @mouseenter="hoveredMonth = month.month"
-                  @mouseleave="hoveredMonth = null"
-                >
-                  <!-- Tooltip -->
-                  <div
-                    v-if="hoveredMonth === month.month && month.revenue > 0"
-                    class="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] bg-sage-900/95 text-white rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none z-50"
-                    style="font-size: 11px; font-weight: 500"
-                  >
-                    {{ formatCurrency(month.revenue) }}
-                    <span class="text-sage-400 ml-1.5 font-normal" style="font-size: 10px">
-                      {{ month.invoice_count }} fatt.
-                    </span>
-                    <span
-                      class="absolute left-1/2 -translate-x-1/2 top-full block"
-                      style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid rgba(15,23,42,0.95)"
-                    />
-                  </div>
-
-                  <!-- Bar -->
-                  <div
-                    class="w-full rounded-t-md transition-all duration-500"
-                    :style="{ height: barHeight(month.revenue), background: barGradient(month) }"
-                  />
+                <dd class="tabular mt-0.5 text-lg font-semibold text-text">{{ formatCurrency(data.paid_revenue) }}</dd>
+                <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-safe/15">
+                  <div class="h-full rounded-full bg-safe transition-[width] duration-700 ease-out-expo" :style="{ width: `${collectionRate}%` }" />
                 </div>
               </div>
-
-              <!-- Month labels -->
-              <div class="flex gap-1">
-                <div v-for="month in data.monthly_revenue" :key="month.month" class="flex-1 text-center">
-                  <span
-                    class="text-[10px] transition-colors duration-150"
-                    :class="isCurrentMonth(month.month)
-                      ? 'text-ocean-500 font-bold'
-                      : hoveredMonth === month.month
-                        ? 'text-sage-600'
-                        : 'text-sage-400'"
-                  >
-                    {{ month.month_name.slice(0, 3) }}
-                  </span>
-                </div>
+              <div>
+                <dt class="label-quiet">Da incassare</dt>
+                <dd class="tabular mt-0.5 text-lg font-semibold text-text">{{ formatCurrency(data.unpaid_revenue) }}</dd>
               </div>
-            </div>
+            </dl>
           </div>
 
-          <!-- Tax estimate -->
-          <div class="col-span-2 glass-card rounded-2xl p-5 shadow-sm animate-in-d2 flex flex-col">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-sm font-semibold text-sage-800">Stima Fiscale</h2>
-              <span
-                class="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider"
-                :class="isForfettario ? 'bg-sage-100/80 text-sage-600' : 'bg-ocean-50 text-ocean-600'"
-              >
-                {{ isForfettario ? 'Forfettario' : 'Ordinario' }}
-              </span>
+          <div class="border-t border-border p-6 lg:border-t-0 lg:border-l">
+            <div class="mb-5 flex items-baseline justify-between gap-4">
+              <div>
+                <h2 class="text-lg font-medium text-text">Incassato per mese</h2>
+                <p class="text-sm text-text-subtle">Fatture pagate, per mese di emissione</p>
+              </div>
             </div>
+            <MonthlyBars :months="data.monthly_revenue" :current-month="selectedYear === currentYear ? currentMonth : null" />
+          </div>
+        </AppCard>
 
+        <!-- ── Three instruments: ceiling, tax, to-do ──────────────────────── -->
+        <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <AppCard v-if="isForfettario" class="settle" style="--settle: 1">
+            <h2 class="text-lg font-medium text-text">Soglia forfettario</h2>
+            <p class="mb-5 text-sm text-text-subtle">Compensi fatturati nel {{ selectedYear }}</p>
+            <ThresholdMeter :amount="data.total_net_revenue" :year="selectedYear" />
+          </AppCard>
+
+          <AppCard class="settle flex flex-col" style="--settle: 2">
+            <h2 class="text-lg font-medium text-text">Stima fiscale</h2>
+            <p class="mb-5 text-sm text-text-subtle">Su {{ formatCurrency(data.total_net_revenue) }} di compensi</p>
             <template v-if="taxEstimate">
-              <!-- Compensi + proportion bar -->
-              <div class="mb-4">
-                <p class="text-[10px] text-sage-400 uppercase tracking-widest mb-0.5">Compensi annui</p>
-                <p class="text-xl font-bold text-sage-900 tracking-tight tabular-nums">{{ formatCurrency(data.total_net_revenue) }}</p>
-                <div class="mt-2">
-                  <div class="h-1.5 rounded-full overflow-hidden flex bg-sage-50">
-                    <div
-                      class="rounded-l-full transition-all duration-700"
-                      :style="{ width: netPercentage + '%', background: 'linear-gradient(90deg, #047857, #059669)' }"
-                    />
-                    <div
-                      class="rounded-r-full transition-all duration-700"
-                      :style="{ width: (100 - netPercentage) + '%', background: 'linear-gradient(90deg, #d97706, #b45309)' }"
-                    />
-                  </div>
-                  <div class="flex justify-between mt-1">
-                    <span class="text-[9px] text-sage-400">{{ netPercentage }}% netto</span>
-                    <span class="text-[9px] text-amber-500/80">{{ 100 - netPercentage }}% imposte</span>
-                  </div>
-                </div>
+              <TaxSplit v-bind="taxEstimate" />
+              <div v-if="isForfettario" class="mt-5">
+                <SegmentedControl v-model="firstFiveYears" :options="RATE_OPTIONS" label="Aliquota imposta sostitutiva" size="sm" block />
               </div>
-
-              <!-- Breakdown rows -->
-              <div class="space-y-1.5 flex-1">
-                <div class="flex justify-between text-xs">
-                  <span class="text-sage-500">Redd. imponibile <span class="text-sage-300">({{ configStore.config?.coefficient }}%)</span></span>
-                  <span class="text-sage-700 font-medium tabular-nums">{{ formatCurrency(taxEstimate.taxableIncome) }}</span>
-                </div>
-                <div class="flex justify-between text-xs">
-                  <span class="text-sage-500">Contributi prev.</span>
-                  <span class="text-amber-600 font-medium tabular-nums">&minus;{{ formatCurrency(taxEstimate.inpsContribution) }}</span>
-                </div>
-
-                <template v-if="taxEstimate.type === 'forfettario'">
-                  <div class="flex justify-between text-xs">
-                    <span class="text-sage-500">Imp. sostitutiva <span class="text-sage-300">({{ taxEstimate.substituteTaxRate }}%)</span></span>
-                    <span class="text-amber-600 font-medium tabular-nums">&minus;{{ formatCurrency(taxEstimate.substituteTax) }}</span>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="flex justify-between text-xs">
-                    <span class="text-sage-500">IRPEF</span>
-                    <span class="text-amber-600 font-medium tabular-nums">&minus;{{ formatCurrency(taxEstimate.irpef) }}</span>
-                  </div>
-                  <div class="flex justify-between text-xs">
-                    <span class="text-sage-500">Addizionali</span>
-                    <span class="text-amber-600 font-medium tabular-nums">&minus;{{ formatCurrency(taxEstimate.addizionaleRegionale + taxEstimate.addizionaleComunale) }}</span>
-                  </div>
-                </template>
-              </div>
-
-              <!-- Net result gradient box -->
-              <div class="mt-3 rounded-xl px-4 py-3" style="background: linear-gradient(135deg, #065f46, #059669)">
-                <p class="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">Netto stimato</p>
-                <p class="text-xl font-bold text-white tracking-tight tabular-nums">{{ formatCurrency(taxEstimate.netIncome) }}</p>
-              </div>
-
-              <!-- Tax rate toggle (forfettario only) -->
-              <div v-if="isForfettario" class="flex items-center gap-1.5 mt-3 pt-3 border-t border-sage-100/50">
-                <span class="text-[10px] text-sage-400 mr-1">Aliquota</span>
-                <button
-                  type="button"
-                  class="text-[10px] px-2.5 py-1 rounded-lg transition-all cursor-pointer font-bold"
-                  :class="firstFiveYears ? 'bg-sage-700 text-white' : 'bg-sage-50 text-sage-400 hover:text-sage-600'"
-                  @click="firstFiveYears = true"
-                >5%</button>
-                <button
-                  type="button"
-                  class="text-[10px] px-2.5 py-1 rounded-lg transition-all cursor-pointer font-bold"
-                  :class="!firstFiveYears ? 'bg-sage-700 text-white' : 'bg-sage-50 text-sage-400 hover:text-sage-600'"
-                  @click="firstFiveYears = false"
-                >15%</button>
-              </div>
+              <p class="mt-auto pt-4 text-2xs text-text-subtle">Stima indicativa: non sostituisce il parere del commercialista.</p>
             </template>
+            <p v-else class="text-sm text-text-muted">La stima appare con la prima fattura dell'anno.</p>
+          </AppCard>
 
-            <!-- Empty state -->
-            <div v-else class="flex-1 flex items-center justify-center">
-              <div class="text-center py-4">
-                <Euro class="w-8 h-8 text-sage-200 mx-auto mb-1.5" />
-                <p class="text-xs text-sage-400">Nessun compenso registrato</p>
-              </div>
+          <AppCard class="settle flex flex-col" :padded="false" style="--settle: 3">
+            <div class="px-5 pt-5 pb-3">
+              <h2 class="text-lg font-medium text-text">Da fare</h2>
+              <p class="text-sm text-text-subtle">Quello che aspetta te</p>
             </div>
-          </div>
+            <div v-if="nothingToDo" class="flex flex-1 flex-col items-center justify-center px-5 pb-8 pt-4 text-center">
+              <CircleCheck :size="28" :stroke-width="1.5" class="text-safe" aria-hidden="true" />
+              <p class="mt-2 text-base font-medium text-text">Tutto in ordine</p>
+              <p class="text-sm text-text-muted">Nessuna scadenza superata, nessuna bozza in sospeso.</p>
+            </div>
+            <ul v-else class="px-2 pb-2">
+              <li v-if="unbilled">
+                <RouterLink
+                  :to="{ path: '/invoices/monthly', query: { year: unbilled.year, month: unbilled.month } }"
+                  class="group flex items-center gap-3 rounded-control px-3 py-2.5 transition-colors hover:bg-surface-hover focus-ring"
+                >
+                  <span class="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent"><CalendarRange :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-base font-medium text-text">Fattura le sedute di {{ ITALIAN_MONTHS[unbilled.month - 1] }}</span>
+                    <span class="block text-sm text-text-muted">{{ plural(unbilled.sessions, 'seduta svolta', 'sedute svolte') }} · {{ formatCurrency(unbilled.amount) }}</span>
+                  </span>
+                  <ArrowRight :size="15" class="text-text-subtle transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </RouterLink>
+              </li>
+              <li v-if="attention.overdue.count > 0">
+                <RouterLink
+                  :to="{ path: '/invoices', query: { status: 'overdue', year: selectedYear } }"
+                  class="group flex items-center gap-3 rounded-control px-3 py-2.5 transition-colors hover:bg-surface-hover focus-ring"
+                >
+                  <span class="grid size-8 shrink-0 place-items-center rounded-full bg-danger-soft text-danger"><TriangleAlert :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-base font-medium text-text">{{ plural(attention.overdue.count, 'fattura scaduta', 'fatture scadute') }}</span>
+                    <span class="block text-sm text-text-muted">{{ formatCurrency(attention.overdue.amount) }} da sollecitare</span>
+                  </span>
+                  <ArrowRight :size="15" class="text-text-subtle transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </RouterLink>
+              </li>
+              <li v-if="attention.drafts.count > 0">
+                <RouterLink
+                  :to="{ path: '/invoices', query: { status: 'draft', year: selectedYear } }"
+                  class="group flex items-center gap-3 rounded-control px-3 py-2.5 transition-colors hover:bg-surface-hover focus-ring"
+                >
+                  <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-text-muted"><FilePen :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-base font-medium text-text">{{ plural(attention.drafts.count, 'bozza da emettere', 'bozze da emettere') }}</span>
+                    <span class="block text-sm text-text-muted">{{ formatCurrency(attention.drafts.amount) }} in totale</span>
+                  </span>
+                  <ArrowRight :size="15" class="text-text-subtle transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </RouterLink>
+              </li>
+              <li v-if="attention.awaiting.count > 0">
+                <RouterLink
+                  :to="{ path: '/invoices', query: { status: 'issued', year: selectedYear } }"
+                  class="group flex items-center gap-3 rounded-control px-3 py-2.5 transition-colors hover:bg-surface-hover focus-ring"
+                >
+                  <span class="grid size-8 shrink-0 place-items-center rounded-full bg-warn-soft text-warn"><Hourglass :size="16" :stroke-width="1.75" aria-hidden="true" /></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-base font-medium text-text">{{ plural(attention.awaiting.count, 'fattura in attesa', 'fatture in attesa') }}</span>
+                    <span class="block text-sm text-text-muted">{{ formatCurrency(attention.awaiting.amount) }} non ancora scadute</span>
+                  </span>
+                  <ArrowRight :size="15" class="text-text-subtle transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </RouterLink>
+              </li>
+            </ul>
+          </AppCard>
         </div>
 
-        <!-- ── Recent invoices ─────────────────────────────────────────── -->
-        <div class="glass-card rounded-2xl shadow-sm animate-in-d3 overflow-hidden">
-          <div class="px-6 py-4 flex items-center justify-between border-b border-sage-100/50">
+        <!-- ── Recent invoices ─────────────────────────────────────────────── -->
+        <AppCard class="settle" :padded="false" style="--settle: 4">
+          <div class="flex items-center justify-between px-5 pt-5 pb-3">
             <div>
-              <h2 class="text-sm font-semibold text-sage-800">Fatture recenti</h2>
-              <p class="text-xs text-sage-400 mt-0.5">Ultime attività dell'anno</p>
+              <h2 class="text-lg font-medium text-text">Fatture recenti</h2>
+              <p class="text-sm text-text-subtle">Le ultime emesse nel {{ selectedYear }}</p>
             </div>
-            <button
-              type="button"
-              class="group flex items-center gap-1 text-xs font-semibold text-sage-500 hover:text-sage-800 transition-colors cursor-pointer"
-              @click="router.push('/invoices')"
-            >
-              Vedi tutte
-              <ArrowRight class="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-            </button>
+            <AppButton variant="ghost" size="sm" :icon-right="ArrowRight" to="/invoices">Tutte le fatture</AppButton>
           </div>
 
-          <div v-if="data.recent_invoices.length === 0" class="px-6 py-12 text-center">
-            <div class="w-12 h-12 rounded-2xl bg-sage-50 flex items-center justify-center mx-auto mb-3">
-              <FileText class="w-6 h-6 text-sage-200" />
-            </div>
-            <p class="text-sm font-semibold text-sage-500">Nessuna fattura</p>
-            <p class="text-xs text-sage-400 mt-1">Non ci sono fatture per il {{ selectedYear }}.</p>
-          </div>
+          <EmptyState
+            v-if="data.recent_invoices.length === 0"
+            :icon="FileText"
+            :bordered="false"
+            :title="`Nessuna fattura nel ${selectedYear}`"
+            description="Le fatture che emetti compariranno qui."
+          >
+            <AppButton variant="primary" to="/invoices/new">Nuova fattura</AppButton>
+          </EmptyState>
 
-          <table v-else class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-sage-100/60 bg-sage-50/30">
-                <th class="px-5 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Numero</th>
-                <th class="px-5 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Cliente</th>
-                <th class="px-5 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Data</th>
-                <th class="px-5 py-3 text-right text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Totale</th>
-                <th class="px-5 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Stato</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-sage-50">
-              <tr
-                v-for="(invoice, idx) in data.recent_invoices"
-                :key="invoice.id"
-                :style="{ '--i': Math.min(idx, 8) }"
-                class="invoice-row hover:bg-sage-50/60 cursor-pointer transition-colors duration-150"
+          <ul v-else class="border-t border-border">
+            <li v-for="invoice in data.recent_invoices" :key="invoice.id" class="border-b border-border last:border-b-0">
+              <button
+                type="button"
+                class="grid h-row w-full grid-cols-[1.25rem_5.5rem_1fr_4.5rem_7rem_6.5rem] items-center gap-4 px-5 text-left transition-colors hover:bg-surface-hover focus-ring last:rounded-b-card"
                 @click="router.push(`/invoices/${invoice.id}`)"
               >
-                <td class="px-5 py-3.5">
-                  <span class="font-mono text-xs font-semibold text-sage-700 bg-sage-50 border border-sage-100 px-2 py-1 rounded-lg">
-                    {{ invoice.invoice_number }}
-                  </span>
-                </td>
-                <td class="px-5 py-3.5">
-                  <div class="flex items-center gap-2.5">
-                    <div
-                      class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white text-[10px] font-bold shadow-sm"
-                      :style="{ background: clientAvatarGradient(invoice.id) }"
-                    >
-                      {{ clientInitials(invoice.client_name) }}
-                    </div>
-                    <span class="text-sm text-sage-700 font-medium truncate max-w-[160px]">{{ invoice.client_name }}</span>
-                  </div>
-                </td>
-                <td class="px-5 py-3.5 text-xs text-sage-400">{{ formatDate(invoice.issue_date) }}</td>
-                <td class="px-5 py-3.5 text-right font-semibold text-sage-800 tabular-nums">{{ formatCurrency(invoice.total_due) }}</td>
-                <td class="px-5 py-3.5">
-                  <StatusBadge :status="invoice.status" type="invoice" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-      </template>
-
-      <!-- ── No data ─────────────────────────────────────────────────────── -->
-      <div v-else class="flex items-center justify-center h-64">
-        <div class="text-center">
-          <p class="text-sm text-sage-400">Nessun dato disponibile.</p>
-          <button
-            type="button"
-            class="mt-3 text-sm font-medium text-sage-600 hover:text-sage-800 transition-colors cursor-pointer"
-            @click="loadDashboard"
-          >
-            Ricarica
-          </button>
-        </div>
+                <InvoiceSeal :status="invoice.status" :issue-date="invoice.issue_date" :due-date="invoice.due_date" :size="18" />
+                <span class="tabular text-sm text-text-muted">N. {{ invoice.invoice_number }}</span>
+                <span class="flex min-w-0 items-center gap-2.5">
+                  <PatientMonogram :name="invoice.client_name" size="sm" />
+                  <span class="truncate text-base text-text">{{ invoice.client_name }}</span>
+                </span>
+                <span class="text-sm text-text-subtle">{{ formatDateShort(invoice.issue_date) }}</span>
+                <span class="tabular text-right text-base font-medium text-text">{{ formatCurrency(invoice.total_due) }}</span>
+                <span class="flex justify-end"><StatusBadge type="invoice" :status="invoice.status" /></span>
+              </button>
+            </li>
+          </ul>
+        </AppCard>
       </div>
-
     </div>
   </div>
 </template>
-
-<style scoped>
-.invoice-row {
-  animation: row-in 0.3s ease both;
-  animation-delay: calc(var(--i, 0) * 30ms);
-}
-
-@keyframes row-in {
-  from { opacity: 0; transform: translateX(-5px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .invoice-row { animation: none; }
-}
-</style>

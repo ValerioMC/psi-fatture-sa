@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ArrowLeft, Printer } from 'lucide-vue-next'
 import { invoke } from '@tauri-apps/api/core'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppSpinner from '@/components/ui/AppSpinner.vue'
 import { getInvoice, getClient, getConfig } from '@/api'
 import type { Invoice, Client, ProfessionalConfig } from '@/types'
 import { formatCurrency, formatDateLong } from '@/utils/format'
 import { useSmoothScroll } from '@/composables/useSmoothScroll'
 
 const route = useRoute()
-const router = useRouter()
 useSmoothScroll()
 const invoiceId = Number(route.params.id)
 
@@ -93,43 +94,30 @@ async function handlePrint(): Promise<void> {
   <div class="print-root">
 
     <!-- ── Toolbar (screen only) ── -->
-    <div class="print:hidden fixed top-5 right-5 z-50 flex items-center gap-2">
-      <button
-        type="button"
-        class="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-slate-200 text-slate-600 hover:text-slate-900 px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-all"
-        @click="router.push(`/invoices/${invoiceId}`)"
-      >
-        <ArrowLeft class="w-4 h-4" />
-        Indietro
-      </button>
-      <button
-        v-if="!loading && invoice"
-        type="button"
-        class="group relative overflow-hidden flex items-center gap-2 text-white font-semibold px-4 py-2 rounded-xl text-sm shadow-sm transition-all"
-        style="background: linear-gradient(135deg, #1e1b4b, #1a3d63); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
-        @click="handlePrint"
-      >
-        <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-        <Printer class="w-4 h-4 relative z-10" />
-        <span class="relative z-10">Stampa PDF</span>
-      </button>
+    <div class="glass print:hidden fixed inset-x-0 top-0 z-(--z-sticky) border-b border-border/70" data-tauri-drag-region>
+      <div class="toolbar-inner mx-auto flex max-w-[794px] items-center gap-2 py-3" data-tauri-drag-region>
+        <AppButton variant="ghost" :icon="ArrowLeft" :to="`/invoices/${invoiceId}`">Fattura</AppButton>
+        <p class="flex-1 text-center text-sm text-text-subtle" data-tauri-drag-region>
+          Dalla finestra di stampa scegli <span class="font-medium text-text-muted">Salva come PDF</span> per inviarla.
+        </p>
+        <AppButton v-if="!loading && invoice" variant="primary" :icon="Printer" @click="handlePrint">Stampa o salva PDF</AppButton>
+      </div>
     </div>
 
     <!-- ── Loading ── -->
-    <div v-if="loading" class="print:hidden flex items-center justify-center min-h-screen">
-      <div class="flex flex-col items-center gap-3">
-        <div class="w-8 h-8 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
-        <p class="text-sm text-sage-400">Caricamento fattura...</p>
-      </div>
+    <div v-if="loading" class="print:hidden flex min-h-[70vh] items-center justify-center text-text-subtle" role="status">
+      <AppSpinner :size="20" />
+      <span class="sr-only">Caricamento della fattura</span>
     </div>
 
     <!-- ── Error ── -->
     <div
       v-else-if="error"
-      class="print:hidden max-w-md mx-auto mt-24 bg-red-50 border border-red-200 rounded-xl p-6 text-center"
+      class="print:hidden mx-auto mt-24 max-w-md rounded-card border border-danger-line bg-danger-soft p-6 text-center"
+      role="alert"
     >
-      <p class="text-sm font-semibold text-red-700 mb-1">Errore nel caricamento</p>
-      <p class="text-xs text-red-500 font-mono break-all">{{ error }}</p>
+      <p class="text-base font-medium text-danger">Non è stato possibile preparare la fattura</p>
+      <p class="mt-1 text-sm text-text-muted">{{ error }}</p>
     </div>
 
     <!-- ── Invoice document ── -->
@@ -356,8 +344,7 @@ async function handlePrint(): Promise<void> {
 /* ── Root: screen background ── */
 .print-root {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  padding-top: 60px;
+  padding-top: 92px;
   padding-bottom: 80px;
 }
 
@@ -367,11 +354,11 @@ async function handlePrint(): Promise<void> {
   margin: 0 auto;
   background: #ffffff;
   border-radius: 14px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.13), 0 4px 16px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-modal);
   overflow: hidden;
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   font-size: 9pt;
-  color: #0f172a;
+  color: #1d1b24;
   line-height: 1.55;
 }
 
@@ -395,10 +382,10 @@ async function handlePrint(): Promise<void> {
 .header-right { flex-shrink: 0; text-align: right; }
 
 .company-name {
-  font-family: Georgia, 'Times New Roman', 'Book Antiqua', serif;
+  font-family: var(--font-display);
   font-size: 19pt;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 600;
+  color: #1d1b24;
   letter-spacing: -0.5px;
   line-height: 1.15;
   margin-bottom: 4px;
@@ -406,7 +393,7 @@ async function handlePrint(): Promise<void> {
 
 .company-profession {
   font-size: 7.5pt;
-  color: #1e4976;
+  color: #34388f;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.4px;
@@ -415,16 +402,16 @@ async function handlePrint(): Promise<void> {
 
 .albo-info {
   font-size: 7.5pt;
-  color: #64748b;
+  color: #5c5866;
   margin-bottom: 2px;
   line-height: 1.45;
 }
-.albo-info strong { color: #1a3d63; font-weight: 600; }
+.albo-info strong { color: #2c2f80; font-weight: 600; }
 
 .company-details {
   margin-top: 8px;
   font-size: 7.5pt;
-  color: #64748b;
+  color: #5c5866;
   line-height: 1.7;
 }
 
@@ -434,15 +421,15 @@ async function handlePrint(): Promise<void> {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: #1e4976;
+  color: #34388f;
   margin-bottom: 4px;
 }
 
 .invoice-number {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 30pt;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 600;
+  color: #1d1b24;
   letter-spacing: -1px;
   line-height: 1;
   margin-bottom: 10px;
@@ -451,12 +438,12 @@ async function handlePrint(): Promise<void> {
 .invoice-prefix {
   font-size: 15pt;
   font-weight: 400;
-  color: #94a3b8;
+  color: #8a8694;
   margin-right: 2px;
 }
 
 .invoice-meta {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e6e2d9;
   padding-top: 8px;
 }
 
@@ -473,19 +460,19 @@ async function handlePrint(): Promise<void> {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #94a3b8;
+  color: #8a8694;
 }
 
 .meta-value {
   font-size: 8pt;
   font-weight: 600;
-  color: #0f172a;
+  color: #1d1b24;
 }
 
 /* ── Divider ── */
 .doc-divider {
   border: none;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e6e2d9;
   margin: 0 0 20px;
 }
 
@@ -495,7 +482,7 @@ async function handlePrint(): Promise<void> {
 .info-card {
   display: flex;
   margin-bottom: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e6e2d9;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -504,8 +491,8 @@ async function handlePrint(): Promise<void> {
 
 .info-col-left {
   flex: 0 0 48%;
-  background: #f8fafc;
-  border-right: 1px solid #e2e8f0;
+  background: #faf8f4;
+  border-right: 1px solid #e6e2d9;
 }
 
 .info-col-right { flex: 1; background: #ffffff; }
@@ -514,16 +501,16 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #1e4976;
+  color: #34388f;
   font-weight: 700;
   margin-bottom: 8px;
 }
 
 .client-name {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 13pt;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 600;
+  color: #1d1b24;
   margin-bottom: 5px;
   letter-spacing: -0.2px;
   line-height: 1.2;
@@ -531,7 +518,7 @@ async function handlePrint(): Promise<void> {
 
 .client-details {
   font-size: 7.5pt;
-  color: #64748b;
+  color: #5c5866;
   line-height: 1.65;
 }
 
@@ -539,20 +526,20 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #1e4976;
+  color: #34388f;
   text-transform: uppercase;
   margin-right: 3px;
 }
 
 .payment-tag {
   display: inline-block;
-  background: #e8f0fa;
-  border: 1px solid #b8cfe8;
+  background: #ecedf9;
+  border: 1px solid #c9cbee;
   border-radius: 4px;
   padding: 3px 10px;
   font-size: 8pt;
   font-weight: 600;
-  color: #1a3d63;
+  color: #2c2f80;
   margin-bottom: 9px;
 }
 
@@ -562,7 +549,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  color: #94a3b8;
+  color: #8a8694;
   font-weight: 600;
   display: block;
   margin-bottom: 1px;
@@ -571,14 +558,14 @@ async function handlePrint(): Promise<void> {
 .pay-value {
   font-size: 8pt;
   font-weight: 600;
-  color: #0f172a;
+  color: #1d1b24;
 }
 
 .iban-value {
-  font-family: 'Courier New', 'Courier', monospace;
+  font-family: var(--font-mono);
   font-size: 7.5pt;
   letter-spacing: 0.8px;
-  color: #0f172a;
+  color: #1d1b24;
   font-weight: 600;
   word-break: break-all;
 }
@@ -590,13 +577,13 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #1e4976;
+  color: #34388f;
   font-weight: 700;
   margin-bottom: 7px;
 }
 
 .items-table-wrap {
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e6e2d9;
   border-radius: 7px;
   overflow: hidden;
 }
@@ -607,8 +594,8 @@ async function handlePrint(): Promise<void> {
 }
 
 .items-table thead tr {
-  background: #f1f5f9;
-  border-bottom: 1.5px solid #e2e8f0;
+  background: #f2efe9;
+  border-bottom: 1.5px solid #e6e2d9;
 }
 
 .items-table thead th {
@@ -617,7 +604,7 @@ async function handlePrint(): Promise<void> {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #1a3d63;
+  color: #2c2f80;
   border: none;
 }
 
@@ -630,28 +617,28 @@ async function handlePrint(): Promise<void> {
   padding: 9px 12px;
   font-size: 8.5pt;
   border: none;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f2efe9;
   vertical-align: top;
 }
 .items-table tbody td:first-child { padding-left: 15px; }
 .items-table tbody td:last-child  { padding-right: 15px; }
 .items-table tbody tr:last-child td { border-bottom: none; }
-.tr-alt { background: #f8fafc; }
+.tr-alt { background: #faf8f4; }
 
-.td-desc      { font-weight: 500; color: #0f172a; }
+.td-desc      { font-weight: 500; color: #1d1b24; }
 .td-center    { text-align: center; }
 .td-right     { text-align: right; }
-.td-secondary { color: #64748b; font-size: 8pt; }
-.td-amount    { font-weight: 700; color: #0f172a; text-align: right; }
+.td-secondary { color: #5c5866; font-size: 8pt; }
+.td-amount    { font-weight: 700; color: #1d1b24; text-align: right; }
 
 .vat-exempt {
   display: inline-block;
-  background: #f1f5f9;
+  background: #f2efe9;
   border-radius: 3px;
   padding: 1px 5px;
   font-size: 7pt;
   font-weight: 600;
-  color: #1e4976;
+  color: #34388f;
 }
 
 /* ══════════════════════════════
@@ -665,7 +652,7 @@ async function handlePrint(): Promise<void> {
 
 .totals-table-wrap {
   width: 295px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e6e2d9;
   border-radius: 7px;
   overflow: hidden;
 }
@@ -679,22 +666,22 @@ async function handlePrint(): Promise<void> {
   padding: 7px 16px;
   font-size: 8.5pt;
   border: none;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f2efe9;
 }
 
-.totals-label { color: #64748b; font-weight: 400; }
-.totals-value { text-align: right; font-weight: 600; color: #0f172a; }
+.totals-label { color: #5c5866; font-weight: 400; }
+.totals-value { text-align: right; font-weight: 600; color: #1d1b24; }
 
-.totals-deduct .totals-label { color: #c53030; }
-.totals-deduct .totals-value { color: #c53030; }
+.totals-deduct .totals-label { color: #a83a2c; }
+.totals-deduct .totals-value { color: #a83a2c; }
 
-.totals-separator td { padding: 0; border-bottom: 2px solid #e2e8f0; }
+.totals-separator td { padding: 0; border-bottom: 2px solid #e6e2d9; }
 
-.totals-grand { background: #0f172a !important; }
+.totals-grand { background: #1d1b24 !important; }
 .totals-grand td { border-bottom: none !important; }
 .totals-grand-label {
   padding: 12px 16px !important;
-  color: #cbd5e1;
+  color: #d4cfc4;
   font-size: 8pt;
   font-weight: 600;
 }
@@ -702,9 +689,9 @@ async function handlePrint(): Promise<void> {
   padding: 12px 16px !important;
   text-align: right;
   color: #ffffff;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--font-display);
   font-size: 15pt;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.3px;
 }
 
@@ -751,14 +738,14 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #94a3b8;
+  color: #8a8694;
   font-weight: 700;
   margin-bottom: 7px;
 }
 
 .sts-box p {
   font-size: 7.5pt;
-  color: #334155;
+  color: #3d3a45;
   margin: 0;
   line-height: 1.65;
 }
@@ -771,14 +758,14 @@ async function handlePrint(): Promise<void> {
 
 .sts-selected {
   font-weight: 700;
-  color: #0f172a;
+  color: #1d1b24;
 }
 
 .sts-checkbox {
   display: inline-block;
   width: 11px;
   height: 11px;
-  border: 1.5px solid #94a3b8;
+  border: 1.5px solid #8a8694;
   margin-right: 4px;
   vertical-align: middle;
   border-radius: 2px;
@@ -786,13 +773,13 @@ async function handlePrint(): Promise<void> {
   line-height: 10px;
   font-size: 8pt;
   font-weight: 700;
-  color: #1a3d63;
+  color: #2c2f80;
 }
 
 /* Invoice notes */
 .user-notes-box {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: #faf8f4;
+  border: 1px solid #e6e2d9;
   border-radius: 6px;
   padding: 10px 15px;
   margin-bottom: 10px;
@@ -802,14 +789,14 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #1e4976;
+  color: #34388f;
   font-weight: 700;
   margin-bottom: 5px;
 }
 
 .user-notes-box p {
   font-size: 8pt;
-  color: #0f172a;
+  color: #1d1b24;
   margin: 0;
   line-height: 1.65;
 }
@@ -818,15 +805,15 @@ async function handlePrint(): Promise<void> {
 .bottom-bar {
   margin-top: 20px;
   padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e6e2d9;
   text-align: center;
   font-size: 7pt;
-  color: #94a3b8;
+  color: #8a8694;
   line-height: 1.7;
 }
 
-.bar-name { color: #1a3d63; font-weight: 600; }
-.bar-dot  { color: #cbd5e1; margin: 0 4px; }
+.bar-name { color: #2c2f80; font-weight: 600; }
+.bar-dot  { color: #d4cfc4; margin: 0 4px; }
 
 /* ══════════════════════════════
    PRINT MEDIA QUERY

@@ -1,121 +1,111 @@
 <script setup lang="ts">
-import { useRoute, RouterLink } from 'vue-router'
-import { useConfigStore } from '@/stores/config'
+/**
+ * The sidebar: brand, the two things you do most (find something, write an
+ * invoice), the five places, and who you are. Ordered by how often a
+ * psychologist goes there: the week's agenda comes right after the overview.
+ */
+import { computed } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
+import { CalendarDays, ClipboardList, FileText, LayoutGrid, Plus, Search, Settings, Users } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
-import {
-  LayoutDashboard,
-  Users,
-  Briefcase,
-  FileText,
-  Calendar,
-  Settings,
-  Plus,
-} from 'lucide-vue-next'
+import AppButton from '@/components/ui/AppButton.vue'
+import PatientMonogram from '@/components/ui/PatientMonogram.vue'
+import { useConfigStore } from '@/stores/config'
+import { TAX_REGIME_LABEL } from '@/utils/labels'
+import { shortcutLabel } from '@/utils/platform'
+
+defineEmits<{ openPalette: [] }>()
 
 const route = useRoute()
 const configStore = useConfigStore()
 
-const navItems = [
-  { to: '/dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
-  { to: '/clients',    label: 'Pazienti',     icon: Users },
-  { to: '/services',   label: 'Prestazioni',  icon: Briefcase },
-  { to: '/invoices',   label: 'Fatture',      icon: FileText },
-  { to: '/agenda',     label: 'Agenda',       icon: Calendar },
-]
+const NAV_ITEMS = [
+  { to: '/dashboard', label: 'Panoramica', icon: LayoutGrid },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+  { to: '/invoices', label: 'Fatture', icon: FileText },
+  { to: '/clients', label: 'Pazienti', icon: Users },
+  { to: '/services', label: 'Prestazioni', icon: ClipboardList },
+] as const
 
-const isActive = (path: string) =>
-  route.path === path || route.path.startsWith(path + '/')
+function isActive(path: string): boolean {
+  return route.path === path || route.path.startsWith(`${path}/`)
+}
+
+const profileName = computed(() => {
+  const config = configStore.config
+  return config ? `${config.first_name} ${config.last_name}`.trim() : 'Profilo'
+})
+
+const regimeLabel = computed(() => {
+  const regime = configStore.config?.tax_regime
+  return regime ? TAX_REGIME_LABEL[regime] : ''
+})
 </script>
 
 <template>
-  <aside
-    class="w-60 flex flex-col h-full shrink-0 glass-card"
-    style="border-right: 1px solid rgba(203,213,225,0.4); border-radius: 0;"
-  >
-    <!-- ── Logo ── -->
-    <div class="px-6 py-6 flex items-center gap-3">
-      <div
-        class="shrink-0 rounded-xl"
-        style="box-shadow: 0 4px 14px rgba(67, 56, 202, 0.35); line-height: 0;"
-      >
-        <BrandMark :size="36" />
-      </div>
-      <div>
-        <h1 class="text-base font-bold leading-none gradient-text heading-serif">PSI Fatture</h1>
-        <p v-if="configStore.fullName" class="text-[10px] text-sage-500 mt-1 font-medium tracking-wider uppercase truncate max-w-[7rem]">
-          {{ configStore.fullName }}
-        </p>
-      </div>
+  <aside class="sidebar flex h-full w-sidebar shrink-0 flex-col border-r border-border bg-surface">
+    <div class="sidebar-top flex items-center gap-2.5 px-5 pt-6 pb-5" data-tauri-drag-region>
+      <BrandMark :size="28" />
+      <span class="display text-[1.1875rem] leading-none text-text" data-tauri-drag-region>PSI Fatture</span>
     </div>
 
-    <!-- ── Divider ── -->
-    <div class="mx-5 h-px" style="background: linear-gradient(to right, transparent, rgba(99,102,241,0.15), transparent)" />
+    <div class="space-y-2 px-3">
+      <button
+        type="button"
+        class="flex h-control w-full items-center gap-2.5 rounded-control border border-border bg-surface-raised px-3 text-base text-text-subtle transition-colors hover:border-border-strong hover:text-text-muted focus-ring"
+        @click="$emit('openPalette')"
+      >
+        <Search :size="15" :stroke-width="1.8" aria-hidden="true" />
+        <span class="flex-1 text-left">Cerca o vai a…</span>
+        <kbd class="rounded-[5px] border border-border bg-surface-sunken px-1.5 font-sans text-2xs text-text-subtle">{{ shortcutLabel('K') }}</kbd>
+      </button>
+      <AppButton variant="primary" :icon="Plus" block to="/invoices/new">Nuova fattura</AppButton>
+    </div>
 
-    <!-- ── Navigation ── -->
-    <nav class="flex-1 px-3 py-4 space-y-0.5">
+    <nav class="mt-6 flex-1 space-y-0.5 px-3" aria-label="Sezioni">
       <RouterLink
-        v-for="item in navItems"
+        v-for="item in NAV_ITEMS"
         :key="item.to"
         :to="item.to"
-        class="group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none"
+        class="nav-item group relative flex h-9 items-center gap-3 rounded-control border px-3 text-base transition-[background-color,color,border-color] duration-150 focus-ring"
         :class="isActive(item.to)
-          ? 'bg-white/75 text-sage-800 shadow-sm'
-          : 'text-sage-600 hover:bg-white/45 hover:text-sage-800'"
+          ? 'border-border bg-surface-raised font-medium text-text shadow-[0_1px_2px_rgb(40_34_20/0.05)]'
+          : 'border-transparent text-text-muted hover:bg-surface-hover hover:text-text'"
+        :aria-current="isActive(item.to) ? 'page' : undefined"
       >
-        <component
-          :is="item.icon"
-          class="w-4 h-4 shrink-0 transition-colors duration-200"
-          :class="isActive(item.to) ? 'text-sage-600' : 'text-sage-400 group-hover:text-sage-600'"
-        />
-        <span class="flex-1">{{ item.label }}</span>
-        <!-- active indicator -->
+        <!-- A placed marker, not a border: a short capsule of ink light in the gutter. -->
         <span
           v-if="isActive(item.to)"
-          class="w-1.5 h-4 rounded-full shrink-0"
-          style="background: linear-gradient(to bottom, #1e1b4b, #4338ca)"
+          class="absolute -left-2 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-accent shadow-glow"
+          aria-hidden="true"
         />
+        <component
+          :is="item.icon"
+          :size="17"
+          :stroke-width="1.75"
+          class="shrink-0 transition-colors"
+          :class="isActive(item.to) ? 'text-accent' : 'text-text-subtle group-hover:text-text-muted'"
+          aria-hidden="true"
+        />
+        {{ item.label }}
       </RouterLink>
     </nav>
 
-    <!-- ── Footer ── -->
-    <div class="px-3 pb-5 space-y-2.5">
-      <!-- CTA Nuova Fattura -->
-      <RouterLink
-        to="/invoices/new"
-        class="group w-full text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 focus:outline-none relative overflow-hidden"
-        style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
-      >
-        <!-- Shine effect -->
-        <div
-          class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"
-          aria-hidden="true"
-        />
-        <Plus class="w-4 h-4 relative z-10" />
-        <span class="text-sm relative z-10">Nuova Fattura</span>
-      </RouterLink>
-
-      <!-- Divider -->
-      <div class="h-px mx-1" style="background: rgba(99,102,241,0.12)" />
-
-      <!-- Settings -->
+    <div class="border-t border-border p-3">
       <RouterLink
         to="/settings"
-        class="group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus:outline-none"
-        :class="isActive('/settings')
-          ? 'bg-white/75 text-sage-800 shadow-sm'
-          : 'text-sage-500 hover:bg-white/45 hover:text-sage-700'"
+        class="group flex items-center gap-3 rounded-control px-2 py-2 transition-colors hover:bg-surface-hover focus-ring"
+        :class="isActive('/settings') ? 'bg-surface-hover' : ''"
+        :aria-current="isActive('/settings') ? 'page' : undefined"
       >
-        <Settings
-          class="w-4 h-4 shrink-0 transition-colors"
-          :class="isActive('/settings') ? 'text-sage-600' : 'text-sage-400 group-hover:text-sage-600'"
-        />
-        <span class="flex-1">Impostazioni</span>
-        <span
-          v-if="isActive('/settings')"
-          class="w-1.5 h-4 rounded-full shrink-0"
-          style="background: linear-gradient(to bottom, #1e1b4b, #4338ca)"
-        />
+        <PatientMonogram :name="`${configStore.config?.first_name ?? ''} ${configStore.config?.last_name ?? ''}`" size="md" />
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-base font-medium text-text">{{ profileName }}</span>
+          <span class="block truncate text-xs text-text-subtle">{{ regimeLabel }}</span>
+        </span>
+        <Settings :size="16" :stroke-width="1.75" class="shrink-0 text-text-subtle transition-transform duration-300 group-hover:rotate-45 group-hover:text-text-muted" aria-label="Impostazioni" />
       </RouterLink>
     </div>
   </aside>
 </template>
+

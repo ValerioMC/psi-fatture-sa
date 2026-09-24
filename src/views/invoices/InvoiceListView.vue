@@ -1,463 +1,345 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { Plus, Search, Eye, Pencil, Trash2, FileText, CalendarRange, CheckSquare, X, TrendingUp, Euro, Clock } from 'lucide-vue-next'
+/**
+ * All invoices of a year. The year is loaded once; status and search filter
+ * locally, so the status tabs can show their counts and typing never waits
+ * on the database. Filters live in the URL, so the dashboard can link here
+ * already filtered ("3 fatture scadute" → ?status=overdue).
+ */
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { CalendarRange, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/stores/invoices'
+import { useToastStore } from '@/stores/toast'
 import type { Invoice, InvoiceStatus } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppCard from '@/components/ui/AppCard.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
-import ConfirmModal from '@/components/ui/ConfirmModal.vue'
-import { formatCurrency, formatDate } from '@/utils/format'
+import InvoiceSeal from '@/components/ui/InvoiceSeal.vue'
+import PatientMonogram from '@/components/ui/PatientMonogram.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import type { SegmentOption } from '@/components/ui/types'
+import { formatCurrency, formatDate, todayIso } from '@/utils/format'
+import { INVOICE_STATUS, INVOICE_STATUS_ORDER, isInvoiceStatus, plural } from '@/utils/labels'
 
+type StatusFilter = InvoiceStatus | 'all'
+
+const route = useRoute()
 const router = useRouter()
 const invoicesStore = useInvoicesStore()
+const toast = useToastStore()
 const currentYear = new Date().getFullYear()
-const invoiceToDelete = ref<Invoice | null>(null)
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'Tutti gli stati' },
-  { value: 'draft', label: 'Bozza' },
-  { value: 'issued', label: 'Emessa' },
-  { value: 'paid', label: 'Pagata' },
-  { value: 'overdue', label: 'Scaduta' },
-  { value: 'cancelled', label: 'Annullata' },
-]
+function queryYear(): number | 0 {
+  const raw = Number(route.query.year)
+  return Number.isInteger(raw) && raw >= 0 ? raw : currentYear
+}
+function queryStatus(): StatusFilter {
+  const raw = String(route.query.status ?? '')
+  return isInvoiceStatus(raw) ? raw : 'all'
+}
 
-const TARGET_STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
-  { value: 'draft', label: 'Bozza' },
-  { value: 'issued', label: 'Emessa' },
-  { value: 'paid', label: 'Pagata' },
-  { value: 'overdue', label: 'Scaduta' },
-  { value: 'cancelled', label: 'Annullata' },
-]
+/** 0 means every year. */
+const year = ref<number>(queryYear())
+const status = ref<StatusFilter>(queryStatus())
+const search = ref(String(route.query.q ?? ''))
 
-const YEAR_OPTIONS = [
-  { value: null, label: 'Tutti gli anni' },
+watch([year, status], () => {
+  void router.replace({
+    query: {
+      ...(year.value !== currentYear ? { year: year.value } : {}),
+      ...(status.value !== 'all' ? { status: status.value } : {}),
+    },
+  })
+})
+
+const YEAR_OPTIONS: SegmentOption<number>[] = [
   { value: currentYear, label: String(currentYear) },
   { value: currentYear - 1, label: String(currentYear - 1) },
   { value: currentYear - 2, label: String(currentYear - 2) },
+  { value: 0, label: 'Tutti gli anni' },
 ]
 
-const filters = reactive<{ year: number | null; status: string; search: string }>({ year: currentYear, status: '', search: '' })
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
+function normalise(text: string): string {
+  return text.toLocaleLowerCase('it-IT').normalize('NFD').replace(/\p{Diacritic}/gu, '')
+}
 
-// ─── Financial summary ────────────────────────────────────────────────────────
-
-const financialSummary = computed(() => {
-  const invoices = invoicesStore.invoices
-  const total    = invoices.reduce((s, i) => s + i.total_due, 0)
-  const paid     = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.total_due, 0)
-  const pending  = invoices.filter(i => i.status === 'issued' || i.status === 'overdue').reduce((s, i) => s + i.total_due, 0)
-  return { count: invoices.length, total, paid, pending }
+const searched = computed(() => {
+  const needle = normalise(search.value.trim())
+  if (needle === '') return invoicesStore.invoices
+  return invoicesStore.invoices.filter((invoice) =>
+    normalise(`${invoice.invoice_number} ${invoice.client_name}`).includes(needle),
+  )
 })
 
-// ─── Selection state ──────────────────────────────────────────────────────────
+const statusOptions = computed<SegmentOption<StatusFilter>[]>(() => [
+  { value: 'all', label: 'Tutte', count: searched.value.length },
+  ...INVOICE_STATUS_ORDER.map((value) => ({
+    value,
+    label: INVOICE_STATUS[value].label,
+    count: searched.value.filter((invoice) => invoice.status === value).length,
+  })),
+])
 
-const selectedIds    = ref<Set<number>>(new Set())
-const bulkTargetStatus = ref<InvoiceStatus>('paid')
-const bulkUpdating   = ref(false)
-const showBulkConfirm = ref(false)
-const bulkError      = ref<string | null>(null)
-
-const selectedCount = computed(() => selectedIds.value.size)
-const allSelected   = computed(
-  () => invoicesStore.invoices.length > 0 && selectedIds.value.size === invoicesStore.invoices.length,
+const visible = computed(() =>
+  status.value === 'all' ? searched.value : searched.value.filter((invoice) => invoice.status === status.value),
 )
 
-function toggleSelectAll() {
-  if (allSelected.value) {
-    selectedIds.value = new Set()
-  } else {
-    selectedIds.value = new Set(invoicesStore.invoices.map(i => i.id))
+const summary = computed(() => {
+  const live = visible.value.filter((invoice) => invoice.status !== 'cancelled')
+  const sum = (list: Invoice[]): number => list.reduce((total, invoice) => total + invoice.total_due, 0)
+  return {
+    count: visible.value.length,
+    total: sum(live),
+    paid: sum(live.filter((invoice) => invoice.status === 'paid')),
+    pending: sum(live.filter((invoice) => invoice.status === 'issued' || invoice.status === 'overdue')),
   }
+})
+
+async function load(): Promise<void> {
+  selected.value = new Set()
+  await invoicesStore.fetchInvoices({ year: year.value === 0 ? undefined : year.value })
+  if (invoicesStore.error) toast.notifyError(invoicesStore.error, 'Caricamento non riuscito')
 }
 
-function toggleSelect(id: number) {
-  const next = new Set(selectedIds.value)
-  next.has(id) ? next.delete(id) : next.add(id)
-  selectedIds.value = next
+watch(year, load)
+onMounted(load)
+
+// ─── Selection and bulk status ──────────────────────────────────────────────
+
+const selected = ref<Set<number>>(new Set())
+const bulkTarget = ref<InvoiceStatus>('paid')
+const bulkConfirmOpen = ref(false)
+const bulkRunning = ref(false)
+
+const allVisibleSelected = computed(
+  () => visible.value.length > 0 && visible.value.every((invoice) => selected.value.has(invoice.id)),
+)
+const someVisibleSelected = computed(
+  () => !allVisibleSelected.value && visible.value.some((invoice) => selected.value.has(invoice.id)),
+)
+const selectedInvoices = computed(() => invoicesStore.invoices.filter((invoice) => selected.value.has(invoice.id)))
+
+function toggleAll(): void {
+  selected.value = allVisibleSelected.value ? new Set() : new Set(visible.value.map((invoice) => invoice.id))
 }
 
-function clearSelection() {
-  selectedIds.value = new Set()
-  bulkError.value = null
+function toggle(id: number): void {
+  const next = new Set(selected.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selected.value = next
 }
 
-function requestBulkUpdate() { showBulkConfirm.value = true }
+const BULK_OPTIONS: SegmentOption<InvoiceStatus>[] = (['issued', 'paid', 'overdue', 'cancelled'] as const).map((value) => ({
+  value,
+  label: INVOICE_STATUS[value].label,
+  tone: INVOICE_STATUS[value].tone,
+}))
 
-async function executeBulkUpdate() {
-  showBulkConfirm.value = false
-  bulkUpdating.value = true
-  bulkError.value = null
+const bulkBlastRadius = computed(() => {
+  const count = selectedInvoices.value.length
+  const amount = selectedInvoices.value.reduce((total, invoice) => total + invoice.total_due, 0)
+  const target = INVOICE_STATUS[bulkTarget.value].label.toLocaleLowerCase('it-IT')
+  const paidNote = bulkTarget.value === 'paid' ? ', con data di pagamento oggi' : ''
+  return `${plural(count, 'fattura', 'fatture')} per ${formatCurrency(amount)} ${count === 1 ? 'passerà' : 'passeranno'} a “${target}”${paidNote}.`
+})
+
+async function runBulk(): Promise<void> {
+  bulkRunning.value = true
+  const ids = [...selected.value]
   try {
-    const ids = [...selectedIds.value]
-    const paidDate = bulkTargetStatus.value === 'paid' ? new Date().toISOString().slice(0, 10) : undefined
-    await invoicesStore.bulkUpdateStatus(ids, bulkTargetStatus.value, paidDate)
-    clearSelection()
-  } catch (e) {
-    bulkError.value = `Aggiornamento non riuscito: ${String(e)}`
+    await invoicesStore.bulkUpdateStatus(ids, bulkTarget.value, bulkTarget.value === 'paid' ? todayIso() : undefined)
+    toast.notify(`${plural(ids.length, 'fattura aggiornata', 'fatture aggiornate')}`)
+    selected.value = new Set()
+    bulkConfirmOpen.value = false
+  } catch (error) {
+    toast.notifyError(error, 'Aggiornamento non riuscito')
   } finally {
-    bulkUpdating.value = false
+    bulkRunning.value = false
   }
 }
 
-function bulkConfirmMessage(): string {
-  const label = TARGET_STATUS_OPTIONS.find(o => o.value === bulkTargetStatus.value)?.label ?? bulkTargetStatus.value
-  return `Cambiare lo stato di ${selectedCount.value} fattura/e in "${label}"?`
-}
+// ─── Delete ─────────────────────────────────────────────────────────────────
 
-// ─── Data loading ─────────────────────────────────────────────────────────────
+const toDelete = ref<Invoice | null>(null)
+const deleting = ref(false)
 
-function loadInvoices() {
-  clearSelection()
-  invoicesStore.fetchInvoices({
-    year:   filters.year ?? undefined,
-    status: filters.status || undefined,
-    search: filters.search || undefined,
-  })
-}
-
-function onSearchInput() {
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(loadInvoices, 300)
-}
-
-function clearSearch() {
-  filters.search = ''
-  loadInvoices()
-}
-
-watch(() => [filters.year, filters.status], loadInvoices)
-onMounted(loadInvoices)
-
-function confirmDelete(invoice: Invoice) { invoiceToDelete.value = invoice }
-
-async function handleDelete() {
-  if (!invoiceToDelete.value) return
+async function confirmDelete(): Promise<void> {
+  const invoice = toDelete.value
+  if (invoice === null) return
+  deleting.value = true
   try {
-    await invoicesStore.removeInvoice(invoiceToDelete.value.id)
-  } catch (e) {
-    bulkError.value = `Eliminazione non riuscita: ${String(e)}`
+    await invoicesStore.removeInvoice(invoice.id)
+    toast.notify(`Fattura N. ${invoice.invoice_number} eliminata`)
+    toDelete.value = null
+  } catch (error) {
+    toast.notifyError(error, 'Eliminazione non riuscita')
   } finally {
-    invoiceToDelete.value = null
+    deleting.value = false
   }
 }
 
-function rowDelay(idx: number): number {
-  return Math.min(idx, 12)
+function clearFilters(): void {
+  search.value = ''
+  status.value = 'all'
 }
 </script>
 
 <template>
-  <div class="p-8">
-    <div class="max-w-5xl mx-auto">
-      <PageHeader title="Fatture" subtitle="Gestisci tutte le tue fatture">
-        <button
-          type="button"
-          class="flex items-center gap-2 border border-sage-200 text-sage-600 hover:text-sage-800 hover:bg-sage-50 font-medium px-4 py-2 rounded-xl text-sm transition-all cursor-pointer"
-          @click="router.push('/invoices/monthly')"
-        >
-          <CalendarRange class="w-4 h-4" />
-          Genera mensili
-        </button>
-        <button
-          type="button"
-          class="group relative overflow-hidden text-white font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all duration-200 cursor-pointer focus:outline-none"
-          style="background: linear-gradient(135deg, #1e1b4b, #4338ca); box-shadow: 0 4px 20px rgba(67, 56, 202, 0.4);"
-          @click="router.push('/invoices/new')"
-        >
-          <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
-          <Plus class="w-4 h-4 relative z-10" />
-          <span class="relative z-10">Nuova Fattura</span>
-        </button>
-      </PageHeader>
+  <div>
+    <PageHeader title="Fatture">
+      <AppButton :icon="CalendarRange" to="/invoices/monthly">Fatturazione mensile</AppButton>
+      <AppButton variant="primary" :icon="Plus" to="/invoices/new">Nuova fattura</AppButton>
+    </PageHeader>
 
-      <!-- Financial summary strip -->
-      <div v-if="!invoicesStore.loading && invoicesStore.invoices.length > 0" class="grid grid-cols-3 gap-4 mb-5 animate-in">
-        <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #059669, #047857)">
-            <TrendingUp class="w-4 h-4 text-white" />
-          </div>
-          <div class="min-w-0">
-            <p class="text-[10px] text-sage-400 uppercase tracking-wider">{{ financialSummary.count }} fatture</p>
-            <p class="text-lg font-bold text-sage-900 leading-tight truncate">{{ formatCurrency(financialSummary.total) }}</p>
-          </div>
+    <div class="mx-auto max-w-[72rem] px-8 pt-6 pb-28">
+      <!-- Summary of what the filters show. -->
+      <dl class="settle mb-5 grid grid-cols-4 divide-x divide-border rounded-card border border-border bg-surface-raised">
+        <div class="px-5 py-4">
+          <dt class="label-quiet">Fatture</dt>
+          <dd class="mt-0.5 text-xl font-semibold text-text">{{ summary.count }}</dd>
         </div>
-        <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #4338ca)">
-            <Euro class="w-4 h-4 text-white" />
-          </div>
-          <div class="min-w-0">
-            <p class="text-[10px] text-sage-400 uppercase tracking-wider">Incassato</p>
-            <p class="text-lg font-bold text-sage-900 leading-tight truncate">{{ formatCurrency(financialSummary.paid) }}</p>
-          </div>
+        <div class="px-5 py-4">
+          <dt class="label-quiet">Totale</dt>
+          <dd class="mt-0.5 text-xl font-semibold text-text">{{ formatCurrency(summary.total) }}</dd>
         </div>
-        <div class="glass-card rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #d97706, #b45309)">
-            <Clock class="w-4 h-4 text-white" />
-          </div>
-          <div class="min-w-0">
-            <p class="text-[10px] text-sage-400 uppercase tracking-wider">In sospeso</p>
-            <p class="text-lg font-bold text-sage-900 leading-tight truncate">{{ formatCurrency(financialSummary.pending) }}</p>
-          </div>
+        <div class="px-5 py-4">
+          <dt class="label-quiet flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-safe" aria-hidden="true" />Incassato</dt>
+          <dd class="mt-0.5 text-xl font-semibold text-text">{{ formatCurrency(summary.paid) }}</dd>
         </div>
-      </div>
+        <div class="px-5 py-4">
+          <dt class="label-quiet flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-warn" aria-hidden="true" />In attesa</dt>
+          <dd class="mt-0.5 text-xl font-semibold text-text">{{ formatCurrency(summary.pending) }}</dd>
+        </div>
+      </dl>
 
-      <!-- Filters bar -->
-      <div class="glass-card rounded-2xl px-4 py-3 shadow-sm mb-4 flex items-center gap-3 animate-in">
-        <select
-          v-model="filters.year"
-          class="bg-white/70 border border-sage-200/70 rounded-xl px-3 py-2 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all cursor-pointer"
-        >
-          <option v-for="opt in YEAR_OPTIONS" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>
+      <!-- Filters: one row, above the list. -->
+      <div class="settle mb-3 flex flex-wrap items-center gap-3" style="--settle: 1">
+        <select v-model.number="year" class="field field-sm w-auto pr-8" aria-label="Anno">
+          <option v-for="option in YEAR_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
-
-        <select
-          v-model="filters.status"
-          class="bg-white/70 border border-sage-200/70 rounded-xl px-3 py-2 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all cursor-pointer"
-        >
-          <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
-
-        <div class="relative flex-1">
-          <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-sage-400 pointer-events-none" />
-          <input
-            v-model="filters.search"
-            type="text"
-            placeholder="Cerca per numero, cliente…"
-            class="w-full bg-white/70 border border-sage-200/70 rounded-xl pl-10 pr-9 py-2 text-sm text-sage-800 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-400/40 transition-all"
-            @input="onSearchInput"
-          />
-          <button
-            v-if="filters.search"
-            type="button"
-            class="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-sage-400 hover:text-sage-600 transition-colors cursor-pointer rounded"
-            @click="clearSearch"
-          >
-            <X class="w-3.5 h-3.5" />
-          </button>
+        <SegmentedControl v-model="status" :options="statusOptions" label="Stato" size="sm" />
+        <div class="relative ml-auto w-52">
+          <Search :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" aria-hidden="true" />
+          <input v-model="search" type="search" class="field field-sm pl-8" placeholder="Numero o paziente" aria-label="Cerca fatture" />
         </div>
-
-        <span class="text-xs text-sage-400 whitespace-nowrap shrink-0">
-          {{ invoicesStore.invoices.length }} {{ invoicesStore.invoices.length === 1 ? 'fattura' : 'fatture' }}
-        </span>
       </div>
 
-      <!-- Bulk action bar -->
-      <Transition
-        enter-active-class="transition-all duration-300 ease-out"
-        enter-from-class="opacity-0 -translate-y-2"
-        enter-to-class="opacity-100 translate-y-0"
-        leave-active-class="transition-all duration-200 ease-in"
-        leave-from-class="opacity-100 translate-y-0"
-        leave-to-class="opacity-0 -translate-y-2"
-      >
-        <div
-          v-if="selectedCount > 0"
-          class="glass-card rounded-2xl px-5 py-3 shadow-sm mb-4 flex items-center gap-4 border border-ocean-200/60 bg-ocean-50/30"
+      <AppCard :padded="false" class="settle overflow-hidden" style="--settle: 2">
+        <SkeletonRows v-if="invoicesStore.loading" variant="table" :count="8" label="Caricamento delle fatture" />
+
+        <EmptyState
+          v-else-if="visible.length === 0"
+          :icon="FileText"
+          :bordered="false"
+          :title="invoicesStore.invoices.length === 0 ? 'Nessuna fattura in questo periodo' : 'Nessuna fattura corrisponde ai filtri'"
+          :description="invoicesStore.invoices.length === 0 ? 'Crea la prima, oppure genera le fatture del mese dalle sedute svolte.' : undefined"
         >
-          <div class="flex items-center gap-2">
-            <CheckSquare class="w-4 h-4 text-ocean-600" />
-            <span class="text-sm font-semibold text-ocean-700">
-              {{ selectedCount }} selezionat{{ selectedCount === 1 ? 'a' : 'e' }}
-            </span>
-          </div>
-          <div class="h-5 w-px bg-ocean-200/60" />
-          <div class="flex items-center gap-2 flex-1">
-            <label class="text-sm text-sage-600 whitespace-nowrap">Cambia stato in:</label>
-            <select
-              v-model="bulkTargetStatus"
-              class="bg-white/80 border border-sage-200/70 rounded-xl px-3 py-1.5 text-sm text-sage-800 focus:outline-none focus:ring-2 focus:ring-ocean-400/40 transition-all cursor-pointer"
-            >
-              <option v-for="opt in TARGET_STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-            <button
-              type="button"
-              class="text-white font-medium px-4 py-1.5 rounded-xl text-sm transition-all duration-200 disabled:opacity-50 cursor-pointer"
-              style="background: linear-gradient(135deg, #1e1b4b, #4338ca);"
-              :disabled="bulkUpdating"
-              @click="requestBulkUpdate"
-            >
-              {{ bulkUpdating ? 'Aggiornamento…' : 'Applica' }}
-            </button>
-          </div>
-          <button
-            type="button"
-            class="p-1.5 text-sage-400 hover:text-sage-600 hover:bg-sage-100 rounded-lg transition-all cursor-pointer"
-            @click="clearSelection"
-          >
-            <X class="w-4 h-4" />
-          </button>
-        </div>
-      </Transition>
+          <AppButton v-if="invoicesStore.invoices.length > 0" @click="clearFilters">Azzera i filtri</AppButton>
+          <AppButton v-else variant="primary" :icon="Plus" to="/invoices/new">Nuova fattura</AppButton>
+        </EmptyState>
 
-      <!-- Bulk error -->
-      <div
-        v-if="bulkError"
-        class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center gap-2 mb-4"
-      >
-        <X class="w-4 h-4 shrink-0 text-red-400" />
-        {{ bulkError }}
-      </div>
-
-      <!-- Table card -->
-      <div class="glass-card rounded-2xl shadow-sm overflow-hidden animate-in-d1">
-        <!-- Loading -->
-        <div v-if="invoicesStore.loading" class="flex flex-col items-center justify-center py-16 gap-3">
-          <div class="w-8 h-8 rounded-full border-2 border-sage-200 border-t-sage-500 animate-spin" />
-          <p class="text-sm text-sage-400">Caricamento fatture…</p>
-        </div>
-
-        <!-- Empty state -->
-        <div
-          v-else-if="invoicesStore.invoices.length === 0"
-          class="flex flex-col items-center justify-center py-16 text-center px-6"
-        >
-          <div class="w-14 h-14 rounded-2xl bg-sage-50 flex items-center justify-center mb-3">
-            <FileText class="w-7 h-7 text-sage-300" />
-          </div>
-          <p class="text-sm font-semibold text-sage-600">Nessuna fattura trovata</p>
-          <p class="text-xs text-sage-400 mt-1">Modifica i filtri o crea una nuova fattura.</p>
-          <button
-            type="button"
-            class="mt-4 flex items-center gap-1.5 text-sm font-medium text-sage-600 hover:text-sage-800 transition-colors cursor-pointer"
-            @click="router.push('/invoices/new')"
-          >
-            <Plus class="w-4 h-4" />
-            Nuova fattura
-          </button>
-        </div>
-
-        <!-- Table -->
-        <table v-else class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-sage-100/60 bg-sage-50/30">
-              <th class="px-4 py-3 text-left w-10">
+        <table v-else class="w-full text-base">
+          <thead class="border-b border-border bg-surface text-left text-xs text-text-subtle">
+            <tr class="h-9">
+              <th class="w-12 pl-5 font-normal">
                 <input
                   type="checkbox"
-                  :checked="allSelected"
-                  class="w-4 h-4 rounded border-sage-300 text-ocean-600 cursor-pointer accent-ocean-600"
-                  @change="toggleSelectAll"
+                  :checked="allVisibleSelected"
+                  :indeterminate="someVisibleSelected"
+                  aria-label="Seleziona tutte le fatture visibili"
+                  @change="toggleAll"
                 />
               </th>
-              <th class="px-4 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Numero</th>
-              <th class="px-4 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Data</th>
-              <th class="px-4 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Cliente</th>
-              <th class="px-4 py-3 text-right text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Totale</th>
-              <th class="px-4 py-3 text-left text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Stato</th>
-              <th class="px-4 py-3 text-right text-[10px] font-semibold text-sage-400 uppercase tracking-wider">Azioni</th>
+              <th class="w-8 font-normal"><span class="sr-only">Stato</span></th>
+              <th class="w-24 font-medium">Numero</th>
+              <th class="font-medium">Paziente</th>
+              <th class="w-28 font-medium">Emessa</th>
+              <th class="w-32 pr-6 text-right font-medium">Importo</th>
+              <th class="w-28 font-medium">Stato</th>
+              <th class="w-24 pr-4"><span class="sr-only">Azioni</span></th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="(invoice, idx) in invoicesStore.invoices"
+              v-for="invoice in visible"
               :key="invoice.id"
-              :style="{ '--i': rowDelay(idx) }"
-              class="invoice-row border-b border-sage-50/70 transition-all duration-150 cursor-pointer group"
-              :class="selectedIds.has(invoice.id) ? 'bg-ocean-50/40 hover:bg-ocean-50/60' : 'hover:bg-sage-50/50'"
+              class="group h-row cursor-pointer border-b border-border last:border-b-0 transition-colors"
+              :class="selected.has(invoice.id) ? 'bg-accent-soft' : 'hover:bg-surface-hover'"
               @click="router.push(`/invoices/${invoice.id}`)"
             >
-              <!-- Checkbox -->
-              <td class="px-4 py-3.5" @click.stop>
+              <td class="pl-5" @click.stop>
                 <input
                   type="checkbox"
-                  :checked="selectedIds.has(invoice.id)"
-                  class="w-4 h-4 rounded border-sage-300 text-ocean-600 cursor-pointer accent-ocean-600"
-                  @change="toggleSelect(invoice.id)"
+                  :checked="selected.has(invoice.id)"
+                  :aria-label="`Seleziona la fattura N. ${invoice.invoice_number}`"
+                  @change="toggle(invoice.id)"
                 />
               </td>
-
-              <!-- Number -->
-              <td class="px-4 py-3.5">
-                <span class="font-mono text-xs font-semibold text-sage-800 bg-sage-50 border border-sage-100 px-2 py-1 rounded-lg">
-                  {{ invoice.invoice_number }}
+              <td><InvoiceSeal :status="invoice.status" :issue-date="invoice.issue_date" :due-date="invoice.due_date" :size="18" /></td>
+              <td class="tabular text-text-muted">N. {{ invoice.invoice_number }}<span v-if="year === 0" class="text-text-subtle">/{{ invoice.year }}</span></td>
+              <td>
+                <span class="flex min-w-0 items-center gap-2.5">
+                  <PatientMonogram :name="invoice.client_name" size="sm" />
+                  <span class="truncate text-text">{{ invoice.client_name }}</span>
                 </span>
               </td>
-
-              <!-- Date -->
-              <td class="px-4 py-3.5 text-sage-500 text-xs">{{ formatDate(invoice.issue_date) }}</td>
-
-              <!-- Client -->
-              <td class="px-4 py-3.5">
-                <span class="font-medium text-sage-800 truncate">{{ invoice.client_name }}</span>
-              </td>
-
-              <!-- Total -->
-              <td class="px-4 py-3.5 text-right font-bold text-sage-900 tabular-nums">
-                {{ formatCurrency(invoice.total_due) }}
-              </td>
-
-              <!-- Status -->
-              <td class="px-4 py-3.5">
-                <StatusBadge :status="invoice.status" type="invoice" />
-              </td>
-
-              <!-- Actions: always visible, subtle -->
-              <td class="px-4 py-3.5" @click.stop>
-                <div class="flex items-center justify-end gap-1">
-                  <button
-                    type="button"
-                    class="p-1.5 text-sage-300 hover:text-ocean-600 hover:bg-ocean-50 rounded-lg transition-all duration-150 cursor-pointer"
-                    title="Visualizza"
-                    @click="router.push(`/invoices/${invoice.id}`)"
-                  >
-                    <Eye class="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    class="p-1.5 text-sage-300 hover:text-sage-600 hover:bg-sage-50 rounded-lg transition-all duration-150 cursor-pointer"
-                    title="Modifica"
-                    @click="router.push(`/invoices/${invoice.id}/edit`)"
-                  >
-                    <Pencil class="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    class="p-1.5 text-sage-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-150 cursor-pointer"
-                    title="Elimina"
-                    @click="confirmDelete(invoice)"
-                  >
-                    <Trash2 class="w-3.5 h-3.5" />
-                  </button>
+              <td class="tabular text-sm text-text-muted">{{ formatDate(invoice.issue_date) }}</td>
+              <td class="tabular pr-6 text-right font-medium text-text">{{ formatCurrency(invoice.total_due) }}</td>
+              <td><StatusBadge type="invoice" :status="invoice.status" /></td>
+              <td class="pr-4" @click.stop>
+                <div class="flex justify-end gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  <AppButton variant="ghost" size="sm" :icon="Pencil" :label="`Modifica la fattura N. ${invoice.invoice_number}`" :to="`/invoices/${invoice.id}/edit`" />
+                  <AppButton variant="danger-quiet" size="sm" :icon="Trash2" :label="`Elimina la fattura N. ${invoice.invoice_number}`" @click="toDelete = invoice" />
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
-      </div>
-
-      <ConfirmModal
-        :open="!!invoiceToDelete"
-        title="Elimina fattura"
-        :message="`Eliminare la fattura ${invoiceToDelete?.invoice_number}?`"
-        @confirm="handleDelete"
-        @cancel="invoiceToDelete = null"
-      />
-      <ConfirmModal
-        :open="showBulkConfirm"
-        title="Aggiornamento stato"
-        :message="bulkConfirmMessage()"
-        confirm-label="Conferma"
-        variant="primary"
-        @confirm="executeBulkUpdate"
-        @cancel="showBulkConfirm = false"
-      />
+      </AppCard>
     </div>
+
+    <!-- Bulk bar: floats above the list while something is selected. -->
+    <Teleport to="body">
+      <Transition name="rise">
+        <div
+          v-if="selected.size > 0"
+          class="fixed bottom-6 left-[calc(50%+7.5rem)] z-(--z-overlay) flex -translate-x-1/2 items-center gap-3 rounded-card border border-border bg-surface-raised py-2 pl-4 pr-2 shadow-modal"
+          role="region"
+          aria-label="Azioni sulle fatture selezionate"
+        >
+          <span class="whitespace-nowrap text-base font-medium text-text">{{ plural(selected.size, 'selezionata', 'selezionate') }}</span>
+          <span class="h-5 w-px bg-border" aria-hidden="true" />
+          <span class="whitespace-nowrap text-sm text-text-muted">Segna come</span>
+          <SegmentedControl v-model="bulkTarget" :options="BULK_OPTIONS" label="Nuovo stato" size="sm" />
+          <AppButton variant="primary" size="sm" @click="bulkConfirmOpen = true">Applica</AppButton>
+          <AppButton variant="ghost" size="sm" :icon="X" label="Annulla selezione" @click="selected = new Set()" />
+        </div>
+      </Transition>
+    </Teleport>
+
+    <ConfirmDialog
+      :open="bulkConfirmOpen"
+      title="Cambiare lo stato?"
+      :blast-radius="bulkBlastRadius"
+      confirm-label="Conferma"
+      tone="accent"
+      :loading="bulkRunning"
+      @confirm="runBulk"
+      @cancel="bulkConfirmOpen = false"
+    />
+    <ConfirmDialog
+      :open="toDelete !== null"
+      title="Eliminare la fattura?"
+      message="L'operazione non si può annullare."
+      :blast-radius="toDelete ? `La fattura N. ${toDelete.invoice_number}/${toDelete.year} di ${toDelete.client_name}, ${formatCurrency(toDelete.total_due)}, verrà eliminata definitivamente.` : undefined"
+      :loading="deleting"
+      @confirm="confirmDelete"
+      @cancel="toDelete = null"
+    />
   </div>
 </template>
-
-<style scoped>
-.invoice-row {
-  animation: row-in 0.28s ease both;
-  animation-delay: calc(var(--i, 0) * 30ms);
-}
-
-@keyframes row-in {
-  from { opacity: 0; transform: translateX(-5px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .invoice-row { animation: none; }
-}
-</style>
