@@ -174,6 +174,7 @@
   const tsTotal = (inv) => inv.total_gross
   const handlers = {
     get_config: () => (window.__MOCK_NO_CONFIG ? null : config),
+    get_ts_environments: () => (window.__MOCK_TS_TEST ? ['produzione', 'test'] : ['produzione']),
     get_ts_settings: () => tsSettings,
     update_ts_settings: ({ input }) => Object.assign(tsSettings, { ...input, username: input.username.trim().toUpperCase() }),
     get_ts_credentials_status: () => tsCreds,

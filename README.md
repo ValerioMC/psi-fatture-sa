@@ -240,7 +240,7 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   del Sistema TS mese per mese), il pannello nel dettaglio di ogni fattura (stato,
   scadenze, invio, sostituzione, annullamento, verifica online) e un segno a forma di
   tessera nella lista fatture.
-- **Credenziali**: in Impostazioni → *Sistema Tessera Sanitaria*: ambiente, codice
+- **Credenziali**: in Impostazioni → *Sistema Tessera Sanitaria*: codice
   fiscale di accesso, partita IVA, password e PINCODE. Una guida passo passo nella card
   spiega dove trovarli (sistemats.it → *Profilo utente → Stampa credenziali*); finché
   mancano, la pagina *Sistema TS* e il pannello della fattura lo segnalano con un
@@ -252,9 +252,15 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   frontend sa solo se ci sono. "Verifica credenziali"
   fa una chiamata reale.
 - **Ambienti**: *Produzione* (`invioSS730p.sanita.finanze.it`) e *Test Sogei*
-  (`invioSS730pTest…`, senza valore fiscale). In test si può compilare con un clic
-  l'utenza pubblica "Psicologo" del kit Sogei. Ogni trasmissione ricorda il proprio
-  ambiente.
+  (`invioSS730pTest…`, senza valore fiscale). Il test esiste solo nelle build per lo
+  sviluppatore: `npm run tauri dev` / `make dev` (build debug) oppure
+  `make build-sogei` (release con la feature Cargo `sogei-test`, da non distribuire).
+  Lì un riquadro tratteggiato in cima alla card permette di passare a *Test Sogei* e
+  compilare con un clic l'utenza pubblica "Psicologo" del kit. La build distribuita
+  (`make build`, CI di release) conosce solo la produzione: il backend rifiuta di
+  salvare l'ambiente di test, ignora un ambiente di test salvato in precedenza (torna
+  ai dati del profilo) e il gateway non chiama l'host di test. Ogni trasmissione
+  ricorda il proprio ambiente.
 - **Protocollo**: Basic auth con CF e password; PINCODE, CF del professionista e del
   paziente cifrati RSA PKCS#1 v1.5 con il certificato `SanitelCF`
   (`src-tauri/resources/sistema_ts/SanitelCF.pem`, **scade il 23/01/2027**: va

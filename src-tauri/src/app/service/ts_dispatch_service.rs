@@ -168,9 +168,9 @@ async fn settle(
             let reason = error.to_string();
             transition::release_for_retry(db, submission.id, &reason, now).await?;
             return Ok(match error {
-                TsGatewayError::Authentication | TsGatewayError::Network(_) => {
-                    Attempt::StopPass(reason)
-                }
+                TsGatewayError::Authentication
+                | TsGatewayError::Network(_)
+                | TsGatewayError::UnavailableEnvironment => Attempt::StopPass(reason),
                 _ => Attempt::Retrying,
             });
         }

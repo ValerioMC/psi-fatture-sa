@@ -85,6 +85,7 @@ pub fn run() {
             delete_ts_pincode,
             save_ts_password,
             delete_ts_password,
+            get_ts_environments,
             get_ts_settings,
             update_ts_settings,
             check_ts_connection,

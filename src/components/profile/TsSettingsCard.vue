@@ -1,17 +1,16 @@
 <script setup lang="ts">
 /**
- * The Sistema TS connection: which environment, who logs in, under which
- * P.IVA documents go out, and the two secrets the app keeps encrypted. A
- * single live call checks that all of it is accepted.
+ * The Sistema TS connection: who logs in, under which P.IVA documents go out,
+ * and the two secrets the app keeps encrypted. A single live call checks that
+ * all of it is accepted.
  *
- * A step-by-step guide says where the credentials come from; the test
- * environment accepts only the public user of the Sogei kit, so there it can
- * be filled in with one click.
+ * End users get production alone. Developer builds add a tray to switch to the
+ * Sogei test environment, which accepts only the kit's public user.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
-import { FlaskConical, KeyRound, PlugZap, ShieldCheck } from 'lucide-vue-next'
+import { KeyRound, PlugZap, ShieldCheck } from 'lucide-vue-next'
 import {
   checkTsConnection,
   deleteTsPassword,
@@ -22,15 +21,15 @@ import {
 } from '@/api'
 import { useStsStore } from '@/stores/sts'
 import { errorMessage, useToastStore } from '@/stores/toast'
-import type { TsConnectionCheck, TsEnvironment, TsSettings } from '@/types'
+import type { TsConnectionCheck, TsSettings } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import FormField from '@/components/ui/FormField.vue'
-import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import TsCredentialsGuide from '@/components/sts/TsCredentialsGuide.vue'
 import TsSecretRow from './TsSecretRow.vue'
+import TsTestEnvironmentTray from './TsTestEnvironmentTray.vue'
 
 /** The public psychologist user of the Sogei development kit (kit730P 20240214). */
 const SOGEI_TEST_USER = {
@@ -39,11 +38,6 @@ const SOGEI_TEST_USER = {
   password: 'Salve123',
   pincode: '3489543096',
 } as const
-
-const ENVIRONMENTS = [
-  { value: 'produzione', label: 'Produzione' },
-  { value: 'test', label: 'Test Sogei', tone: 'warn' },
-] as const
 
 const sts = useStsStore()
 const toast = useToastStore()
@@ -146,10 +140,6 @@ async function verify(): Promise<void> {
     checking.value = false
   }
 }
-
-function setEnvironment(value: TsEnvironment): void {
-  form.environment = value
-}
 </script>
 
 <template>
@@ -158,24 +148,7 @@ function setEnvironment(value: TsEnvironment): void {
       <CardHeader title="Sistema Tessera Sanitaria" subtitle="Invio delle spese sanitarie" :icon="KeyRound" />
 
       <div class="space-y-4 px-5 pb-5">
-        <SegmentedControl
-          :model-value="form.environment"
-          :options="ENVIRONMENTS"
-          label="Ambiente Sistema TS"
-          block
-          size="sm"
-          @update:model-value="setEnvironment"
-        />
-
-        <p v-if="form.environment === 'test'" class="flex items-start gap-2 rounded-control bg-warn-soft px-3 py-2 text-xs leading-relaxed text-text-muted ring-1 ring-inset ring-warn-line">
-          <FlaskConical :size="14" class="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
-          <span>
-            Le trasmissioni vanno all’ambiente di prova di Sogei e non hanno valore fiscale.
-            <button type="button" class="font-medium text-text underline decoration-border-strong underline-offset-2 hover:decoration-text focus-ring rounded-sm" :disabled="saving" @click="useSogeiTestUser">
-              Usa l’utenza di prova
-            </button>
-          </span>
-        </p>
+        <TsTestEnvironmentTray v-if="sts.testAvailable" v-model="form.environment" :busy="saving" @use-test-user="useSogeiTestUser" />
 
         <TsCredentialsGuide v-if="form.environment === 'produzione'" :initially-open="incomplete || route.query.focus === 'sts'" />
 
@@ -187,7 +160,7 @@ function setEnvironment(value: TsEnvironment): void {
             <input :id="id" v-model="form.vat_number" class="field font-mono" inputmode="numeric" autocomplete="off" maxlength="11" :aria-invalid="invalid" :aria-describedby="describedBy" />
           </FormField>
           <div v-if="dirty" class="flex justify-end">
-            <AppButton variant="primary" size="sm" type="submit" :loading="saving">Salva ambiente e utente</AppButton>
+            <AppButton variant="primary" size="sm" type="submit" :loading="saving">{{ sts.testAvailable ? 'Salva ambiente e utente' : 'Salva utente' }}</AppButton>
           </div>
         </form>
 

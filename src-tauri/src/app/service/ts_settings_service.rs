@@ -5,15 +5,36 @@ use crate::app::model::ts::{TsEnvironment, TsSettings, UpdateTsSettingsInput};
 use crate::app::repository::{config_repository, ts_settings_repository};
 use crate::app::service::validation_service as validate;
 
-/// The Sistema TS settings. Until saved, they point at production with the
-/// codice fiscale and P.IVA of the professional profile.
+/// The Sistema TS settings. Until saved, or when saved for an environment
+/// this build does not have, they point at production with the codice fiscale
+/// and P.IVA of the professional profile.
 pub async fn get(db: &impl ConnectionTrait) -> Result<TsSettings, String> {
+    get_within(db, TsEnvironment::available()).await
+}
+
+/// Refuses an environment this build does not have: a distributed release
+/// never saves the test one.
+pub async fn update(
+    db: &impl ConnectionTrait,
+    input: UpdateTsSettingsInput,
+) -> Result<TsSettings, String> {
+    update_within(db, input, TsEnvironment::available()).await
+}
+
+async fn get_within(
+    db: &impl ConnectionTrait,
+    available: &[TsEnvironment],
+) -> Result<TsSettings, String> {
     if let Some(row) = ts_settings_repository::find(db).await? {
-        return Ok(TsSettings {
-            environment: TsEnvironment::parse(&row.environment)?,
-            username: row.username,
-            vat_number: row.vat_number,
-        });
+        let environment = TsEnvironment::parse(&row.environment)?;
+        if available.contains(&environment) {
+            return Ok(TsSettings {
+                environment,
+                username: row.username,
+                vat_number: row.vat_number,
+            });
+        }
+        log::warn!(target: "sistema_ts", environment = environment.as_str(); "saved environment not in this build, falling back to production");
     }
     let profile = config_repository::find(db)
         .await
@@ -28,10 +49,16 @@ pub async fn get(db: &impl ConnectionTrait) -> Result<TsSettings, String> {
     })
 }
 
-pub async fn update(
+async fn update_within(
     db: &impl ConnectionTrait,
     input: UpdateTsSettingsInput,
+    available: &[TsEnvironment],
 ) -> Result<TsSettings, String> {
+    if !available.contains(&input.environment) {
+        return Err(
+            "L'ambiente di test Sogei non è disponibile in questa versione dell'app".to_string(),
+        );
+    }
     let username = input.username.trim().to_uppercase();
     let vat_number = input.vat_number.trim().to_string();
     validate_identity(input.environment, &username, &vat_number)?;
@@ -44,7 +71,7 @@ pub async fn update(
         updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
     };
     ts_settings_repository::save(db, active).await?;
-    get(db).await
+    get_within(db, available).await
 }
 
 /// Production data must be real; the test kit's P.IVA fails the checksum,
@@ -81,6 +108,17 @@ mod tests {
         db
     }
 
+    const PRODUCTION_ONLY: &[TsEnvironment] = &[TsEnvironment::Produzione];
+    const EVERY_ENVIRONMENT: &[TsEnvironment] = &[TsEnvironment::Produzione, TsEnvironment::Test];
+
+    /// Saves as a developer build does, whatever build runs the tests.
+    async fn save_anywhere(
+        db: &DatabaseConnection,
+        input: UpdateTsSettingsInput,
+    ) -> Result<TsSettings, String> {
+        update_within(db, input, EVERY_ENVIRONMENT).await
+    }
+
     fn input(environment: TsEnvironment, username: &str, vat: &str) -> UpdateTsSettingsInput {
         UpdateTsSettingsInput {
             environment,
@@ -106,7 +144,7 @@ mod tests {
     #[tokio::test]
     async fn saves_the_test_kit_identity_despite_its_checksums() {
         let db = setup().await;
-        let saved = update(
+        let saved = save_anywhere(
             &db,
             input(TsEnvironment::Test, " mtomra66a41g224m ", "65498732105"),
         )
@@ -114,7 +152,7 @@ mod tests {
         .unwrap();
         assert_eq!(saved.environment, TsEnvironment::Test);
         assert_eq!(saved.username, "MTOMRA66A41G224M");
-        assert_eq!(get(&db).await.unwrap(), saved);
+        assert_eq!(get_within(&db, EVERY_ENVIRONMENT).await.unwrap(), saved);
     }
 
     #[tokio::test]
@@ -136,19 +174,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_production_only_build_refuses_the_test_environment() {
+        let db = setup().await;
+        let err = update_within(
+            &db,
+            input(TsEnvironment::Test, "MTOMRA66A41G224M", "65498732105"),
+            PRODUCTION_ONLY,
+        )
+        .await
+        .unwrap_err();
+        assert!(err.contains("non è disponibile"));
+        assert!(ts_settings_repository::find(&db).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_production_only_build_ignores_saved_test_settings() {
+        let db = setup().await;
+        db.execute_unprepared(
+            "INSERT INTO professional_config (id, fiscal_code, vat_number) VALUES (1, 'RSSMRA80A41H501Y', '12345678903')",
+        )
+        .await
+        .unwrap();
+        save_anywhere(
+            &db,
+            input(TsEnvironment::Test, "MTOMRA66A41G224M", "65498732105"),
+        )
+        .await
+        .unwrap();
+        let settings = get_within(&db, PRODUCTION_ONLY).await.unwrap();
+        assert_eq!(settings.environment, TsEnvironment::Produzione);
+        assert_eq!(settings.username, "RSSMRA80A41H501Y");
+        assert_eq!(settings.vat_number, "12345678903");
+    }
+
+    #[tokio::test]
     async fn rejects_malformed_identity() {
         let db = setup().await;
         assert!(
-            update(&db, input(TsEnvironment::Test, "SHORT", "65498732105"))
+            save_anywhere(&db, input(TsEnvironment::Test, "SHORT", "65498732105"))
                 .await
                 .is_err()
         );
         assert!(
-            update(&db, input(TsEnvironment::Test, "MTOMRA66A41G224M", "123"))
+            save_anywhere(&db, input(TsEnvironment::Test, "MTOMRA66A41G224M", "123"))
                 .await
                 .is_err()
         );
-        assert!(update(&db, input(TsEnvironment::Test, "", ""))
+        assert!(save_anywhere(&db, input(TsEnvironment::Test, "", ""))
             .await
             .is_err());
     }

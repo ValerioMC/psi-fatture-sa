@@ -7,7 +7,7 @@ MANIFEST   := src-tauri/Cargo.toml
 BUNDLE_DIR := src-tauri/target/release/bundle
 
 .DEFAULT_GOAL := help
-.PHONY: help dev build app install test test-frontend test-backend lint fmt
+.PHONY: help dev build build-sogei app install test test-frontend test-backend lint fmt
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -19,6 +19,12 @@ build: ## Build the frontend and bundle the desktop app (unsigned) into src-taur
 	$(NPM) install
 	$(NPM) run tauri build
 	@echo "$(BUNDLE_DIR)"
+
+# Same bundle with the Sogei test environment kept in: for the developer only, never to distribute.
+build-sogei: ## Bundle a release that keeps the Sogei test environment (developer only, do not distribute)
+	$(NPM) install
+	$(NPM) run tauri -- build --features sogei-test
+	@echo "$(BUNDLE_DIR) (contains the Sogei test environment: do not distribute)"
 
 # Mounts the disk image `make build` just produced and runs PSI Fatture straight from it. Nothing
 # is copied into /Applications, so an installed copy (if any) is left alone.

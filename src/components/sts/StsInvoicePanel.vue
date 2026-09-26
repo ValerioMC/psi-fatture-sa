@@ -252,7 +252,7 @@ const remoteTotal = computed(() => {
 
     <Transition name="pane">
       <div v-if="remote" class="mt-4 rounded-control border border-border bg-surface px-3 py-3 text-xs" aria-live="polite">
-        <p class="mb-2 font-medium text-text">Sul Sistema TS ({{ TS_ENVIRONMENT_LABEL[sts.environment].toLowerCase() }})</p>
+        <p class="mb-2 font-medium text-text">Sul Sistema TS<template v-if="sts.testAvailable"> ({{ TS_ENVIRONMENT_LABEL[sts.environment].toLowerCase() }})</template></p>
         <template v-if="remote.kind === 'found'">
           <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             <dt class="text-text-subtle">Stato</dt>

@@ -11,6 +11,7 @@ import {
   enqueueTsReplacement,
   enqueueTsSubmission,
   getTsCredentialsStatus,
+  getTsEnvironments,
   getTsSettings,
   listTsSubmissions,
   updateTsSettings,
@@ -22,11 +23,14 @@ import { groupByInvoice, invoiceStsState, type InvoiceStsState } from '@/utils/s
 export const useStsStore = defineStore('sts', () => {
   const submissions = ref<TsSubmission[]>([])
   const settings = ref<TsSettings | null>(null)
+  const environments = ref<TsEnvironment[]>(['produzione'])
   const credentials = ref<TsCredentialsStatus | null>(null)
   const loaded = ref(false)
   const dispatching = ref(false)
 
   const environment = computed<TsEnvironment>(() => settings.value?.environment ?? 'produzione')
+  /** Only a developer build offers the Sogei test environment. */
+  const testAvailable = computed(() => environments.value.includes('test'))
   /** Both secrets stored: nothing stops a transmission on this side. */
   const connected = computed(() => credentials.value !== null && credentials.value.password_configured && credentials.value.pincode_configured)
   const byInvoice = computed(() => groupByInvoice(submissions.value))
@@ -50,8 +54,9 @@ export const useStsStore = defineStore('sts', () => {
   })
 
   async function load(): Promise<void> {
-    const [list, current, secrets] = await Promise.all([listTsSubmissions(), getTsSettings(), getTsCredentialsStatus()])
+    const [list, current, secrets, offered] = await Promise.all([listTsSubmissions(), getTsSettings(), getTsCredentialsStatus(), getTsEnvironments()])
     submissions.value = list
+    environments.value = offered
     settings.value = current
     credentials.value = secrets
     loaded.value = true
@@ -114,6 +119,7 @@ export const useStsStore = defineStore('sts', () => {
     loaded,
     dispatching,
     environment,
+    testAvailable,
     counts,
     stateOf,
     load,

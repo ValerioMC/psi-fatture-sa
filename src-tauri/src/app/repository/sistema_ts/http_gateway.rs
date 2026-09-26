@@ -55,6 +55,9 @@ impl HttpSistemaTsGateway {
         action: &str,
         body: String,
     ) -> Result<String, TsGatewayError> {
+        if !session.environment.is_available() {
+            return Err(TsGatewayError::UnavailableEnvironment);
+        }
         let url = format!("{}{}", session.environment.base_url(), path);
         let response = self
             .client(session.environment)

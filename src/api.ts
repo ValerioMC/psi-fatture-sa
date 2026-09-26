@@ -19,6 +19,7 @@ import type {
   TsConnectionCheck,
   TsCredentialsStatus,
   TsDispatchSummary,
+  TsEnvironment,
   TsQueryResult,
   TsReportBasis,
   TsReportRow,
@@ -106,6 +107,8 @@ export const getDashboard = (year: number) => invoke<DashboardData>('get_dashboa
 
 // ─── Sistema Tessera Sanitaria ───────────────────────────────────────────────
 
+/** Production alone in a distributed build; test too in a developer one. */
+export const getTsEnvironments = () => invoke<TsEnvironment[]>('get_ts_environments')
 export const getTsSettings = () => invoke<TsSettings>('get_ts_settings')
 export const updateTsSettings = (input: TsSettings) =>
   invoke<TsSettings>('update_ts_settings', { input })

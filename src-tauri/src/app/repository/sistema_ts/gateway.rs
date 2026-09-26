@@ -43,6 +43,8 @@ pub enum TsGatewayError {
     Malformed(String),
     #[error("Preparazione della richiesta non riuscita: {0}")]
     Request(String),
+    #[error("Ambiente Sistema TS non disponibile in questa versione dell'app")]
+    UnavailableEnvironment,
 }
 
 /// The Sistema TS services the app uses: the synchronous document calls, the

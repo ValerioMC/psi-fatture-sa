@@ -1,8 +1,9 @@
 use tauri::State;
 
 use crate::app::model::ts::{
-    TsConnectionCheck, TsCredentialsStatus, TsDispatchSummary, TsQueryResult, TsReportBasis,
-    TsReportRow, TsSettings, TsSubmission, TsSubmissionFilters, UpdateTsSettingsInput,
+    TsConnectionCheck, TsCredentialsStatus, TsDispatchSummary, TsEnvironment, TsQueryResult,
+    TsReportBasis, TsReportRow, TsSettings, TsSubmission, TsSubmissionFilters,
+    UpdateTsSettingsInput,
 };
 use crate::app::service::{
     ts_credential_service, ts_dispatch_service, ts_remote_service, ts_settings_service,
@@ -42,6 +43,12 @@ pub fn save_ts_password(
 #[tauri::command]
 pub fn delete_ts_password(state: State<'_, AppState>) -> Result<TsCredentialsStatus, String> {
     ts_credential_service::delete_password(state.secrets.as_ref())
+}
+
+/// The environments this build offers: production alone in a distributed release.
+#[tauri::command]
+pub fn get_ts_environments() -> Vec<TsEnvironment> {
+    TsEnvironment::available().to_vec()
 }
 
 #[tauri::command]

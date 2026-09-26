@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 /// Which Sistema TS installation a transmission goes to. Test accepts the
-/// public credentials of the Sogei development kit and has no fiscal effect.
+/// public credentials of the Sogei development kit and has no fiscal effect,
+/// and exists only in builds for the developer: see `available`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum TsEnvironment {
@@ -9,7 +10,26 @@ pub enum TsEnvironment {
     Produzione,
 }
 
+/// Environments of a build for the developer: debug, or release with the
+/// `sogei-test` feature.
+const DEVELOPER_ENVIRONMENTS: &[TsEnvironment] = &[TsEnvironment::Produzione, TsEnvironment::Test];
+const DISTRIBUTED_ENVIRONMENTS: &[TsEnvironment] = &[TsEnvironment::Produzione];
+
 impl TsEnvironment {
+    /// The environments this build may talk to. A distributed release knows
+    /// production alone, so its users can neither pick nor reach the test host.
+    pub fn available() -> &'static [TsEnvironment] {
+        if cfg!(any(debug_assertions, feature = "sogei-test")) {
+            DEVELOPER_ENVIRONMENTS
+        } else {
+            DISTRIBUTED_ENVIRONMENTS
+        }
+    }
+
+    pub fn is_available(self) -> bool {
+        Self::available().contains(&self)
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             TsEnvironment::Test => "test",
@@ -43,6 +63,19 @@ mod tests {
             assert_eq!(TsEnvironment::parse(environment.as_str()), Ok(environment));
         }
         assert!(TsEnvironment::parse("prod").is_err());
+    }
+
+    #[test]
+    fn production_is_available_in_every_build() {
+        assert!(TsEnvironment::Produzione.is_available());
+        assert!(DISTRIBUTED_ENVIRONMENTS.contains(&TsEnvironment::Produzione));
+        assert!(!DISTRIBUTED_ENVIRONMENTS.contains(&TsEnvironment::Test));
+    }
+
+    #[test]
+    #[cfg(any(debug_assertions, feature = "sogei-test"))]
+    fn test_is_available_in_developer_builds() {
+        assert!(TsEnvironment::Test.is_available());
     }
 
     #[test]
