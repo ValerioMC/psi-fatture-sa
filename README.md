@@ -241,7 +241,10 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   scadenze, invio, sostituzione, annullamento, verifica online) e un segno a forma di
   tessera nella lista fatture.
 - **Credenziali**: in Impostazioni → *Sistema Tessera Sanitaria*: ambiente, codice
-  fiscale di accesso, partita IVA, password e PINCODE. Password e PINCODE stanno solo
+  fiscale di accesso, partita IVA, password e PINCODE. Una guida passo passo nella card
+  spiega dove trovarli (sistemats.it → *Profilo utente → Stampa credenziali*); finché
+  mancano, la pagina *Sistema TS* e il pannello della fattura lo segnalano con un
+  rimando diretto alla card (`/settings?focus=sts`). Password e PINCODE stanno solo
   nel portachiavi del sistema operativo (crate `keyring`, servizio
   `it.psifatture.sistema-ts`); il frontend sa solo se ci sono. "Verifica credenziali"
   fa una chiamata reale.

@@ -6,7 +6,8 @@
  * header button sends now.
  */
 import { computed, onMounted, ref, watch } from 'vue'
-import { CalendarClock, CircleCheck, Hourglass, IdCard, Send, Settings2, UploadCloud } from 'lucide-vue-next'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { ArrowRight, CalendarClock, CircleCheck, ExternalLink, Hourglass, IdCard, KeyRound, Send, Settings2, UploadCloud } from 'lucide-vue-next'
 import { listClients, listInvoices } from '@/api'
 import { useStsStore } from '@/stores/sts'
 import { useToastStore } from '@/stores/toast'
@@ -148,6 +149,14 @@ function resend(submission: TsSubmission): void {
   void withRow(submission, () => send([submission.invoice_id]))
 }
 
+async function openPortal(): Promise<void> {
+  try {
+    await openUrl('https://sistemats1.sanita.finanze.it/portale/')
+  } catch (error) {
+    toast.notifyError(error, 'Non riesco ad aprire il browser')
+  }
+}
+
 async function confirmCancel(): Promise<void> {
   const submission = toCancel.value
   toCancel.value = null
@@ -164,6 +173,26 @@ async function confirmCancel(): Promise<void> {
     </PageHeader>
 
     <div class="page pt-6 pb-28">
+      <!-- Until both secrets are stored nothing can leave: say so first, and where to find them. -->
+      <section
+        v-if="sts.loaded && !sts.connected"
+        class="connect-banner settle mb-5 flex flex-wrap items-center gap-4 rounded-card border border-accent-line px-5 py-4"
+        aria-labelledby="connect-title"
+      >
+        <span class="icon-chip" style="--chip: var(--accent)" aria-hidden="true"><KeyRound :size="16" :stroke-width="1.8" /></span>
+        <div class="min-w-0 flex-1">
+          <h2 id="connect-title" class="text-md font-semibold text-text">Collega il Sistema TS</h2>
+          <p class="mt-0.5 text-sm text-text-muted">
+            Servono la password e il PINCODE del Sistema TS: li trovi su sistemats.it, in <span class="font-medium text-text">Profilo utente → Stampa credenziali</span>.
+            Finché mancano, le fatture restano in coda.
+          </p>
+        </div>
+        <div class="flex shrink-0 gap-2">
+          <AppButton variant="ghost" :icon="ExternalLink" @click="openPortal">Apri sistemats.it</AppButton>
+          <AppButton variant="primary" :icon-right="ArrowRight" :to="{ path: '/settings', query: { focus: 'sts' } }">Inserisci le credenziali</AppButton>
+        </div>
+      </section>
+
       <div class="settle mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatTile label="Da trasmettere" :value="String(pending.length)" :icon="UploadCloud" :tone="pending.length > 0 ? 'accent' : 'safe'">
           <template #hint>{{ pending.length > 0 ? `${formatCurrency(pendingTotal)} di spese ${year}` : `Tutto il ${year} è sul Sistema TS` }}</template>
@@ -217,3 +246,12 @@ async function confirmCancel(): Promise<void> {
     />
   </div>
 </template>
+
+<style scoped>
+/* The one thing to do before anything else: an accent wash from the icon's corner, not an alarm. */
+.connect-banner {
+  background:
+    radial-gradient(90% 140% at 0% 0%, var(--color-accent-soft), transparent 60%),
+    var(--surface-raised);
+}
+</style>

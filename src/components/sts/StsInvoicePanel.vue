@@ -5,6 +5,7 @@
  * Sistema TS actually holds. The history lists every transmission.
  */
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Ban, ChevronDown, RefreshCw, ScanSearch, Send, Undo2 } from 'lucide-vue-next'
 import { queryTsInvoice } from '@/api'
 import { useStsStore } from '@/stores/sts'
@@ -214,6 +215,11 @@ const remoteTotal = computed(() => {
       {{ state.current.outcome_message }}
     </p>
 
+    <p v-if="sts.loaded && !sts.connected && (state.kind === 'none' || state.kind === 'queued')" class="mt-3 text-xs leading-relaxed text-text-muted">
+      Mancano le credenziali del Sistema TS: l’invio parte appena le inserisci.
+      <RouterLink :to="{ path: '/settings', query: { focus: 'sts' } }" class="rounded-sm font-medium text-accent hover:underline focus-ring">Inseriscile</RouterLink>
+    </p>
+
     <p v-if="deadline" class="mt-3 flex items-center gap-2 text-xs" :class="{
       'text-accent': deadline.tone === 'accent',
       'text-text-subtle': deadline.tone === 'neutral',
@@ -235,7 +241,7 @@ const remoteTotal = computed(() => {
         Togli dalla coda
       </AppButton>
       <div class="flex gap-2">
-        <AppButton variant="ghost" size="sm" class="flex-1" :icon="ScanSearch" :loading="busy === 'query'" @click="verify">
+        <AppButton v-if="sts.connected" variant="ghost" size="sm" class="flex-1" :icon="ScanSearch" :loading="busy === 'query'" @click="verify">
           Verifica online
         </AppButton>
         <AppButton v-if="actions.cancel" variant="danger-quiet" size="sm" class="flex-1" :icon="Ban" :loading="busy === 'cancel'" @click="cancelOpen = true">

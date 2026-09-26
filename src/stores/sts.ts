@@ -10,21 +10,25 @@ import {
   enqueueTsCancellation,
   enqueueTsReplacement,
   enqueueTsSubmission,
+  getTsCredentialsStatus,
   getTsSettings,
   listTsSubmissions,
   updateTsSettings,
   withdrawTsSubmission,
 } from '@/api'
-import type { TsDispatchSummary, TsEnvironment, TsSettings, TsSubmission } from '@/types'
+import type { TsCredentialsStatus, TsDispatchSummary, TsEnvironment, TsSettings, TsSubmission } from '@/types'
 import { groupByInvoice, invoiceStsState, type InvoiceStsState } from '@/utils/sts'
 
 export const useStsStore = defineStore('sts', () => {
   const submissions = ref<TsSubmission[]>([])
   const settings = ref<TsSettings | null>(null)
+  const credentials = ref<TsCredentialsStatus | null>(null)
   const loaded = ref(false)
   const dispatching = ref(false)
 
   const environment = computed<TsEnvironment>(() => settings.value?.environment ?? 'produzione')
+  /** Both secrets stored: nothing stops a transmission on this side. */
+  const connected = computed(() => credentials.value !== null && credentials.value.password_configured && credentials.value.pincode_configured)
   const byInvoice = computed(() => groupByInvoice(submissions.value))
 
   function stateOf(invoiceId: number): InvoiceStsState {
@@ -46,9 +50,10 @@ export const useStsStore = defineStore('sts', () => {
   })
 
   async function load(): Promise<void> {
-    const [list, current] = await Promise.all([listTsSubmissions(), getTsSettings()])
+    const [list, current, secrets] = await Promise.all([listTsSubmissions(), getTsSettings(), getTsCredentialsStatus()])
     submissions.value = list
     settings.value = current
+    credentials.value = secrets
     loaded.value = true
   }
 
@@ -104,6 +109,8 @@ export const useStsStore = defineStore('sts', () => {
   return {
     submissions,
     settings,
+    credentials,
+    connected,
     loaded,
     dispatching,
     environment,

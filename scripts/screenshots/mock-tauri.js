@@ -280,6 +280,7 @@
       }
     },
     print_current_page: () => null,
+    'plugin:opener|open_url': ({ url }) => { window.__MOCK_OPENED_URL = url },
   }
 
   window.__TAURI_INTERNALS__ = {
