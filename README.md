@@ -253,8 +253,12 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   fa una chiamata reale.
 - **Ambienti**: *Produzione* (`invioSS730p.sanita.finanze.it`) e *Test Sogei*
   (`invioSS730pTest…`, senza valore fiscale). Il test esiste solo nelle build per lo
-  sviluppatore: `npm run tauri dev` / `make dev` (build debug) oppure
-  `make build-sogei` (release con la feature Cargo `sogei-test`, da non distribuire).
+  sviluppatore: `npm run tauri dev` / `make dev` (build debug), `make build-sogei`
+  (release con la feature Cargo `sogei-test`) e `make install`, che installa in
+  `/Applications` proprio quella release. Il bundle che lasciano in
+  `src-tauri/target/release/bundle/` non va distribuito. Per installare in locale
+  invece la build cliente, senza ambiente di test, c'è `make install-prod` (usa
+  `make build`).
   Lì un riquadro tratteggiato in cima alla card permette di passare a *Test Sogei* e
   compilare con un clic l'utenza pubblica "Psicologo" del kit. La build distribuita
   (`make build`, CI di release) conosce solo la produzione: il backend rifiuta di

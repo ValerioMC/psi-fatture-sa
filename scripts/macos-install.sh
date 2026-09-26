@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Mounts the disk image `make build` just produced, copies PSI Fatture.app into /Applications,
-# and ejects the disk image again.
+# Mounts the disk image `make install` or `make install-prod` just produced, copies PSI Fatture.app
+# into /Applications, and ejects the disk image again.
 #
 #   scripts/macos-install.sh [path/to/PSI Fatture_*.dmg]
 #

@@ -7,7 +7,7 @@ MANIFEST   := src-tauri/Cargo.toml
 BUNDLE_DIR := src-tauri/target/release/bundle
 
 .DEFAULT_GOAL := help
-.PHONY: help dev build build-sogei app install test test-frontend test-backend lint fmt
+.PHONY: help dev build build-sogei app install install-prod test test-frontend test-backend lint fmt
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -31,8 +31,16 @@ build-sogei: ## Bundle a release that keeps the Sogei test environment (develope
 app: build ## macOS: mount the disk image and run PSI Fatture from it, without installing it
 	./scripts/macos-app.sh
 
-# Replaces whatever is at /Applications/PSI Fatture.app, unlike `app`, which leaves it alone.
-install: build ## macOS: mount the disk image and install PSI Fatture.app into /Applications
+# Replaces whatever is at /Applications/PSI Fatture.app, unlike `app`, which leaves it alone. It is
+# the developer's own copy, so it keeps the Sogei test environment: the bundle it leaves behind must
+# not be distributed (use `make build` for that).
+install: build-sogei ## macOS: install the developer build (with Sogei test environment) into /Applications
+	./scripts/macos-install.sh
+
+# Same as `install`, but with the customer build: no Sogei test environment. For checking locally
+# what a customer's install looks like, without touching /Applications/PSI Fatture.app's dev copy
+# for longer than the check takes.
+install-prod: build ## macOS: install the customer build (no Sogei test environment) into /Applications
 	./scripts/macos-install.sh
 
 test: test-frontend test-backend ## Everything
