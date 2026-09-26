@@ -10,11 +10,11 @@ describe('calculateInvoiceTotals', () => {
     )
     expect(totals.total_net).toBe(280)
     expect(totals.total_tax).toBe(0)
-    expect(totals.contributo_enpap).toBe(5.6)
+    expect(totals.contributo_enpap).toBe(5.64)
     expect(totals.ritenuta_acconto).toBe(0)
     expect(totals.marca_da_bollo).toBe(2)
-    expect(totals.total_gross).toBe(285.6)
-    expect(totals.total_due).toBe(287.6)
+    expect(totals.total_gross).toBe(285.64)
+    expect(totals.total_due).toBe(287.64)
   })
 
   it('applies ritenuta on net plus ENPAP in ordinario regime', () => {
@@ -23,10 +23,10 @@ describe('calculateInvoiceTotals', () => {
       'ordinario',
       true,
     )
-    expect(totals.contributo_enpap).toBe(2)
-    expect(totals.ritenuta_acconto).toBe(20.4)
+    expect(totals.contributo_enpap).toBe(2.04)
+    expect(totals.ritenuta_acconto).toBe(20.41)
     expect(totals.marca_da_bollo).toBe(2)
-    expect(totals.total_due).toBe(100 + 2 - 20.4 + 2)
+    expect(totals.total_due).toBe(83.63)
   })
 
   it('skips marca da bollo below threshold or with VAT', () => {

@@ -673,18 +673,18 @@ async function handlePrint(): Promise<void> {
 
 .totals-separator td { padding: 0; border-bottom: 2px solid #e6e2d9; }
 
-.totals-grand { background: #1d1b24 !important; }
+.totals-grand { background: #ecedf9 !important; border: 1px solid #c9cbee; }
 .totals-grand td { border-bottom: none !important; }
 .totals-grand-label {
   padding: 12px 16px !important;
-  color: #d4cfc4;
+  color: #34388f;
   font-size: 8pt;
   font-weight: 600;
 }
 .totals-grand-value {
   padding: 12px 16px !important;
   text-align: right;
-  color: #ffffff;
+  color: #2c2f80;
   font-family: var(--font-display);
   font-size: 15pt;
   font-weight: 600;

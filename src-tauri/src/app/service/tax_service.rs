@@ -44,6 +44,8 @@ pub fn ritenuta_rate_for_regime(tax_regime: &str) -> f64 {
 ///
 /// Marca da bollo (€2) applies to VAT-exempt invoices above €77.47
 /// regardless of regime, as is the case for exempt healthcare services.
+/// The bollo is compenso charged to the client, so it concurs to the
+/// ENPAP base and is included before the ENPAP contribution is computed.
 pub fn calculate_invoice_totals(
     lines: &[InvoiceLineData],
     enpap_rate: f64,
@@ -55,16 +57,18 @@ pub fn calculate_invoice_totals(
         (net + line_net, tax + line_vat)
     });
 
-    let contributo_enpap = round2(total_net * enpap_rate / 100.0);
-    let total_gross = total_net + total_tax + contributo_enpap;
-    let ritenuta_acconto = round2((total_net + contributo_enpap) * ritenuta_rate / 100.0);
-
     let needs_bollo = total_tax == 0.0 && total_net > MARCA_DA_BOLLO_THRESHOLD;
     let marca_da_bollo = if needs_bollo {
         MARCA_DA_BOLLO_AMOUNT
     } else {
         0.0
     };
+
+    // Marca da bollo charged to the client is additional compenso for a
+    // forfettario professional, so it concurs to the ENPAP base too.
+    let contributo_enpap = round2((total_net + marca_da_bollo) * enpap_rate / 100.0);
+    let total_gross = total_net + total_tax + contributo_enpap;
+    let ritenuta_acconto = round2((total_net + contributo_enpap) * ritenuta_rate / 100.0);
 
     let total_due = total_gross - ritenuta_acconto + marca_da_bollo;
 
@@ -101,11 +105,11 @@ mod tests {
         let totals = calculate_invoice_totals(&[line(4, 70.0, 0.0)], ENPAP_RATE, 0.0);
         assert_eq!(totals.total_net, 280.0);
         assert_eq!(totals.total_tax, 0.0);
-        assert_eq!(totals.contributo_enpap, 5.6);
+        assert_eq!(totals.contributo_enpap, 5.64);
         assert_eq!(totals.ritenuta_acconto, 0.0);
         assert_eq!(totals.marca_da_bollo, 2.0);
-        assert_eq!(totals.total_gross, 285.6);
-        assert_eq!(totals.total_due, 287.6);
+        assert_eq!(totals.total_gross, 285.64);
+        assert_eq!(totals.total_due, 287.64);
     }
 
     #[test]
@@ -132,9 +136,9 @@ mod tests {
     fn ordinario_ritenuta_on_net_plus_enpap() {
         let ritenuta = ritenuta_rate_for_regime(TAX_REGIME_ORDINARIO);
         let totals = calculate_invoice_totals(&[line(1, 100.0, 0.0)], ENPAP_RATE, ritenuta);
-        assert_eq!(totals.contributo_enpap, 2.0);
-        assert_eq!(totals.ritenuta_acconto, 20.4);
-        assert_eq!(totals.total_due, 100.0 + 2.0 - 20.4 + 2.0);
+        assert_eq!(totals.contributo_enpap, 2.04);
+        assert_eq!(totals.ritenuta_acconto, 20.41);
+        assert_eq!(totals.total_due, 83.63);
     }
 
     #[test]

@@ -47,17 +47,21 @@ export function calculateInvoiceTotals(
     total_tax += lineVat
   }
 
-  const contributo_enpap = applyEnpap ? round2(total_net * ENPAP_RATE) : 0
+  const hasVat = total_tax > 0
+  const appliesMarcaDaBollo =
+    !hasVat && total_net > MARCA_DA_BOLLO_THRESHOLD
+  const marca_da_bollo = appliesMarcaDaBollo ? MARCA_DA_BOLLO_AMOUNT : 0
+
+  // Marca da bollo charged to the client is additional compenso for a
+  // forfettario professional, so it concurs to the ENPAP base too.
+  const contributo_enpap = applyEnpap
+    ? round2((total_net + marca_da_bollo) * ENPAP_RATE)
+    : 0
   const total_gross = total_net + total_tax + contributo_enpap
 
   const ritenuta_base = total_net + contributo_enpap
   const ritenuta_acconto =
     taxRegime === 'ordinario' ? round2(ritenuta_base * RITENUTA_RATE) : 0
-
-  const hasVat = total_tax > 0
-  const appliesMarcaDaBollo =
-    !hasVat && total_net > MARCA_DA_BOLLO_THRESHOLD
-  const marca_da_bollo = appliesMarcaDaBollo ? MARCA_DA_BOLLO_AMOUNT : 0
 
   const total_due = total_gross - ritenuta_acconto + marca_da_bollo
 
