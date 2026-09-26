@@ -71,16 +71,24 @@ const PAYMENT_CONDITIONS: Record<string, string> = {
 const legalNotes = computed((): string[] => {
   const lines: string[] = []
   if (!invoice.value || !config.value) return lines
-  if (isForfettario.value)
-    lines.push("Operazione effettuata ai sensi dell'art. 1, c. 54-89 Legge n. 190/2014 – Regime Forfettario. Imposta non dovuta.")
+  const forfettarioNote = isForfettario.value
+    ? "Operazione senza applicazione dell'IVA effettuata ai sensi dell'art. 1, commi da 54 a 89, L. n. 190 del 2014 e modificato dalla L.n. 208 del 2015 e dalla L.n. 145 del 2018 – Regime Forfettario. Imposta non dovuta."
+    : ""
+  const enpapNote = (invoice.value.apply_enpap && invoice.value.contributo_enpap > 0)
+    ? `Contributo integrativo ENPAP 2% (${formatCurrency(invoice.value.contributo_enpap)}) addebitato al cliente ai sensi dell'art. 8, L. 21/86.`
+    : ""
+
+  if (forfettarioNote && enpapNote) {
+    lines.push(`${forfettarioNote} ${enpapNote}`)
+  } else {
+    if (forfettarioNote) lines.push(forfettarioNote)
+    if (enpapNote) lines.push(enpapNote)
+  }
+
   if (!hasIva.value && !isForfettario.value)
     lines.push("Operazione esente da IVA ai sensi dell'art. 10, n. 18, DPR 633/72.")
-  if (invoice.value.apply_enpap && invoice.value.contributo_enpap > 0)
-    lines.push(`Contributo integrativo ENPAP 2% (${formatCurrency(invoice.value.contributo_enpap)}) addebitato al cliente ai sensi dell'art. 8, L. 21/86.`)
   if (invoice.value.ritenuta_acconto > 0)
     lines.push(`Si richiede di operare una ritenuta d'acconto del 20% pari a ${formatCurrency(invoice.value.ritenuta_acconto)}.`)
-  if (invoice.value.marca_da_bollo)
-    lines.push('Marca da bollo virtuale di € 2,00 assolta ai sensi del D.M. 17/06/2014 (importo > € 77,47 e operazione esente IVA).')
   return lines
 })
 
@@ -258,6 +266,10 @@ async function handlePrint(): Promise<void> {
                 <td class="totals-label">IVA</td>
                 <td class="totals-value">{{ formatCurrency(invoice.total_tax) }}</td>
               </tr>
+              <tr v-if="invoice.marca_da_bollo">
+                <td class="totals-label">Marca da bollo</td>
+                <td class="totals-value">{{ formatCurrency(2) }}</td>
+              </tr>
               <tr v-if="invoice.apply_enpap && invoice.contributo_enpap > 0">
                 <td class="totals-label">Contributo ENPAP 2%</td>
                 <td class="totals-value">{{ formatCurrency(invoice.contributo_enpap) }}</td>
@@ -265,10 +277,6 @@ async function handlePrint(): Promise<void> {
               <tr v-if="invoice.ritenuta_acconto > 0" class="totals-deduct">
                 <td class="totals-label">Ritenuta d'acconto 20%</td>
                 <td class="totals-value">− {{ formatCurrency(invoice.ritenuta_acconto) }}</td>
-              </tr>
-              <tr v-if="invoice.marca_da_bollo">
-                <td class="totals-label">Marca da bollo</td>
-                <td class="totals-value">{{ formatCurrency(2) }}</td>
               </tr>
               <tr class="totals-separator"><td colspan="2" /></tr>
               <tr class="totals-grand">

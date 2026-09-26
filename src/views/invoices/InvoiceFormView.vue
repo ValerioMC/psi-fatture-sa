@@ -336,8 +336,8 @@ async function onSubmit(): Promise<void> {
               <dl class="space-y-2 text-base">
                 <div class="flex justify-between"><dt class="text-text-muted">Imponibile</dt><dd class="tabular text-text">{{ formatCurrency(totals.total_net) }}</dd></div>
                 <div v-if="totals.total_tax > 0" class="flex justify-between"><dt class="text-text-muted">IVA</dt><dd class="tabular text-text">{{ formatCurrency(totals.total_tax) }}</dd></div>
-                <div v-if="form.apply_enpap" class="flex justify-between"><dt class="text-text-muted">ENPAP 2%</dt><dd class="tabular text-text">{{ formatCurrency(totals.contributo_enpap) }}</dd></div>
                 <div v-if="totals.marca_da_bollo > 0" class="flex justify-between"><dt class="text-text-muted">Marca da bollo</dt><dd class="tabular text-text">{{ formatCurrency(totals.marca_da_bollo) }}</dd></div>
+                <div v-if="form.apply_enpap" class="flex justify-between"><dt class="text-text-muted">ENPAP 2%</dt><dd class="tabular text-text">{{ formatCurrency(totals.contributo_enpap) }}</dd></div>
                 <div v-if="totals.ritenuta_acconto > 0" class="flex justify-between"><dt class="text-text-muted">Ritenuta 20%</dt><dd class="tabular text-text">−{{ formatCurrency(totals.ritenuta_acconto) }}</dd></div>
               </dl>
               <div class="receipt-total -mx-5 mt-4 px-5 py-4">

@@ -192,8 +192,8 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
             <dl class="w-80 space-y-2 text-base">
               <div class="flex justify-between"><dt class="text-text-muted">Imponibile</dt><dd class="tabular text-text">{{ formatCurrency(invoice.total_net) }}</dd></div>
               <div v-if="invoice.total_tax > 0" class="flex justify-between"><dt class="text-text-muted">IVA</dt><dd class="tabular text-text">{{ formatCurrency(invoice.total_tax) }}</dd></div>
-              <div v-if="invoice.apply_enpap && invoice.contributo_enpap > 0" class="flex justify-between"><dt class="text-text-muted">Contributo ENPAP 2%</dt><dd class="tabular text-text">{{ formatCurrency(invoice.contributo_enpap) }}</dd></div>
               <div v-if="invoice.marca_da_bollo" class="flex justify-between"><dt class="text-text-muted">Marca da bollo</dt><dd class="tabular text-text">{{ formatCurrency(2) }}</dd></div>
+              <div v-if="invoice.apply_enpap && invoice.contributo_enpap > 0" class="flex justify-between"><dt class="text-text-muted">Contributo ENPAP 2%</dt><dd class="tabular text-text">{{ formatCurrency(invoice.contributo_enpap) }}</dd></div>
               <div v-if="invoice.ritenuta_acconto > 0" class="flex justify-between"><dt class="text-text-muted">Ritenuta d'acconto 20%</dt><dd class="tabular text-text">−{{ formatCurrency(invoice.ritenuta_acconto) }}</dd></div>
               <div class="flex items-baseline justify-between border-t border-border pt-3">
                 <dt class="font-medium text-text">Totale dovuto</dt>
