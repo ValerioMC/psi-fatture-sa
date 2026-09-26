@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * One secret kept in the OS keychain: whether it is there, and a field to
+ * One secret kept in the app's encrypted store: whether it is there, and a field to
  * set or replace it. The value is never read back; replacing means typing
  * a new one, and removing asks first.
  */
@@ -61,7 +61,7 @@ function close(): void {
     <div class="flex items-center justify-between gap-2">
       <span class="text-sm font-medium text-text">{{ label }}</span>
       <div class="flex items-center gap-1">
-        <AppBadge v-if="configured" tone="safe" dot>Nel portachiavi</AppBadge>
+        <AppBadge v-if="configured" tone="safe" dot>Cifrato in app</AppBadge>
         <AppBadge v-else tone="warn" dot>Da inserire</AppBadge>
       </div>
     </div>

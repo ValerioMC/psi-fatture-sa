@@ -11,7 +11,7 @@ use app::controller::{
     appointment_controller::*, client_controller::*, config_controller::*, dashboard_controller::*,
     invoice_controller::*, service_controller::*, ts_controller::*,
 };
-use app::repository::secret_store::{KeyringSecretStore, SecretStore};
+use app::repository::secret_store::{EncryptedFileSecretStore, OsMachineId, SecretStore};
 use app::repository::sistema_ts::gateway::SistemaTsGateway;
 use app::repository::sistema_ts::http_gateway::HttpSistemaTsGateway;
 
@@ -33,7 +33,10 @@ pub fn run() {
     let db = tauri::async_runtime::block_on(app::db::connection::init_db())
         .expect("Failed to initialize database");
 
-    let secrets: Arc<dyn SecretStore> = Arc::new(KeyringSecretStore);
+    let secrets: Arc<dyn SecretStore> = Arc::new(EncryptedFileSecretStore::new(
+        app::db::connection::secrets_path(),
+        Box::new(OsMachineId::default()),
+    ));
     let ts_gateway: Arc<dyn SistemaTsGateway> =
         Arc::new(HttpSistemaTsGateway::new().expect("Failed to load the Sistema TS certificates"));
     app::controller::ts_worker::spawn(db.clone(), secrets.clone(), ts_gateway.clone());

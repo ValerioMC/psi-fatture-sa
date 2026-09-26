@@ -1,18 +1,19 @@
 use crate::app::model::ts::{TsCredentialsStatus, TsSettings};
-use crate::app::repository::secret_store::{SecretKind, SecretStore};
+use crate::app::repository::secret_store::{SecretKind, SecretStore, SecretStoreError};
 use crate::app::repository::sistema_ts::gateway::TsSession;
 
 const SECRET_MAX_LENGTH: usize = 64;
 
-/// Reports which Sistema TS secrets are stored, without exposing them.
+/// Reports which Sistema TS secrets are stored, without exposing them. An
+/// unreadable one counts as missing, so the Impostazioni ask for it again.
 pub fn status(store: &dyn SecretStore) -> Result<TsCredentialsStatus, String> {
     Ok(TsCredentialsStatus {
-        password_configured: read(store, SecretKind::TsPassword)?.is_some(),
-        pincode_configured: read(store, SecretKind::TsPincode)?.is_some(),
+        password_configured: is_configured(store, SecretKind::TsPassword)?,
+        pincode_configured: is_configured(store, SecretKind::TsPincode)?,
     })
 }
 
-/// Stores the PINCODE in the OS keychain, replacing any previous one.
+/// Stores the PINCODE encrypted, replacing any previous one.
 pub fn save_pincode(store: &dyn SecretStore, pincode: &str) -> Result<TsCredentialsStatus, String> {
     save(store, SecretKind::TsPincode, pincode.trim(), "PINCODE")
 }
@@ -21,7 +22,7 @@ pub fn delete_pincode(store: &dyn SecretStore) -> Result<TsCredentialsStatus, St
     remove(store, SecretKind::TsPincode)
 }
 
-/// Stores the Sistema TS password in the OS keychain. Kept as typed: spaces count.
+/// Stores the Sistema TS password encrypted. Kept as typed: spaces count.
 pub fn save_password(
     store: &dyn SecretStore,
     password: &str,
@@ -54,6 +55,17 @@ pub fn session(store: &dyn SecretStore, settings: &TsSettings) -> Result<TsSessi
 
 fn read(store: &dyn SecretStore, kind: SecretKind) -> Result<Option<String>, String> {
     store.read(kind).map_err(|e| e.to_string())
+}
+
+fn is_configured(store: &dyn SecretStore, kind: SecretKind) -> Result<bool, String> {
+    match store.read(kind) {
+        Ok(secret) => Ok(secret.is_some()),
+        Err(SecretStoreError::Unreadable) => {
+            log::warn!(target: "sistema_ts", secret:? = kind; "stored secret unreadable, reported as missing");
+            Ok(false)
+        }
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 fn save(
@@ -90,7 +102,7 @@ mod tests {
     use super::*;
     use crate::app::model::ts::TsEnvironment;
     use crate::app::repository::secret_store::testing::{
-        InMemorySecretStore, UnavailableSecretStore,
+        InMemorySecretStore, UnavailableSecretStore, UnreadableSecretStore,
     };
 
     fn settings() -> TsSettings {
@@ -156,11 +168,21 @@ mod tests {
     }
 
     #[test]
-    fn surfaces_keychain_failures() {
+    fn surfaces_store_failures() {
         let store = UnavailableSecretStore;
-        assert!(status(&store).unwrap_err().contains("Portachiavi"));
+        assert!(status(&store).unwrap_err().contains("Archivio credenziali"));
         assert!(save_pincode(&store, "1234").is_err());
         assert!(delete_password(&store).is_err());
+    }
+
+    #[test]
+    fn unreadable_secrets_read_as_missing_but_block_the_session() {
+        let store = UnreadableSecretStore;
+        let status = status(&store).unwrap();
+        assert!(!status.password_configured && !status.pincode_configured);
+        assert!(session(&store, &settings())
+            .unwrap_err()
+            .contains("inseriscila di nuovo"));
     }
 
     #[test]

@@ -6,13 +6,22 @@ use std::path::PathBuf;
 
 use crate::migration::Migrator;
 
-/// Returns the path to the SQLite database file.
-pub fn db_path() -> PathBuf {
+fn data_dir() -> PathBuf {
     let data_dir = dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("psi-fatture-sa");
     std::fs::create_dir_all(&data_dir).ok();
-    data_dir.join("database.db")
+    data_dir
+}
+
+/// Returns the path to the SQLite database file.
+pub fn db_path() -> PathBuf {
+    data_dir().join("database.db")
+}
+
+/// Returns the path to the encrypted Sistema TS credentials, beside the database.
+pub fn secrets_path() -> PathBuf {
+    data_dir().join("secrets.json")
 }
 
 /// Initializes the SeaORM connection pool and runs all pending migrations.

@@ -244,9 +244,12 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   fiscale di accesso, partita IVA, password e PINCODE. Una guida passo passo nella card
   spiega dove trovarli (sistemats.it → *Profilo utente → Stampa credenziali*); finché
   mancano, la pagina *Sistema TS* e il pannello della fattura lo segnalano con un
-  rimando diretto alla card (`/settings?focus=sts`). Password e PINCODE stanno solo
-  nel portachiavi del sistema operativo (crate `keyring`, servizio
-  `it.psifatture.sistema-ts`); il frontend sa solo se ci sono. "Verifica credenziali"
+  rimando diretto alla card (`/settings?focus=sts`). Password e PINCODE li custodisce
+  l'app in `secrets.json`, accanto al database: AES-256-GCM con una chiave derivata
+  (HKDF-SHA256) dall'identificativo del computer e da un sale casuale, file leggibile
+  solo dall'utente. Mai in chiaro e nessun accesso al portachiavi di sistema: copiato
+  su un altro computer il file non si decifra, e l'app chiede di reinserirli. Il
+  frontend sa solo se ci sono. "Verifica credenziali"
   fa una chiamata reale.
 - **Ambienti**: *Produzione* (`invioSS730p.sanita.finanze.it`) e *Test Sogei*
   (`invioSS730pTest…`, senza valore fiscale). In test si può compilare con un clic
@@ -330,8 +333,8 @@ psi-fatture-sa/
 npm test
 
 # Backend (cargo): calcolo totali fattura, validazione input, Sistema TS (buste SOAP,
-# risposte reali catturate, coda, invio con gateway finto). I test usano un portachiavi
-# in memoria: non toccano quello di sistema
+# risposte reali catturate, coda, invio con gateway finto). I test usano un archivio
+# credenziali in memoria o in un file temporaneo
 cd src-tauri && cargo test
 ```
 
@@ -384,7 +387,7 @@ Il file `.vscode/settings.json` già presente nel repo configura:
 ## Stack tecnologico
 
 - **Frontend**: Vue 3, TypeScript, Tailwind CSS 4, Pinia, Vite
-- **Backend**: Rust, Tauri 2, SeaORM, SQLite, keyring (portachiavi di sistema),
+- **Backend**: Rust, Tauri 2, SeaORM, SQLite, aes-gcm + hkdf (credenziali cifrate),
   reqwest + rustls, quick-xml, rsa (Sistema TS)
 - **Build**: Tauri CLI, Vite, vue-tsc
 - **Test**: Vitest (frontend), cargo test (backend)

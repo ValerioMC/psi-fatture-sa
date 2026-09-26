@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * The Sistema TS connection: which environment, who logs in, under which
- * P.IVA documents go out, and the two secrets kept in the OS keychain. A
+ * P.IVA documents go out, and the two secrets the app keeps encrypted. A
  * single live call checks that all of it is accepted.
  *
  * A step-by-step guide says where the credentials come from; the test
@@ -99,12 +99,12 @@ async function saveIdentity(): Promise<void> {
 
 async function savePassword(value: string): Promise<void> {
   credentials.value = await saveTsPassword(value)
-  toast.notify('Password nel portachiavi')
+  toast.notify('Password salvata e cifrata')
 }
 
 async function savePincode(value: string): Promise<void> {
   credentials.value = await saveTsPincode(value)
-  toast.notify('PINCODE nel portachiavi')
+  toast.notify('PINCODE salvato e cifrato')
 }
 
 async function confirmRemove(): Promise<void> {
@@ -198,7 +198,7 @@ function setEnvironment(value: TsEnvironment): void {
 
         <p class="flex items-start gap-2 text-xs leading-relaxed text-text-subtle">
           <ShieldCheck :size="14" :stroke-width="1.8" class="mt-0.5 shrink-0" aria-hidden="true" />
-          Password e PINCODE stanno solo nel portachiavi di sistema, mai su disco. Viaggiano cifrati come richiede il Sistema TS.
+          Password e PINCODE restano su questo computer, cifrati dall’app con una chiave legata al computer: mai in chiaro, nessun accesso al portachiavi di sistema. Viaggiano cifrati come richiede il Sistema TS.
         </p>
 
         <div class="border-t border-border pt-4">
@@ -219,7 +219,7 @@ function setEnvironment(value: TsEnvironment): void {
       <ConfirmDialog
         :open="removing !== null"
         :title="removing === 'password' ? 'Rimuovere la password?' : 'Rimuovere il PINCODE?'"
-        message="Viene cancellato dal portachiavi di sistema."
+        message="Viene cancellato dall’archivio cifrato dell’app."
         blast-radius="Le trasmissioni in coda al Sistema TS restano ferme finché non lo inserisci di nuovo."
         confirm-label="Rimuovi"
         :loading="removeBusy"

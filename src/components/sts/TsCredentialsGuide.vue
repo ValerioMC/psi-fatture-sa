@@ -28,7 +28,7 @@ const STEPS = [
   },
   {
     title: 'Copiali qui sotto',
-    text: 'Il codice fiscale è l’utente. Password e PINCODE restano solo nel portachiavi di questo computer.',
+    text: 'Il codice fiscale è l’utente. Password e PINCODE restano solo su questo computer, cifrati dall’app.',
   },
   {
     title: 'Premi “Verifica credenziali”',
