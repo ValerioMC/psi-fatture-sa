@@ -3,6 +3,7 @@ use sea_orm_migration::MigratorTrait;
 mod m20240101_create_schema;
 mod m20240201_add_batch_invoicing;
 mod m20240301_add_profession;
+mod m20240401_add_specialization_and_quantity_option;
 
 pub struct Migrator;
 
@@ -13,6 +14,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240101_create_schema::Migration),
             Box::new(m20240201_add_batch_invoicing::Migration),
             Box::new(m20240301_add_profession::Migration),
+            Box::new(m20240401_add_specialization_and_quantity_option::Migration),
         ]
     }
 }

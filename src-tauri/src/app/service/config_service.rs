@@ -70,6 +70,8 @@ fn build_active_model(input: &UpsertConfigInput) -> ActiveModel {
         coefficient: Set(input.coefficient),
         profession: Set(input.profession.as_str().to_owned()),
         is_psicoanalista: Set(input.is_psicoanalista as i32),
+        specialization: Set(input.specialization.clone()),
+        hide_quantity_in_invoice: Set(input.hide_quantity_in_invoice as i32),
         initial_invoice_number: Set(input.initial_invoice_number),
         updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
         ..Default::default()
@@ -98,6 +100,8 @@ fn into_domain(m: professional_config::Model) -> ProfessionalConfig {
         coefficient: m.coefficient,
         profession: Profession::from(m.profession),
         is_psicoanalista: m.is_psicoanalista != 0,
+        specialization: m.specialization,
+        hide_quantity_in_invoice: m.hide_quantity_in_invoice != 0,
         initial_invoice_number: m.initial_invoice_number,
         created_at: m.created_at,
         updated_at: m.updated_at,
@@ -129,6 +133,8 @@ mod tests {
             coefficient: 78.0,
             profession: Profession::Psicoterapeuta,
             is_psicoanalista: true,
+            specialization: String::new(),
+            hide_quantity_in_invoice: false,
             initial_invoice_number: 1,
         }
     }
@@ -208,7 +214,8 @@ mod tests {
             "zip_code": "00100", "country": "IT", "phone": "",
             "pec_email": "mario.rossi@pec.it", "iban": "IT60X0542811101000000123456",
             "coefficient": 78, "profession": "psicoterapeuta",
-            "is_psicoanalista": true, "initial_invoice_number": 1
+            "is_psicoanalista": true, "specialization": "", "hide_quantity_in_invoice": false,
+            "initial_invoice_number": 1
         }"#;
         let input: UpsertConfigInput = serde_json::from_str(payload).unwrap();
 

@@ -55,6 +55,7 @@
     id: 1, title: 'Dott.ssa', first_name: 'Maria', last_name: 'Ferretti', vat_number: '12345678903', fiscal_code: 'FRRMRA80A41F205Z',
     tax_regime: 'forfettario', albo_number: '12345', albo_region: 'Lombardia', address: 'Via Solferino 24', city: 'Milano', province: 'MI', zip_code: '20121', country: 'IT',
     phone: '+39 02 1234567', pec_email: 'maria.ferretti@pec.it', iban: 'IT60X0542811101000000123456', coefficient: 78, profession: 'psicoterapeuta', is_psicoanalista: false,
+    specialization: '', hide_quantity_in_invoice: false,
     initial_invoice_number: 1, created_at: '2025-01-01', updated_at: '2025-01-01',
   }
 

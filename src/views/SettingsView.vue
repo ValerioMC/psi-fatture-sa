@@ -26,7 +26,7 @@ const toast = useToastStore()
 const { preference, setPreference } = useTheme()
 const { form, errors, check, checkSections } = useProfileForm()
 
-const ALL_SECTIONS: ProfileSection[] = ['identity', 'profession', 'tax', 'numbering', 'studio', 'payment']
+const ALL_SECTIONS: ProfileSection[] = ['identity', 'profession', 'tax', 'numbering', 'invoice', 'studio', 'payment']
 const saving = ref(false)
 const saved = ref('')
 

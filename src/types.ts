@@ -28,6 +28,8 @@ export interface ProfessionalConfig {
   coefficient: number
   profession: Profession
   is_psicoanalista: boolean
+  specialization: string
+  hide_quantity_in_invoice: boolean
   initial_invoice_number: number
   created_at: string
   updated_at: string

@@ -24,5 +24,9 @@ pub struct UpsertConfigInput {
     pub coefficient: f64,
     pub profession: Profession,
     pub is_psicoanalista: bool,
+    /// Free-text specialization, shown on invoices instead of the IPA membership
+    /// line when `is_psicoanalista` is false.
+    pub specialization: String,
+    pub hide_quantity_in_invoice: bool,
     pub initial_invoice_number: i64,
 }

@@ -63,7 +63,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 }
 
 const PAYMENT_CONDITIONS: Record<string, string> = {
-  bonifico: 'Pagamento immediato',
+  bonifico: 'Pagamento a vista',
   contanti: 'Contestuale alla prestazione',
   pos: 'Contestuale alla prestazione',
 }
@@ -135,7 +135,7 @@ async function handlePrint(): Promise<void> {
           <div class="header-left">
             <div class="company-name">{{ professionalFullName }}</div>
             <div class="company-profession">
-              {{ professionLabel }}<template v-if="config.is_psicoanalista"> &nbsp;&mdash;&nbsp; Psicoanalista</template>
+              {{ professionLabel }}<template v-if="config.is_psicoanalista"> &nbsp;&mdash;&nbsp; Psicoanalista</template><template v-else-if="config.specialization"> &nbsp;&mdash;&nbsp; {{ config.specialization }}</template>
             </div>
             <div v-if="config.albo_number || config.albo_region" class="albo-info">
               <template v-if="config.albo_number">Iscriz. Albo n.&nbsp;<strong>{{ config.albo_number }}</strong></template>
@@ -161,10 +161,6 @@ async function handlePrint(): Promise<void> {
               <span class="invoice-prefix">N.</span>{{ invoice.invoice_number }}
             </div>
             <div class="invoice-meta">
-              <div class="meta-row">
-                <span class="meta-label">Anno</span>
-                <span class="meta-value">{{ invoice.year }}</span>
-              </div>
               <div class="meta-row">
                 <span class="meta-label">Data emissione</span>
                 <span class="meta-value">{{ formatDateLong(invoice.issue_date) }}</span>
@@ -223,8 +219,8 @@ async function handlePrint(): Promise<void> {
             <thead>
               <tr>
                 <th class="th-desc">Descrizione</th>
-                <th class="th-center">Qtà</th>
-                <th class="th-right">Prezzo unit.</th>
+                <th v-if="!config.hide_quantity_in_invoice" class="th-center">Qtà</th>
+                <th v-if="!config.hide_quantity_in_invoice" class="th-right">Prezzo unit.</th>
                 <th class="th-center">IVA</th>
                 <th class="th-right th-last">Importo</th>
               </tr>
@@ -236,8 +232,8 @@ async function handlePrint(): Promise<void> {
                 :class="i % 2 === 1 ? 'tr-alt' : ''"
               >
                 <td class="td-desc">{{ line.description }}</td>
-                <td class="td-center td-secondary">{{ line.quantity }}</td>
-                <td class="td-right td-secondary">{{ formatCurrency(line.unit_price) }}</td>
+                <td v-if="!config.hide_quantity_in_invoice" class="td-center td-secondary">{{ line.quantity }}</td>
+                <td v-if="!config.hide_quantity_in_invoice" class="td-right td-secondary">{{ formatCurrency(line.unit_price) }}</td>
                 <td class="td-center td-secondary">
                   <span v-if="line.vat_rate === 0" class="vat-exempt">Esente</span>
                   <template v-else>{{ line.vat_rate }}%</template>

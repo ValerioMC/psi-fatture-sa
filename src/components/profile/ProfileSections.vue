@@ -85,6 +85,15 @@ const PROFESSIONS: SegmentOption<Profession>[] = [
         label="Sono psicoanalista, membro IPA"
         description="Aggiunge in fattura “Membro della International Psychoanalytical Association”."
       />
+      <FormField
+        v-slot="{ id }"
+        class="mt-5 max-w-96"
+        label="Specializzazione personalizzata"
+        optional
+        hint="Alternativa al check IPA: un testo libero mostrato in fattura al posto della qualifica standard."
+      >
+        <input :id="id" v-model="form.specialization" type="text" class="field" :disabled="form.is_psicoanalista" placeholder="Es. Specialista in terapia EMDR" />
+      </FormField>
     </FormSection>
 
     <FormSection v-if="sections.includes('tax')" title="Regime fiscale" description="Decide cosa compare in fattura: IVA, ritenuta d'acconto, marca da bollo e diciture di legge.">
@@ -113,6 +122,14 @@ const PROFESSIONS: SegmentOption<Profession>[] = [
       >
         <input :id="id" v-model.number="form.initial_invoice_number" type="number" min="1" class="field tabular" :aria-invalid="invalid" :aria-describedby="describedBy" @blur="emit('check', 'initial_invoice_number')" />
       </FormField>
+    </FormSection>
+
+    <FormSection v-if="sections.includes('invoice')" title="Fattura" description="Cosa compare nel documento stampato.">
+      <ToggleSwitch
+        v-model="form.hide_quantity_in_invoice"
+        label="Non mostrare la quantità in fattura"
+        description="Nasconde le colonne Quantità e Prezzo unitario; resta solo l'importo per riga."
+      />
     </FormSection>
 
     <FormSection v-if="sections.includes('studio')" title="Studio" description="L'indirizzo del tuo domicilio fiscale o dello studio, stampato in fattura.">

@@ -25,6 +25,8 @@ pub struct ProfessionalConfig {
     pub coefficient: f64,
     pub profession: Profession,
     pub is_psicoanalista: bool,
+    pub specialization: String,
+    pub hide_quantity_in_invoice: bool,
     pub initial_invoice_number: i64,
     pub created_at: String,
     pub updated_at: String,

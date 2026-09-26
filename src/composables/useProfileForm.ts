@@ -11,7 +11,7 @@ import {
 } from '@/utils/validation'
 
 /** The groups of the professional profile; onboarding asks them in steps, settings shows them all. */
-export type ProfileSection = 'identity' | 'profession' | 'tax' | 'numbering' | 'studio' | 'payment'
+export type ProfileSection = 'identity' | 'profession' | 'tax' | 'numbering' | 'invoice' | 'studio' | 'payment'
 
 export type ProfileField =
   | 'first_name' | 'last_name' | 'vat_number' | 'fiscal_code' | 'coefficient'
@@ -22,6 +22,7 @@ export const SECTION_FIELDS: Readonly<Record<ProfileSection, readonly ProfileFie
   profession: [],
   tax: ['coefficient'],
   numbering: ['initial_invoice_number'],
+  invoice: [],
   studio: ['address', 'city', 'province', 'zip_code'],
   payment: ['pec_email', 'iban'],
 }
@@ -47,6 +48,8 @@ export function emptyProfile(): UpsertConfigInput {
     coefficient: 78,
     profession: 'psicologo',
     is_psicoanalista: false,
+    specialization: '',
+    hide_quantity_in_invoice: false,
     initial_invoice_number: 1,
   }
 }
