@@ -17,6 +17,8 @@ import AppCard from '@/components/ui/AppCard.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import InvoiceSeal from '@/components/ui/InvoiceSeal.vue'
+import TsMark from '@/components/ui/TsMark.vue'
+import { useStsStore } from '@/stores/sts'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import StatTile from '@/components/ui/StatTile.vue'
@@ -32,6 +34,7 @@ type StatusFilter = InvoiceStatus | 'all'
 const route = useRoute()
 const router = useRouter()
 const invoicesStore = useInvoicesStore()
+const sts = useStsStore()
 const toast = useToastStore()
 const currentYear = new Date().getFullYear()
 
@@ -142,7 +145,11 @@ async function load(): Promise<void> {
 }
 
 watch(year, load)
-onMounted(load)
+onMounted(() => {
+  void load()
+  // The Sistema TS marks are a courtesy: without them the list still works.
+  sts.load().catch(() => undefined)
+})
 
 // ─── Selection and bulk status ──────────────────────────────────────────────
 
@@ -303,6 +310,7 @@ function clearFilters(): void {
                 />
               </th>
               <th class="w-8 font-normal"><span class="sr-only">Stato</span></th>
+              <th class="w-8 font-normal"><span class="sr-only">Sistema TS</span></th>
               <th class="w-24 font-medium">Numero</th>
               <th class="font-medium">Paziente</th>
               <th class="w-28 font-medium">Emessa</th>
@@ -331,6 +339,7 @@ function clearFilters(): void {
                 />
               </td>
               <td><InvoiceSeal :status="invoice.status" :issue-date="invoice.issue_date" :due-date="invoice.due_date" :size="18" /></td>
+              <td><TsMark v-if="invoice.status === 'paid' || sts.stateOf(invoice.id).kind !== 'none'" :kind="sts.stateOf(invoice.id).kind" :size="18" /></td>
               <td class="tabular text-text-muted">N. {{ invoice.invoice_number }}<span v-if="year === 0" class="text-text-subtle">/{{ invoice.year }}</span></td>
               <td>
                 <span class="flex min-w-0 items-center gap-2.5">

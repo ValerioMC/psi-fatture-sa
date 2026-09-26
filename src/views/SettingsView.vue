@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The professional profile and the app's appearance. Appearance applies at
+ * The professional profile, the app's appearance and the Sistema TS PINCODE. Appearance applies at
  * once; the profile is saved on demand, and a bar rises from the bottom as
  * soon as something differs from what is saved.
  */
@@ -16,6 +16,7 @@ import AppCard from '@/components/ui/AppCard.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import ProfileSections from '@/components/profile/ProfileSections.vue'
+import TsSettingsCard from '@/components/profile/TsSettingsCard.vue'
 import { useProfileForm, type ProfileSection } from '@/composables/useProfileForm'
 import { useTheme } from '@/composables/useTheme'
 import type { ThemePreference } from '@/utils/theme'
@@ -115,7 +116,7 @@ function discardAndLeave(): void {
 
 <template>
   <div>
-    <PageHeader title="Impostazioni" subtitle="Il tuo profilo professionale e l'aspetto dell'app." :icon="Settings" />
+    <PageHeader title="Impostazioni" subtitle="Il tuo profilo professionale, l'aspetto dell'app e le credenziali del Sistema TS." :icon="Settings" />
 
     <div class="page grid grid-cols-1 items-start gap-5 pt-6 pb-28 xl:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
       <AppCard class="settle min-w-0 px-8 py-4">
@@ -150,6 +151,8 @@ function discardAndLeave(): void {
             </button>
           </div>
         </AppCard>
+
+        <TsSettingsCard />
 
         <!-- The letterhead, as it will print: what the profile fields are for. -->
         <AppCard :padded="false">

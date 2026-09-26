@@ -7,7 +7,7 @@
 import { computed, nextTick, ref, toRef, watch, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  CalendarDays, CalendarRange, ClipboardList, CornerDownLeft, FileText, LayoutGrid,
+  CalendarDays, CalendarRange, ClipboardList, CornerDownLeft, FileText, IdCard, LayoutGrid,
   Moon, Plus, Search, Settings, Sun, UserPlus, Users,
 } from 'lucide-vue-next'
 import { useFocusTrap } from '@/composables/useFocusTrap'
@@ -62,6 +62,7 @@ const staticItems = computed<PaletteItem[]>(() => [
   { id: 'go-invoices', group: 'Vai a', label: 'Fatture', icon: FileText, run: go('/invoices') },
   { id: 'go-patients', group: 'Vai a', label: 'Pazienti', keywords: 'clienti', icon: Users, run: go('/clients') },
   { id: 'go-services', group: 'Vai a', label: 'Prestazioni', keywords: 'tariffe servizi', icon: ClipboardList, run: go('/services') },
+  { id: 'go-sts', group: 'Vai a', label: 'Sistema TS', keywords: 'tessera sanitaria spese sanitarie precompilata 730 trasmissione', icon: IdCard, run: go('/sts') },
   { id: 'go-settings', group: 'Vai a', label: 'Impostazioni', keywords: 'profilo partita iva iban', icon: Settings, run: go('/settings') },
 ])
 

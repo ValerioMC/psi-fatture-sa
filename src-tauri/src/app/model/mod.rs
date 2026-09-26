@@ -4,3 +4,4 @@ pub mod config;
 pub mod dashboard;
 pub mod invoice;
 pub mod service;
+pub mod ts;

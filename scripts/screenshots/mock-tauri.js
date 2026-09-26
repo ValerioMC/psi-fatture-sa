@@ -137,8 +137,99 @@
 
   const MONTHS = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
   const clone = (x) => JSON.parse(JSON.stringify(x))
+  // ── Sistema TS: a simulated queue and remote store over the demo invoices ──
+  const stamp = (date, time = '10:15:00') => `${date} ${time}`
+  const tsSettings = { environment: window.__MOCK_TS_TEST ? 'test' : 'produzione', username: 'FRRMRA80A41F205Z', vat_number: '12345678903' }
+  const tsCreds = { password_configured: !window.__MOCK_NO_TS_CREDENTIALS, pincode_configured: !window.__MOCK_NO_TS_CREDENTIALS }
+  const tsSubs = []
+  let tsId = 1
+  // Protocols are 17 digits: past 2^53, so they are built as strings.
+  let tsProtocolSeq = 100000
+  const nextProtocol = () => `99260101000${tsProtocolSeq++}`
+  const tsInvoiceView = (inv) => ({ invoice_number: inv.invoice_number, invoice_year: inv.year, client_name: inv.client_name })
+  const tsNew = (inv, operation, status, extra = {}) => {
+    const sub = { id: tsId++, invoice_id: inv.id, ...tsInvoiceView(inv), operation, status, target_submission_id: null, environment: tsSettings.environment,
+      document: { vat_number: tsSettings.vat_number, issue_date: inv.issue_date, number: inv.invoice_number }, protocol: null, outcome_code: null, outcome_message: null,
+      attempt_count: 0, last_error: null, next_attempt_at: stamp(todayIso), last_attempt_at: null, sent_at: null, resolved_at: null, created_at: stamp(todayIso), updated_at: stamp(todayIso), ...extra }
+    tsSubs.push(sub)
+    return sub
+  }
+  const tsAccept = (sub, date) => Object.assign(sub, { status: 'accettata', protocol: nextProtocol(), attempt_count: sub.attempt_count + 1, sent_at: stamp(date), resolved_at: stamp(date), last_attempt_at: stamp(date) })
+  const seedTs = () => {
+    const paid = invoices.filter((i) => i.status === 'paid' && i.paid_date).sort((a, b) => a.paid_date.localeCompare(b.paid_date))
+    const cutoff = addDays(todayIso, -40)
+    paid.forEach((inv, index) => {
+      const client = clients.find((c) => c.id === inv.client_id)
+      if (inv.paid_date > cutoff) return
+      if (client?.client_type !== 'persona_fisica') return
+      const sub = tsNew(inv, 'invio', 'non_inviata', { created_at: stamp(inv.paid_date) })
+      if (index % 90 === 5) Object.assign(sub, { status: 'scartata', attempt_count: 1, outcome_code: 'WS19', outcome_message: 'WS19 CF DEL CITTADINO NON VALIDO', resolved_at: stamp(addDays(inv.paid_date, 2)) })
+      else tsAccept(sub, addDays(inv.paid_date, 2))
+    })
+    const recent = paid.filter((i) => i.paid_date > cutoff)
+    if (recent[0]) tsNew(recent[0], 'invio', 'non_inviata', { attempt_count: 2, last_error: 'Sistema TS non raggiungibile: operation timed out', next_attempt_at: stamp(todayIso, '23:59:00') })
+  }
+  seedTs()
+  const tsLive = (invoiceId) => [...tsSubs].reverse().find((s) => s.invoice_id === invoiceId && s.status === 'accettata' && s.operation !== 'annullamento' && s.environment === tsSettings.environment)
+  const tsTotal = (inv) => inv.total_gross
   const handlers = {
     get_config: () => (window.__MOCK_NO_CONFIG ? null : config),
+    get_ts_settings: () => tsSettings,
+    update_ts_settings: ({ input }) => Object.assign(tsSettings, { ...input, username: input.username.trim().toUpperCase() }),
+    get_ts_credentials_status: () => tsCreds,
+    save_ts_pincode: () => Object.assign(tsCreds, { pincode_configured: true }),
+    delete_ts_pincode: () => Object.assign(tsCreds, { pincode_configured: false }),
+    save_ts_password: () => Object.assign(tsCreds, { password_configured: true }),
+    delete_ts_password: () => Object.assign(tsCreds, { password_configured: false }),
+    check_ts_connection: () => tsCreds.password_configured && tsCreds.pincode_configured
+      ? { ok: true, message: `Credenziali accettate dal Sistema TS (${tsSettings.environment})` }
+      : { ok: false, message: 'Manca la password del Sistema TS: inseriscila nelle Impostazioni' },
+    list_ts_submissions: ({ filters }) => tsSubs.filter((s) => !filters?.invoice_id || s.invoice_id === filters.invoice_id),
+    enqueue_ts_submission: ({ invoiceId }) => {
+      const inv = invoices.find((i) => i.id === invoiceId)
+      if (inv.status !== 'paid') throw new Error('Solo le fatture pagate possono essere trasmesse al Sistema TS')
+      return tsNew(inv, 'invio', 'non_inviata')
+    },
+    enqueue_ts_replacement: ({ submissionId }) => { const t = tsSubs.find((s) => s.id === submissionId); return tsNew(invoices.find((i) => i.id === t.invoice_id), 'sostituzione', 'non_inviata', { target_submission_id: t.id, document: t.document }) },
+    enqueue_ts_cancellation: ({ submissionId }) => { const t = tsSubs.find((s) => s.id === submissionId); return tsNew(invoices.find((i) => i.id === t.invoice_id), 'annullamento', 'non_inviata', { target_submission_id: t.id, document: t.document }) },
+    withdraw_ts_submission: ({ submissionId }) => { tsSubs.splice(tsSubs.findIndex((s) => s.id === submissionId), 1) },
+    dispatch_ts_queue: () => {
+      const summary = { accepted: 0, rejected: 0, retrying: 0, waiting_other_environment: 0, blocked: null }
+      if (!tsCreds.password_configured || !tsCreds.pincode_configured) return { ...summary, blocked: 'Manca la password del Sistema TS: inseriscila nelle Impostazioni' }
+      for (const sub of tsSubs.filter((s) => s.status === 'non_inviata')) {
+        if (sub.environment !== tsSettings.environment) { summary.waiting_other_environment++; continue }
+        tsAccept(sub, todayIso)
+        sub.last_error = null
+        const target = tsSubs.find((s) => s.id === sub.target_submission_id)
+        if (target) target.status = sub.operation === 'annullamento' ? 'annullata' : 'sostituita'
+        summary.accepted++
+      }
+      return summary
+    },
+    query_ts_invoice: ({ invoiceId }) => {
+      const inv = invoices.find((i) => i.id === invoiceId)
+      const all = tsSubs.filter((s) => s.invoice_id === invoiceId && s.status !== 'scartata' && s.protocol)
+      const last = all[all.length - 1]
+      if (!last) return { kind: 'not_found' }
+      const cancelled = last.operation === 'annullamento'
+      return { kind: 'found', document: { id: last.document, payment_date: inv.paid_date, totals: [{ expense_type: 'SP', amount: tsTotal(inv) }], refunded_totals: [], protocol: last.protocol,
+        sent_date: last.sent_at.slice(0, 10), send_kind: last.operation === 'sostituzione' ? 'V' : 'I', cancelled, messages: cancelled ? [{ code: 'W010', description: "IL DOCUMENTO E' STATO ANNULLATO IN PRECEDENZA", kind: 'W' }] : [] } }
+    },
+    get_ts_monthly_report: ({ year, month, basis }) => {
+      if (!tsCreds.password_configured) throw new Error('Manca la password del Sistema TS: inseriscila nelle Impostazioni')
+      const prefix = `${year}-${pad(month)}`
+      const rows = []
+      for (const inv of invoices) {
+        const live = tsLive(inv.id)
+        if (!live) continue
+        const day = basis === 'invio' ? live.sent_at.slice(0, 10) : inv.paid_date
+        if (!day.startsWith(prefix)) continue
+        rows.push({ vat_number: live.document.vat_number, issue_date: inv.issue_date, document_number: inv.invoice_number, payment_date: inv.paid_date, protocol: live.protocol,
+          sent_date: live.sent_at.slice(0, 10), send_kind: live.operation === 'sostituzione' ? 'V' : 'I', amount: tsTotal(inv), refunded_amount: 0, invoice_id: inv.id })
+      }
+      if (rows.length > 3) rows.splice(2, 0, { ...rows[0], document_number: 'FT-0042', invoice_id: null, protocol: nextProtocol() })
+      return rows
+    },
     upsert_config: ({ input }) => Object.assign(config, input),
     list_clients: ({ search }) => clients.filter((c) => !search || (clientName(c) + c.fiscal_code).toLowerCase().includes(search.toLowerCase())).sort((a, b) => clientName(a).localeCompare(clientName(b))),
     get_client: ({ id }) => clients.find((c) => c.id === id),

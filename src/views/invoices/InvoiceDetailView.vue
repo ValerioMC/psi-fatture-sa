@@ -2,7 +2,7 @@
 /**
  * One invoice: the document on the left, its life and its actions on the
  * right. The next step is always the primary button: a draft is issued, an
- * issued or overdue invoice is marked paid.
+ * issued or overdue invoice is marked paid. Below sits its Sistema TS panel.
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -18,6 +18,7 @@ import StatusBadge from '@/components/ui/StatusBadge.vue'
 import InvoiceSeal from '@/components/ui/InvoiceSeal.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import StsInvoicePanel from '@/components/sts/StsInvoicePanel.vue'
 import { formatCurrency, formatDateLong, todayIso } from '@/utils/format'
 import { PAYMENT_METHOD_LABEL } from '@/utils/labels'
 import { deriveSeal, describeSeal } from '@/utils/invoiceSeal'
@@ -239,6 +240,8 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
               {{ nextStep.label }}
             </AppButton>
           </AppCard>
+
+          <StsInvoicePanel v-if="invoice.status !== 'draft'" :invoice="invoice" />
 
           <AppButton variant="danger-quiet" :icon="Trash2" block @click="deleteOpen = true">Elimina fattura</AppButton>
         </aside>

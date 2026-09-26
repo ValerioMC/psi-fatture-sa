@@ -122,7 +122,7 @@ impl InvoiceRow {
 }
 
 /// Loads a full invoice (with client_name and lines) by id.
-pub async fn load_invoice(db: &DatabaseConnection, id: i64) -> Result<Invoice, String> {
+pub async fn load_invoice(db: &impl ConnectionTrait, id: i64) -> Result<Invoice, String> {
     let row = InvoiceRow::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         "SELECT i.*, c.first_name || ' ' || c.last_name AS client_name
@@ -375,7 +375,10 @@ pub async fn bulk_update_status(
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
-async fn load_lines(db: &DatabaseConnection, invoice_id: i64) -> Result<Vec<InvoiceLine>, String> {
+async fn load_lines(
+    db: &impl ConnectionTrait,
+    invoice_id: i64,
+) -> Result<Vec<InvoiceLine>, String> {
     let models = invoice_line::Entity::find()
         .filter(invoice_line::Column::InvoiceId.eq(invoice_id))
         .order_by_asc(invoice_line::Column::Id)
@@ -401,4 +404,27 @@ fn into_line(m: invoice_line::Model) -> InvoiceLine {
 
 fn round2(v: f64) -> f64 {
     (v * 100.0).round() / 100.0
+}
+
+/// The invoice issued on `issue_date` with `number`, if any: how a Sistema TS
+/// document is traced back to its invoice.
+pub async fn find_id_by_issue(
+    db: &impl ConnectionTrait,
+    issue_date: &str,
+    number: &str,
+) -> Result<Option<i64>, String> {
+    #[derive(FromQueryResult)]
+    struct IdRow {
+        id: i64,
+    }
+
+    let row = IdRow::find_by_statement(Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Sqlite,
+        "SELECT id FROM invoices WHERE issue_date = ? AND invoice_number = ?",
+        [issue_date.into(), number.into()],
+    ))
+    .one(db)
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(row.map(|r| r.id))
 }

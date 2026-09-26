@@ -4,18 +4,20 @@
  * invoice), the places grouped by what they are for, and who you are.
  *
  * It also keeps a small pulse of the practice: today's sessions next to the
- * agenda, late invoices next to the invoices, and, on forfettario, how far
- * the year has gone towards the 85.000 € ceiling. The pulse is re-read on
+ * agenda, late invoices next to the invoices, Sistema TS transmissions that
+ * need a look, and, on forfettario, how far the year has gone towards the
+ * 85.000 € ceiling. The pulse is re-read on
  * every navigation, which is when a change made on a page can have landed.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { CalendarDays, ClipboardList, FileText, LayoutGrid, Plus, Search, Settings, Users } from 'lucide-vue-next'
+import { CalendarDays, ClipboardList, FileText, IdCard, LayoutGrid, Plus, Search, Settings, Users } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import { getDashboard, listAppointments, listInvoices } from '@/api'
 import { useConfigStore } from '@/stores/config'
+import { useStsStore } from '@/stores/sts'
 import { summariseAttention } from '@/utils/attention'
 import { FORFETTARIO_THRESHOLD, readThreshold } from '@/utils/forfettario'
 import { formatCurrencyCompact, todayIso } from '@/utils/format'
@@ -26,6 +28,7 @@ defineEmits<{ openPalette: [] }>()
 
 const route = useRoute()
 const configStore = useConfigStore()
+const sts = useStsStore()
 
 type Badge = { value: number; tone: 'accent' | 'danger' | 'neutral'; title: string }
 
@@ -48,6 +51,7 @@ async function refreshPulse(): Promise<void> {
     overdue.value = attention.overdue.count
     drafts.value = attention.drafts.count
     yearRevenue.value = dashboard.total_net_revenue
+    await sts.load()
   } catch {
     // The pulse is a courtesy: a failed read leaves the last known values in place.
   }
@@ -76,6 +80,14 @@ const NAV_GROUPS = computed(() => [
         badge: overdue.value > 0
           ? { value: overdue.value, tone: 'danger', title: 'Fatture scadute' } as Badge
           : drafts.value > 0 ? { value: drafts.value, tone: 'neutral', title: 'Bozze da emettere' } as Badge : null,
+      },
+      {
+        to: '/sts',
+        label: 'Sistema TS',
+        icon: IdCard,
+        badge: sts.counts.rejected > 0
+          ? { value: sts.counts.rejected, tone: 'danger', title: 'Trasmissioni scartate' } as Badge
+          : sts.counts.queued > 0 ? { value: sts.counts.queued, tone: 'neutral', title: 'Trasmissioni in coda' } as Badge : null,
       },
       { to: '/clients', label: 'Pazienti', icon: Users, badge: null },
       { to: '/services', label: 'Prestazioni', icon: ClipboardList, badge: null },

@@ -2,4 +2,8 @@ pub mod appointment_repository;
 pub mod client_repository;
 pub mod config_repository;
 pub mod invoice_repository;
+pub mod secret_store;
 pub mod service_repository;
+pub mod sistema_ts;
+pub mod ts_settings_repository;
+pub mod ts_submission_repository;

@@ -30,7 +30,7 @@ pub async fn find_all(
 
 /// Returns a single client by id.
 pub async fn find_by_id(
-    db: &DatabaseConnection,
+    db: &impl sea_orm::ConnectionTrait,
     id: i64,
 ) -> Result<Option<client::Model>, sea_orm::DbErr> {
     client::Entity::find_by_id(id).one(db).await

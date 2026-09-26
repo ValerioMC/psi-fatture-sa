@@ -19,6 +19,7 @@ const router = createRouter({
         { path: 'invoices/new', name: 'invoices.new', component: () => import('@/views/invoices/InvoiceFormView.vue') },
         { path: 'invoices/:id/edit', name: 'invoices.edit', component: () => import('@/views/invoices/InvoiceFormView.vue') },
         { path: 'invoices/:id', name: 'invoices.detail', component: () => import('@/views/invoices/InvoiceDetailView.vue') },
+        { path: 'sts', name: 'sts', component: () => import('@/views/sts/StsView.vue') },
         { path: 'agenda', name: 'agenda', component: () => import('@/views/agenda/AgendaView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
       ],

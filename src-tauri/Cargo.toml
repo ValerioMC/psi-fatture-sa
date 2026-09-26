@@ -26,6 +26,16 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "5"
 anyhow = "1"
 thiserror = "2"
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+quick-xml = "0.37"
+rsa = "0.9"
+x509-cert = { version = "0.2", features = ["pem"] }
+rand = "0.8"
+base64 = "0.22"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tokio = { version = "1", features = ["sync", "time"] }
+log = { version = "0.4", features = ["kv"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }

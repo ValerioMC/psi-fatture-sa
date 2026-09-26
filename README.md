@@ -230,6 +230,51 @@ e un solo colore d'accento (indaco inchiostro) per selezione, azione primaria e 
   sopra la barra laterale e intestazioni e barra laterale trascinano la finestra
   (permesso `core:window:allow-start-dragging`).
 
+## Sistema Tessera Sanitaria
+
+Le spese sanitarie delle fatture pagate si trasmettono al Sistema TS (Sogei) tramite il
+**web service sincrono** `DocumentoSpesa730p`, un documento per chiamata, con l'esito
+nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
+
+- **Dove**: la pagina *Sistema TS* (da trasmettere, trasmissioni con esito, contenuto
+  del Sistema TS mese per mese), il pannello nel dettaglio di ogni fattura (stato,
+  scadenze, invio, sostituzione, annullamento, verifica online) e un segno a forma di
+  tessera nella lista fatture.
+- **Credenziali**: in Impostazioni → *Sistema Tessera Sanitaria*: ambiente, codice
+  fiscale di accesso, partita IVA, password e PINCODE. Password e PINCODE stanno solo
+  nel portachiavi del sistema operativo (crate `keyring`, servizio
+  `it.psifatture.sistema-ts`); il frontend sa solo se ci sono. "Verifica credenziali"
+  fa una chiamata reale.
+- **Ambienti**: *Produzione* (`invioSS730p.sanita.finanze.it`) e *Test Sogei*
+  (`invioSS730pTest…`, senza valore fiscale). In test si può compilare con un clic
+  l'utenza pubblica "Psicologo" del kit Sogei. Ogni trasmissione ricorda il proprio
+  ambiente.
+- **Protocollo**: Basic auth con CF e password; PINCODE, CF del professionista e del
+  paziente cifrati RSA PKCS#1 v1.5 con il certificato `SanitelCF`
+  (`src-tauri/resources/sistema_ts/SanitelCF.pem`, **scade il 23/01/2027**: va
+  sostituito con quello del nuovo kit). L'host di test usa la CA *Sogei Certification
+  Authority Test*, inclusa in `SogeiTestCA.pem` e accettata solo per quell'ambiente.
+- **Cosa si invia**: tipo spesa `SP`, importo = onorario + contributo ENPAP (senza
+  bollo), natura IVA `N2.2` (forfettario) o `N4` (ordinario, esente), pagamento
+  tracciato per bonifico e POS, opposizione del paziente senza codice fiscale.
+- **Coda offline**: tabella `ts_submissions` (`invio` / `sostituzione` /
+  `annullamento`; stati `non_inviata → inviata → accettata | scartata`, poi
+  `annullata` / `sostituita`). Un worker la svuota ogni minuto; errori di rete e
+  `WS99` si ritentano con backoff da 1 minuto a 6 ore; credenziali rifiutate o
+  servizio irraggiungibile fermano il giro senza scartare nulla.
+- **Lista e verifica**: report mensile (`ReportMensile730`, per data di invio o di
+  pagamento) e interrogazione puntuale del singolo documento.
+- **Scadenze**: invio entro il 31 gennaio dell'anno dopo il pagamento, correzioni
+  gratuite nei 5 giorni successivi (spostati al lunedì se cadono nel weekend).
+- **Cancellazione fatture**: non si elimina una fattura i cui dati sono sul Sistema TS
+  di produzione; prima va annullato l'invio.
+
+Test contro l'ambiente di test Sogei (servono rete e l'utenza pubblica del kit):
+
+```bash
+cd src-tauri && cargo test live_ -- --ignored
+```
+
 ## Screenshot per il sito vetrina
 
 `scripts/screenshots/capture.mjs` genera le immagini WebP di psifatture.it dal dev
@@ -255,7 +300,8 @@ psi-fatture-sa/
 │   │   ├── ui/             # Componenti base (bottoni, campi, dialoghi, sigillo…)
 │   │   ├── layout/         # Barra laterale, layout, palette ⌘K
 │   │   ├── dashboard/      # Grafico mensile, soglia forfettario, stima fiscale
-│   │   └── profile/        # Sezioni del profilo (impostazioni e primo avvio)
+│   │   ├── profile/        # Sezioni del profilo, credenziali Sistema TS
+│   │   └── sts/            # Pannelli del Sistema Tessera Sanitaria
 │   ├── composables/        # Tema, focus trap, form profilo, smooth scroll
 │   ├── stores/             # State management (Pinia), notifiche
 │   └── utils/              # Formattazione, fisco, validazione, stato fatture
@@ -280,7 +326,9 @@ psi-fatture-sa/
 # sigillo delle fatture, soglia forfettario, date locali, ricorrenze, tema, notifiche
 npm test
 
-# Backend (cargo): calcolo totali fattura e validazione input
+# Backend (cargo): calcolo totali fattura, validazione input, Sistema TS (buste SOAP,
+# risposte reali catturate, coda, invio con gateway finto). I test usano un portachiavi
+# in memoria: non toccano quello di sistema
 cd src-tauri && cargo test
 ```
 
@@ -333,7 +381,8 @@ Il file `.vscode/settings.json` già presente nel repo configura:
 ## Stack tecnologico
 
 - **Frontend**: Vue 3, TypeScript, Tailwind CSS 4, Pinia, Vite
-- **Backend**: Rust, Tauri 2, SeaORM, SQLite
+- **Backend**: Rust, Tauri 2, SeaORM, SQLite, keyring (portachiavi di sistema),
+  reqwest + rustls, quick-xml, rsa (Sistema TS)
 - **Build**: Tauri CLI, Vite, vue-tsc
 - **Test**: Vitest (frontend), cargo test (backend)
 

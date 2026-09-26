@@ -121,7 +121,7 @@ fn validate_client_fields(
     Ok(())
 }
 
-fn into_domain(m: client::Model) -> Client {
+pub(crate) fn into_domain(m: client::Model) -> Client {
     Client {
         id: m.id,
         client_type: ClientType::from(m.client_type),

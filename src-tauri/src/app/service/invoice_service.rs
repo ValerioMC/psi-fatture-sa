@@ -13,6 +13,7 @@ use crate::app::repository::{appointment_repository, invoice_repository};
 use crate::app::service::tax_service::{
     calculate_invoice_totals, ritenuta_rate_for_regime, InvoiceLineData, ENPAP_RATE,
 };
+use crate::app::service::ts_submission_service;
 use crate::app::service::validation_service as validate;
 
 /// Lists invoices with optional filters (year, status, client_id, search).
@@ -112,6 +113,12 @@ pub async fn update(db: &DatabaseConnection, input: UpdateInvoiceInput) -> Resul
 
 /// Deletes an invoice by id.
 pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), String> {
+    if ts_submission_service::blocks_invoice_deletion(db, id).await? {
+        return Err(
+            "Fattura trasmessa al Sistema TS: annulla la trasmissione prima di eliminarla"
+                .to_string(),
+        );
+    }
     invoice_repository::delete_invoice(db, id)
         .await
         .map_err(|e| e.to_string())

@@ -1,10 +1,10 @@
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait};
+use sea_orm::{ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait};
 
 use crate::app::entity::professional_config::{self, ActiveModel};
 
 /// Returns the professional config (singleton, id=1), or None if not configured.
 pub async fn find(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
 ) -> Result<Option<professional_config::Model>, sea_orm::DbErr> {
     professional_config::Entity::find_by_id(1).one(db).await
 }
