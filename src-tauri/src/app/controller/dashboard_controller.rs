@@ -1,8 +1,8 @@
 use tauri::State;
 
+use crate::app::app_state::AppState;
 use crate::app::model::dashboard::DashboardData;
 use crate::app::service::dashboard_service;
-use crate::AppState;
 
 /// Returns aggregated dashboard analytics for the given year.
 #[tauri::command]

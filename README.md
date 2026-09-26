@@ -323,17 +323,40 @@ psi-fatture-sa/
 │   └── utils/              # Formattazione, fisco, validazione, stato fatture
 ├── src-tauri/              # Backend Rust + Tauri
 │   ├── src/
+│   │   ├── lib.rs          # Avvio: stato condiviso, worker, registrazione comandi
 │   │   ├── app/
-│   │   │   ├── controller/ # Comandi Tauri (API layer)
-│   │   │   ├── service/    # Logica di business
-│   │   │   ├── repository/ # Accesso dati (SeaORM)
-│   │   │   ├── entity/     # Entità database
-│   │   │   └── model/      # DTO e tipi condivisi
-│   │   └── migration/      # Migrazioni schema SQLite
+│   │   │   ├── app_state.rs # Stato condiviso dai comandi (DB, credenziali, gateway)
+│   │   │   ├── controller/ # Comandi Tauri (API layer); ts/ per il Sistema TS
+│   │   │   ├── service/    # Logica di business; ts/ per il Sistema TS
+│   │   │   ├── repository/ # Accesso dati (SeaORM, SQL) e servizi esterni
+│   │   │   │   ├── invoice/    # Fatture e proiezione delle righe lette
+│   │   │   │   ├── secret/     # Archivio cifrato delle credenziali
+│   │   │   │   └── ts/         # Coda STS; sistema_ts/ è il client SOAP
+│   │   │   ├── scheduler/  # Worker in background (invio coda STS)
+│   │   │   ├── entity/     # Entità database (una tabella per file)
+│   │   │   ├── model/      # DTO e tipi condivisi, un sottopackage per dominio
+│   │   │   └── db/         # Connessione e percorsi dei file dati
+│   │   ├── migration/      # Migrazioni schema SQLite
+│   │   └── test_support/   # Test double e fixture condivisi (solo in `cargo test`)
 │   ├── tauri.conf.json     # Configurazione Tauri
 │   └── Cargo.toml          # Dipendenze Rust
 └── package.json            # Dipendenze frontend
 ```
+
+### Convenzioni del backend
+
+- **Strati**: `controller → service → repository → model/entity`. I controller
+  inoltrano ai service; solo i repository scrivono SQL o chiamano servizi esterni.
+- **Un tipo per file**: ogni `struct`, `enum` e `trait` ha il suo file, chiamato come
+  il tipo in snake_case (`TsSubmissionStatus` → `ts_submission_status.rs`). Il
+  `mod.rs` del package lo riesporta, così si importa `model::ts::TsSubmission`.
+  Eccezioni: le entità SeaORM (`Model` e `Relation` devono stare nello stesso modulo)
+  e le struct di riga dichiarate dentro una sola funzione di query.
+- **Sottopackage per dominio** quando un concetto ha più file (`ts/`, `invoice/`,
+  `secret/`). I tipi di servizio interni al package sono `pub(super)`.
+- **Test separati**: i test di `foo.rs` stanno in `foo_test.rs` accanto, dichiarati
+  con `#[cfg(test)] #[path = "foo_test.rs"] mod tests;`. Restano figli del modulo, quindi
+  vedono anche le funzioni private. I doppi riusati in più test stanno in `src/test_support/`.
 
 ## Test
 

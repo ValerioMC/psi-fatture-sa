@@ -1,8 +1,8 @@
 use tauri::State;
 
+use crate::app::app_state::AppState;
 use crate::app::model::service::{CreateServiceInput, Service, UpdateServiceInput};
 use crate::app::service::service_service;
-use crate::AppState;
 
 /// Lists services, optionally filtering to active-only.
 #[tauri::command]

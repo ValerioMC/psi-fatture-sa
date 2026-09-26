@@ -1,10 +1,10 @@
 use tauri::State;
 
+use crate::app::app_state::AppState;
 use crate::app::model::appointment::{
     Appointment, CreateAppointmentInput, CreateRecurringAppointmentsInput, UpdateAppointmentInput,
 };
 use crate::app::service::appointment_service;
-use crate::AppState;
 
 /// Lists appointments with optional date range and client filters.
 #[tauri::command]

@@ -1,8 +1,8 @@
 use tauri::State;
 
+use crate::app::app_state::AppState;
 use crate::app::model::client::{Client, CreateClientInput, UpdateClientInput};
 use crate::app::service::client_service;
-use crate::AppState;
 
 /// Lists all clients, optionally filtered by search query.
 #[tauri::command]

@@ -1,8 +1,8 @@
 use tauri::State;
 
+use crate::app::app_state::AppState;
 use crate::app::model::config::{ProfessionalConfig, UpsertConfigInput};
 use crate::app::service::config_service;
-use crate::AppState;
 
 /// Returns the professional config, or None if not yet configured.
 #[tauri::command]

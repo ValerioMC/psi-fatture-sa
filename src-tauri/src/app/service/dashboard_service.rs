@@ -1,7 +1,11 @@
-use sea_orm::{DatabaseConnection, FromQueryResult, Statement};
+use std::collections::HashMap;
 
-use crate::app::model::dashboard::{DashboardData, MonthlyRevenue};
-use crate::app::repository::invoice_repository;
+use sea_orm::DatabaseConnection;
+
+use crate::app::model::dashboard::{DashboardData, MonthTotal, MonthlyRevenue};
+use crate::app::model::invoice::Invoice;
+use crate::app::repository::dashboard_repository;
+use crate::app::repository::invoice::invoice_repository;
 
 const MONTH_NAMES: [&str; 12] = [
     "Gennaio",
@@ -20,145 +24,54 @@ const MONTH_NAMES: [&str; 12] = [
 
 /// Returns aggregated dashboard analytics for the given year.
 pub async fn get(db: &DatabaseConnection, year: i64) -> Result<DashboardData, String> {
-    let total_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
-    let total_net_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_net),0) AS REAL) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await?;
-    let paid_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status='paid'", year).await?;
-    let unpaid_revenue = query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status IN ('issued','overdue')", year).await?;
-    let total_invoices = query_i64(
-        db,
-        "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status!='cancelled'",
-        year,
-    )
-    .await?;
-    let paid_invoices = query_i64(
-        db,
-        "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='paid'",
-        year,
-    )
-    .await?;
-    let draft_invoices = query_i64(
-        db,
-        "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='draft'",
-        year,
-    )
-    .await?;
-
-    let monthly_revenue = build_monthly_revenue(db, year).await?;
-    let recent_invoices = load_recent_invoices(db, year).await?;
-
+    let month_totals = dashboard_repository::paid_totals_by_month(db, year).await?;
     Ok(DashboardData {
         year,
-        total_revenue,
-        total_net_revenue,
-        paid_revenue,
-        unpaid_revenue,
-        total_invoices,
-        paid_invoices,
-        draft_invoices,
-        monthly_revenue,
-        recent_invoices,
+        total_revenue: dashboard_repository::revenue(db, year).await?,
+        total_net_revenue: dashboard_repository::net_revenue(db, year).await?,
+        paid_revenue: dashboard_repository::paid_revenue(db, year).await?,
+        unpaid_revenue: dashboard_repository::unpaid_revenue(db, year).await?,
+        total_invoices: dashboard_repository::invoice_count(db, year).await?,
+        paid_invoices: dashboard_repository::paid_invoice_count(db, year).await?,
+        draft_invoices: dashboard_repository::draft_invoice_count(db, year).await?,
+        monthly_revenue: monthly_revenue(&month_totals),
+        recent_invoices: recent_invoices(db, year).await?,
     })
 }
 
-// ─── Private helpers ──────────────────────────────────────────────────────────
-
-async fn query_f64(db: &DatabaseConnection, sql: &str, year: i64) -> Result<f64, String> {
-    #[derive(FromQueryResult)]
-    struct Row {
-        val: f64,
-    }
-    let row = Row::find_by_statement(Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Sqlite,
-        sql,
-        [year.into()],
-    ))
-    .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
-    Ok(row.map(|r| r.val).unwrap_or(0.0))
-}
-
-async fn query_i64(db: &DatabaseConnection, sql: &str, year: i64) -> Result<i64, String> {
-    #[derive(FromQueryResult)]
-    struct Row {
-        val: i64,
-    }
-    let row = Row::find_by_statement(Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Sqlite,
-        sql,
-        [year.into()],
-    ))
-    .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
-    Ok(row.map(|r| r.val).unwrap_or(0))
-}
-
-async fn build_monthly_revenue(
-    db: &DatabaseConnection,
-    year: i64,
-) -> Result<Vec<MonthlyRevenue>, String> {
-    #[derive(FromQueryResult)]
-    struct Row {
-        month: i64,
-        revenue: f64,
-        invoice_count: i64,
-    }
-
-    let rows = Row::find_by_statement(Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Sqlite,
-        "SELECT CAST(strftime('%m', issue_date) AS INTEGER) AS month,
-                CAST(COALESCE(SUM(total_due), 0) AS REAL) AS revenue,
-                COUNT(*) AS invoice_count
-         FROM invoices WHERE year=? AND status='paid'
-         GROUP BY month ORDER BY month",
-        [year.into()],
-    ))
-    .all(db)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    let map: std::collections::HashMap<i64, (f64, i64)> = rows
-        .into_iter()
-        .map(|r| (r.month, (r.revenue, r.invoice_count)))
-        .collect();
-
-    Ok((1i64..=12)
-        .map(|m| {
-            let (revenue, invoice_count) = map.get(&m).copied().unwrap_or((0.0, 0));
+/// All twelve months, zero where nothing was paid.
+fn monthly_revenue(totals: &[MonthTotal]) -> Vec<MonthlyRevenue> {
+    let by_month: HashMap<i64, &MonthTotal> = totals.iter().map(|t| (t.month, t)).collect();
+    (1i64..=12)
+        .map(|month| {
+            let (revenue, invoice_count) = by_month
+                .get(&month)
+                .map(|t| (t.revenue, t.invoice_count))
+                .unwrap_or((0.0, 0));
             MonthlyRevenue {
-                month: m,
-                month_name: MONTH_NAMES[(m - 1) as usize].to_string(),
+                month,
+                month_name: MONTH_NAMES[(month - 1) as usize].to_string(),
                 revenue,
                 invoice_count,
             }
         })
-        .collect())
+        .collect()
 }
 
-async fn load_recent_invoices(
-    db: &DatabaseConnection,
-    year: i64,
-) -> Result<Vec<crate::app::model::invoice::Invoice>, String> {
-    #[derive(FromQueryResult)]
-    struct IdRow {
-        id: i64,
-    }
-
-    let rows = IdRow::find_by_statement(Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Sqlite,
-        "SELECT id FROM invoices WHERE year=? AND status!='cancelled' ORDER BY issue_date DESC LIMIT 5",
-        [year.into()],
-    ))
-    .all(db)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    let mut results = Vec::new();
-    for row in rows {
-        if let Ok(inv) = invoice_repository::load_invoice(db, row.id).await {
-            results.push(inv);
+/// An invoice that fails to load is left out rather than failing the whole dashboard.
+async fn recent_invoices(db: &DatabaseConnection, year: i64) -> Result<Vec<Invoice>, String> {
+    let mut invoices = Vec::new();
+    for id in dashboard_repository::recent_invoice_ids(db, year).await? {
+        match invoice_repository::load_invoice(db, id).await {
+            Ok(invoice) => invoices.push(invoice),
+            Err(error) => {
+                log::warn!(target: "dashboard", invoice_id = id, error:% = error; "recent invoice skipped")
+            }
         }
     }
-    Ok(results)
+    Ok(invoices)
 }
+
+#[cfg(test)]
+#[path = "dashboard_service_test.rs"]
+mod tests;

@@ -2,31 +2,18 @@
 
 mod app;
 mod migration;
+#[cfg(test)]
+mod test_support;
 
 use std::sync::Arc;
 
-use sea_orm::DatabaseConnection;
-
+use app::app_state::AppState;
 use app::controller::{
     appointment_controller::*, client_controller::*, config_controller::*, dashboard_controller::*,
-    invoice_controller::*, service_controller::*, ts_controller::*,
+    invoice_controller::*, print_controller::*, service_controller::*, ts::ts_controller::*,
 };
-use app::repository::secret_store::{EncryptedFileSecretStore, OsMachineId, SecretStore};
-use app::repository::sistema_ts::gateway::SistemaTsGateway;
-use app::repository::sistema_ts::http_gateway::HttpSistemaTsGateway;
-
-/// Application state shared across all Tauri commands.
-pub struct AppState {
-    pub db: DatabaseConnection,
-    pub secrets: Arc<dyn SecretStore>,
-    pub ts_gateway: Arc<dyn SistemaTsGateway>,
-}
-
-/// Triggers the native OS print dialog for the current webview.
-#[tauri::command]
-fn print_current_page(webview: tauri::Webview) -> Result<(), String> {
-    webview.print().map_err(|e| e.to_string())
-}
+use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
+use app::repository::ts::sistema_ts::{HttpSistemaTsGateway, SistemaTsGateway};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -39,7 +26,7 @@ pub fn run() {
     ));
     let ts_gateway: Arc<dyn SistemaTsGateway> =
         Arc::new(HttpSistemaTsGateway::new().expect("Failed to load the Sistema TS certificates"));
-    app::controller::ts_worker::spawn(db.clone(), secrets.clone(), ts_gateway.clone());
+    app::scheduler::ts_worker::spawn(db.clone(), secrets.clone(), ts_gateway.clone());
 
     tauri::Builder::default()
         .manage(AppState {

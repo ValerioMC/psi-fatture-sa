@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::ts_submission_status::TsSubmissionStatus;
+use super::TsSubmissionStatus;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct TsSubmissionFilters {

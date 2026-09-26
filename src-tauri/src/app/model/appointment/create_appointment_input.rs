@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::appointment::AppointmentStatus;
+use super::AppointmentStatus;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateAppointmentInput {

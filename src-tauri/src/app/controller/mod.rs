@@ -3,6 +3,6 @@ pub mod client_controller;
 pub mod config_controller;
 pub mod dashboard_controller;
 pub mod invoice_controller;
+pub mod print_controller;
 pub mod service_controller;
-pub mod ts_controller;
-pub mod ts_worker;
+pub mod ts;

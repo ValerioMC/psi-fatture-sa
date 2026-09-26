@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::ts_document::TsDocumentId;
-use super::ts_environment::TsEnvironment;
-use super::ts_operation::TsOperation;
-use super::ts_submission_status::TsSubmissionStatus;
+use super::{TsDocumentId, TsEnvironment, TsOperation, TsSubmissionStatus};
 
 /// One queued or completed Sistema TS transmission, with the invoice it reports.
 #[derive(Debug, Clone, Serialize, Deserialize)]
