@@ -92,7 +92,7 @@ const legalNotes = computed((): string[] => {
   return lines
 })
 
-/** Opens the native OS print dialog via Tauri. On macOS use PDF → "Save as PDF" to export. */
+/** Opens the native OS print dialog via Tauri. */
 async function handlePrint(): Promise<void> {
   await invoke('print_current_page')
 }
@@ -106,9 +106,9 @@ async function handlePrint(): Promise<void> {
       <div class="toolbar-inner mx-auto flex max-w-[794px] items-center gap-2 py-3" data-tauri-drag-region>
         <AppButton variant="ghost" :icon="ArrowLeft" :to="`/invoices/${invoiceId}`">Fattura</AppButton>
         <p class="flex-1 text-center text-sm text-text-subtle" data-tauri-drag-region>
-          Dalla finestra di stampa scegli <span class="font-medium text-text-muted">Salva come PDF</span> per inviarla.
+          Per il paziente il PDF lo prepara l’app: dalla fattura, <span class="font-medium text-text-muted">Salva PDF</span> o <span class="font-medium text-text-muted">Invia al paziente</span>.
         </p>
-        <AppButton v-if="!loading && invoice" variant="primary" :icon="Printer" @click="handlePrint">Stampa o salva PDF</AppButton>
+        <AppButton v-if="!loading && invoice" variant="primary" :icon="Printer" @click="handlePrint">Stampa</AppButton>
       </div>
     </div>
 

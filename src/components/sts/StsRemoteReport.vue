@@ -80,7 +80,7 @@ watch([year, month, basis], () => { void load() }, { immediate: true })
   <SkeletonRows v-if="loading && rows === null" variant="table" :count="5" label="Lettura del report dal Sistema TS" />
 
   <EmptyState v-else-if="failure" :icon="CloudOff" :bordered="false" title="Report non disponibile" :description="failure">
-    <AppButton to="/settings">Controlla le credenziali</AppButton>
+    <AppButton to="/settings/sts">Controlla le credenziali</AppButton>
   </EmptyState>
 
   <EmptyState

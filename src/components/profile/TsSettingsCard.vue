@@ -9,7 +9,6 @@
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRoute } from 'vue-router'
 import { KeyRound, PlugZap, ShieldCheck } from 'lucide-vue-next'
 import {
   checkTsConnection,
@@ -22,13 +21,14 @@ import {
 import { useStsStore } from '@/stores/sts'
 import { errorMessage, useToastStore } from '@/stores/toast'
 import type { TsConnectionCheck, TsSettings } from '@/types'
+import ActionButton from '@/components/ui/ActionButton.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import FormField from '@/components/ui/FormField.vue'
 import TsCredentialsGuide from '@/components/sts/TsCredentialsGuide.vue'
-import TsSecretRow from './TsSecretRow.vue'
+import SecretRow from './SecretRow.vue'
 import TsTestEnvironmentTray from './TsTestEnvironmentTray.vue'
 
 /** The public psychologist user of the Sogei development kit (kit730P 20240214). */
@@ -44,10 +44,7 @@ const toast = useToastStore()
 
 const form = reactive<TsSettings>({ environment: 'produzione', username: '', vat_number: '' })
 const { credentials } = storeToRefs(sts)
-const route = useRoute()
-const sectionRef = ref<HTMLElement | null>(null)
 const saving = ref(false)
-const checking = ref(false)
 const check = ref<TsConnectionCheck | null>(null)
 const removing = ref<'password' | 'pincode' | null>(null)
 const removeBusy = ref(false)
@@ -59,7 +56,6 @@ onMounted(async () => {
   } catch (error) {
     toast.notifyError(error, 'Impostazioni Sistema TS non leggibili')
   }
-  if (route.query.focus === 'sts') sectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 })
 
 const incomplete = computed(() => credentials.value !== null && !(credentials.value.password_configured && credentials.value.pincode_configured))
@@ -130,27 +126,25 @@ async function useSogeiTestUser(): Promise<void> {
   }
 }
 
-async function verify(): Promise<void> {
-  checking.value = true
+async function verify(): Promise<boolean> {
   try {
     check.value = await checkTsConnection()
   } catch (error) {
     check.value = { ok: false, message: errorMessage(error) }
-  } finally {
-    checking.value = false
   }
+  return check.value.ok
 }
 </script>
 
 <template>
-  <section id="sistema-ts" ref="sectionRef" class="scroll-mt-32">
+  <section id="sistema-ts">
     <AppCard :padded="false">
       <CardHeader title="Sistema Tessera Sanitaria" subtitle="Invio delle spese sanitarie" :icon="KeyRound" />
 
       <div class="space-y-4 px-5 pb-5">
         <TsTestEnvironmentTray v-if="sts.testAvailable" v-model="form.environment" :busy="saving" @use-test-user="useSogeiTestUser" />
 
-        <TsCredentialsGuide v-if="form.environment === 'produzione'" :initially-open="incomplete || route.query.focus === 'sts'" />
+        <TsCredentialsGuide v-if="form.environment === 'produzione'" :initially-open="incomplete" />
 
         <form class="space-y-3" novalidate @submit.prevent="saveIdentity">
           <FormField v-slot="{ id, invalid, describedBy }" label="Codice fiscale di accesso" hint="L’utente con cui entri nel Sistema TS.">
@@ -165,8 +159,8 @@ async function verify(): Promise<void> {
         </form>
 
         <div v-if="credentials" class="space-y-2">
-          <TsSecretRow label="Password" hint="La password del Sistema TS." :configured="credentials.password_configured" :save="savePassword" @remove="removing = 'password'" />
-          <TsSecretRow label="PINCODE" hint="Quello delle tue credenziali Sistema TS." :configured="credentials.pincode_configured" no-spaces :save="savePincode" @remove="removing = 'pincode'" />
+          <SecretRow label="Password" field-label="Password Sistema TS" hint="La password del Sistema TS." :configured="credentials.password_configured" :save="savePassword" @remove="removing = 'password'" />
+          <SecretRow label="PINCODE" field-label="PINCODE Sistema TS" hint="Quello delle tue credenziali Sistema TS." :configured="credentials.pincode_configured" no-spaces :save="savePincode" @remove="removing = 'pincode'" />
         </div>
 
         <p class="flex items-start gap-2 text-xs leading-relaxed text-text-subtle">
@@ -175,7 +169,7 @@ async function verify(): Promise<void> {
         </p>
 
         <div class="border-t border-border pt-4">
-          <AppButton block :icon="PlugZap" :loading="checking" :disabled="dirty" @click="verify">Verifica credenziali</AppButton>
+          <ActionButton block variant="secondary" :icon="PlugZap" :run="verify" :disabled="dirty" done-label="Verificate" working-label="Verifica delle credenziali in corso">Verifica credenziali</ActionButton>
           <Transition name="pane">
             <p
               v-if="check"

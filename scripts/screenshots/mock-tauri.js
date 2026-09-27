@@ -172,7 +172,89 @@
   seedTs()
   const tsLive = (invoiceId) => [...tsSubs].reverse().find((s) => s.invoice_id === invoiceId && s.status === 'accettata' && s.operation !== 'annullamento' && s.environment === tsSettings.environment)
   const tsTotal = (inv) => inv.total_gross
+  // ─── Email: a psypec.it mailbox, ready, and the last month's invoices already sent ───
+  const EMAIL_PRESETS = [
+    { provider: 'psypec', label: 'PEC psypec.it', host: 'smtps.sicurezzapostale.it', port: 465, security: 'tls', domains: ['psypec.it'], certified: true, note: "La casella PEC gratuita dell'Ordine degli Psicologi, gestita da Namirial. Usa l'indirizzo completo e la password della casella." },
+    { provider: 'aruba_pec', label: 'PEC Aruba', host: 'smtps.pec.aruba.it', port: 465, security: 'tls', domains: ['pec.it', 'arubapec.it'], certified: true, note: "Una casella PEC di Aruba. Usa l'indirizzo completo e la password della casella." },
+    { provider: 'gmail', label: 'Gmail', host: 'smtp.gmail.com', port: 465, security: 'tls', domains: ['gmail.com', 'googlemail.com'], certified: false, note: 'Gmail accetta solo una password per le app: si crea da account Google → Sicurezza, con la verifica in due passaggi attiva.' },
+    { provider: 'custom', label: 'Altro provider', host: '', port: 465, security: 'tls', domains: [], certified: false, note: 'Server, porta e sicurezza si trovano nella guida del tuo provider, alla voce SMTP o posta in uscita.' },
+  ]
+  const emailAccount = window.__MOCK_EMAIL_UNSET
+    ? { provider: 'psypec', sender_address: '', sender_name: 'Dott.ssa Maria Ferretti', smtp_host: 'smtps.sicurezzapostale.it', smtp_port: 465, security: 'tls', username: '', bcc_self: false, saved: false }
+    : { provider: 'psypec', sender_address: 'maria.ferretti@psypec.it', sender_name: 'Dott.ssa Maria Ferretti', smtp_host: 'smtps.sicurezzapostale.it', smtp_port: 465, security: 'tls', username: 'maria.ferretti@psypec.it', bcc_self: true, saved: true }
+  const emailCreds = { password_configured: !window.__MOCK_EMAIL_UNSET }
+  const DEFAULT_TEMPLATE = { subject: 'Fattura n. {numero_fattura} – {professionista}', body: 'Gentile {paziente},\n\nin allegato trova la fattura n. {numero_fattura} del {data_fattura}, per un importo di {importo}.\n\nResto a disposizione per qualsiasi chiarimento.\n\nCordiali saluti,\n{professionista}' }
+  let emailTemplate = { ...DEFAULT_TEMPLATE }
+  const PLACEHOLDERS = [['paziente', 'Paziente'], ['nome_paziente', 'Nome del paziente'], ['numero_fattura', 'Numero fattura'], ['data_fattura', 'Data fattura'], ['importo', 'Importo dovuto'], ['scadenza', 'Scadenza'], ['professionista', 'Il tuo nome']].map(([key, label]) => ({ key, label }))
+  const MONTH_NAMES = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre']
+  const longDate = (d) => d ? `${Number(d.slice(8, 10))} ${MONTH_NAMES[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}` : ''
+  const euro = (v) => `${v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')} €`
+  const fill = (text, values) => text.replace(/\{\s*([a-z_]+)\s*\}/g, (all, key) => (key in values ? values[key] : all))
+  const valuesOf = (inv) => {
+    const c = clients.find((x) => x.id === inv.client_id)
+    const patient = c.client_type === 'azienda' ? c.last_name : `${c.first_name} ${c.last_name}`
+    return { paziente: patient, nome_paziente: c.first_name || patient, numero_fattura: `${inv.invoice_number}/${inv.year}`, data_fattura: longDate(inv.issue_date), importo: euro(inv.total_due), scadenza: longDate(inv.due_date), professionista: 'Dott.ssa Maria Ferretti' }
+  }
+  const invoiceEmails = []
+  let emailId = 1
+  const emailRecord = (inv, status, error, at) => {
+    const c = clients.find((x) => x.id === inv.client_id)
+    const record = { id: emailId++, invoice_id: inv.id, recipient: c.email ?? 'paziente@email.it', subject: fill(emailTemplate.subject, valuesOf(inv)), attachment_name: `Fattura_${inv.invoice_number}_${inv.year}.pdf`, status, error, sent_at: at }
+    invoiceEmails.unshift(record)
+    return record
+  }
+  for (const inv of invoices.filter((i) => i.status !== 'draft' && i.status !== 'cancelled').slice(-60, -8)) {
+    if (clients.find((c) => c.id === inv.client_id).email) emailRecord(inv, 'sent', null, `${addDays(inv.issue_date, 1)} 09:${pad(10 + (inv.id % 40))}:00`)
+  }
+  const sendDelay = () => new Promise((r) => setTimeout(r, window.__MOCK_SEND_DELAY ?? 1400))
+
   const handlers = {
+    get_email_providers: () => EMAIL_PRESETS,
+    get_email_account: () => emailAccount,
+    update_email_account: ({ input }) => {
+      const preset = EMAIL_PRESETS.find((p) => p.provider === input.provider)
+      Object.assign(emailAccount, input, input.provider === 'custom' ? {} : { smtp_host: preset.host, smtp_port: preset.port, security: preset.security }, { username: input.username || input.sender_address, saved: true })
+      return emailAccount
+    },
+    get_email_credentials_status: () => emailCreds,
+    save_email_password: () => Object.assign(emailCreds, { password_configured: true }),
+    delete_email_password: () => Object.assign(emailCreds, { password_configured: false }),
+    check_email_connection: async () => { await sendDelay(); return window.__MOCK_EMAIL_FAIL ? { ok: false, message: 'Il server di posta non ha accettato indirizzo e password: controllali nelle Impostazioni' } : { ok: true, message: `Collegamento riuscito: le fatture partiranno da ${emailAccount.sender_address}` } },
+    get_email_template: () => emailTemplate,
+    update_email_template: ({ template }) => { emailTemplate = { subject: template.subject.trim(), body: template.body.trim() }; return emailTemplate },
+    reset_email_template: () => { emailTemplate = { ...DEFAULT_TEMPLATE }; return emailTemplate },
+    get_email_placeholders: () => PLACEHOLDERS,
+    preview_email_template: ({ template }) => {
+      const values = { paziente: 'Anna Bianchi', nome_paziente: 'Anna', numero_fattura: `12/${TY}`, data_fattura: longDate(todayIso), importo: '81,60 €', scadenza: longDate(addDays(todayIso, 30)), professionista: 'Dott.ssa Maria Ferretti' }
+      return { subject: fill(template.subject, values), body: fill(template.body, values) }
+    },
+    prepare_invoice_email: ({ invoiceId }) => {
+      const inv = invoices.find((i) => i.id === invoiceId)
+      if (inv.status === 'draft') throw new Error('Emetti la fattura prima di inviarla al paziente')
+      const c = clients.find((x) => x.id === inv.client_id)
+      const values = valuesOf(inv)
+      return { invoice_id: inv.id, recipient: c.email ?? '', recipient_on_file: Boolean(c.email), subject: fill(emailTemplate.subject, values), body: fill(emailTemplate.body, values), attachment_name: `Fattura_${inv.invoice_number}_${inv.year}.pdf` }
+    },
+    send_invoice_email: async ({ input }) => {
+      await sendDelay()
+      const inv = invoices.find((i) => i.id === input.invoice_id)
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
+      if (window.__MOCK_EMAIL_FAIL) { emailRecord(inv, 'failed', 'Il server di posta non risponde: riprova tra qualche minuto', now); throw new Error('Il server di posta non risponde: riprova tra qualche minuto') }
+      const record = emailRecord(inv, 'sent', null, now)
+      record.recipient = input.recipient
+      return record
+    },
+    send_prepared_invoice_email: async ({ invoiceId }) => {
+      await sendDelay()
+      const inv = invoices.find((i) => i.id === invoiceId)
+      if (!clients.find((c) => c.id === inv.client_id).email) throw new Error('Il paziente non ha un indirizzo email nella sua scheda')
+      return emailRecord(inv, 'sent', null, new Date().toISOString().slice(0, 19).replace('T', ' '))
+    },
+    list_invoice_emails: ({ filters }) => invoiceEmails.filter((e) => !filters?.invoice_id || e.invoice_id === filters.invoice_id),
+    open_invoice_pdf: () => null,
+    save_invoice_pdf: async () => { await sendDelay() },
+    get_invoice_pdf_name: ({ invoiceId }) => { const inv = invoices.find((i) => i.id === invoiceId); return `Fattura_${inv.invoice_number}_${inv.year}.pdf` },
+    'plugin:dialog|save': ({ options }) => `/Users/demo/Documents/${options?.defaultPath ?? 'Fattura.pdf'}`,
     get_config: () => (window.__MOCK_NO_CONFIG ? null : config),
     get_ts_environments: () => (window.__MOCK_TS_TEST ? ['produzione', 'test'] : ['produzione']),
     get_ts_settings: () => tsSettings,
@@ -289,7 +371,7 @@
       const handler = handlers[cmd]
       if (!handler) { console.warn('mock: unhandled', cmd); throw new Error(`mock: ${cmd}`) }
       await new Promise((r) => setTimeout(r, 30))
-      return clone(handler(args) ?? null)
+      return clone((await handler(args)) ?? null)
     },
     transformCallback: () => 0,
     metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },

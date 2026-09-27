@@ -117,3 +117,16 @@ fn rejects_vat_number_with_wrong_check_digit() {
     let result = validate_vat_number("01234567890");
     assert!(result.unwrap_err().contains("cifra di controllo errata"));
 }
+
+#[test]
+fn validates_email_shape() {
+    assert!(validate_email("").is_ok());
+    assert!(validate_email(" anna@example.it ").is_ok());
+    assert!(validate_email("maria.demo@psypec.it").is_ok());
+    assert!(validate_email("anna.example.it").is_err());
+    assert!(validate_email("anna@example").is_err());
+    assert!(validate_email("anna@example.i").is_err());
+    assert!(validate_email("an na@example.it").is_err());
+    assert!(validate_email("@example.it").is_err());
+    assert!(validate_email("anna@@example.it").is_err());
+}

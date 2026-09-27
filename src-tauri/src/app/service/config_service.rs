@@ -78,7 +78,7 @@ fn build_active_model(input: &UpsertConfigInput) -> ActiveModel {
     }
 }
 
-fn into_domain(m: professional_config::Model) -> ProfessionalConfig {
+pub(crate) fn into_domain(m: professional_config::Model) -> ProfessionalConfig {
     ProfessionalConfig {
         id: m.id,
         title: m.title,

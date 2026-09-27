@@ -1,5 +1,6 @@
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
+    EntityTrait, QueryFilter, QueryOrder,
 };
 
 use crate::app::entity::client::{self, ActiveModel, Column};
@@ -50,6 +51,22 @@ pub async fn update(
     active: ActiveModel,
 ) -> Result<client::Model, sea_orm::DbErr> {
     active.update(db).await
+}
+
+/// Sets a client's email address, leaving every other field as it is.
+pub async fn update_email(
+    db: &impl ConnectionTrait,
+    id: i64,
+    email: &str,
+) -> Result<(), sea_orm::DbErr> {
+    let active = ActiveModel {
+        id: Set(id),
+        email: Set(Some(email.to_string())),
+        updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
+        ..Default::default()
+    };
+    active.update(db).await?;
+    Ok(())
 }
 
 /// Deletes a client by id.

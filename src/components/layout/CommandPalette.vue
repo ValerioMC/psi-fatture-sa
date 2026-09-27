@@ -7,8 +7,8 @@
 import { computed, nextTick, ref, toRef, watch, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  CalendarDays, CalendarRange, ClipboardList, CornerDownLeft, FileText, IdCard, LayoutGrid,
-  Moon, Plus, Search, Settings, Sun, UserPlus, Users,
+  CalendarDays, CalendarRange, ClipboardList, CornerDownLeft, FileText, IdCard, KeyRound, LayoutGrid,
+  Mail, Moon, Plus, Search, Settings, Sun, UserPlus, Users,
 } from 'lucide-vue-next'
 import { useFocusTrap } from '@/composables/useFocusTrap'
 import { useTheme } from '@/composables/useTheme'
@@ -63,7 +63,9 @@ const staticItems = computed<PaletteItem[]>(() => [
   { id: 'go-patients', group: 'Vai a', label: 'Pazienti', keywords: 'clienti', icon: Users, run: go('/clients') },
   { id: 'go-services', group: 'Vai a', label: 'Prestazioni', keywords: 'tariffe servizi', icon: ClipboardList, run: go('/services') },
   { id: 'go-sts', group: 'Vai a', label: 'Sistema TS', keywords: 'tessera sanitaria spese sanitarie precompilata 730 trasmissione', icon: IdCard, run: go('/sts') },
-  { id: 'go-settings', group: 'Vai a', label: 'Impostazioni', keywords: 'profilo partita iva iban', icon: Settings, run: go('/settings') },
+  { id: 'go-settings', group: 'Vai a', label: 'Impostazioni', keywords: 'profilo partita iva iban', icon: Settings, run: go('/settings/profile') },
+  { id: 'go-settings-email', group: 'Vai a', label: 'Impostazioni email', keywords: 'posta pec psypec smtp modello invio fatture', icon: Mail, run: go('/settings/email') },
+  { id: 'go-settings-sts', group: 'Vai a', label: 'Credenziali Sistema TS', keywords: 'pincode password tessera sanitaria', icon: KeyRound, run: go('/settings/sts') },
 ])
 
 const patientItems = computed<PaletteItem[]>(() =>

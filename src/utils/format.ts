@@ -126,3 +126,13 @@ export function splitCurrency(value: number): CurrencyParts {
     symbol: pick(['currency']),
   }
 }
+
+/**
+ * Formats a UTC timestamp saved by the backend ("YYYY-MM-DD HH:MM:SS") in local time.
+ * @example formatUtcTimestamp("2026-09-26 10:05:00") → "26 set, 12:05"
+ */
+export function formatUtcTimestamp(timestamp: string): string {
+  const moment = new Date(`${timestamp.replace(' ', 'T')}Z`)
+  if (Number.isNaN(moment.getTime())) return timestamp
+  return moment.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}

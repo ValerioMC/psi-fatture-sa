@@ -7,9 +7,11 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CalendarRange, CircleCheck, FileText, Hourglass, Pencil, Plus, Search, Sigma, Trash2, X } from 'lucide-vue-next'
+import { CalendarRange, CircleCheck, FileText, Hourglass, Pencil, Plus, Search, Send, Sigma, Trash2, X } from 'lucide-vue-next'
+import { checkEmailConnection } from '@/api'
 import { useInvoicesStore } from '@/stores/invoices'
-import { useToastStore } from '@/stores/toast'
+import { errorMessage, useToastStore } from '@/stores/toast'
+import { useEmailStore } from '@/stores/email'
 import type { Invoice, InvoiceStatus } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -18,6 +20,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import InvoiceSeal from '@/components/ui/InvoiceSeal.vue'
 import TsMark from '@/components/ui/TsMark.vue'
+import MailMark from '@/components/ui/MailMark.vue'
 import { useStsStore } from '@/stores/sts'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -35,6 +38,7 @@ const route = useRoute()
 const router = useRouter()
 const invoicesStore = useInvoicesStore()
 const sts = useStsStore()
+const email = useEmailStore()
 const toast = useToastStore()
 const currentYear = new Date().getFullYear()
 
@@ -147,8 +151,9 @@ async function load(): Promise<void> {
 watch(year, load)
 onMounted(() => {
   void load()
-  // The Sistema TS marks are a courtesy: without them the list still works.
+  // The Sistema TS and email marks are a courtesy: without them the list still works.
   sts.load().catch(() => undefined)
+  email.load().catch(() => undefined)
 })
 
 // ─── Selection and bulk status ──────────────────────────────────────────────
@@ -203,6 +208,62 @@ async function runBulk(): Promise<void> {
     toast.notifyError(error, 'Aggiornamento non riuscito')
   } finally {
     bulkRunning.value = false
+  }
+}
+
+// ─── Bulk email ─────────────────────────────────────────────────────────────
+
+const bulkEmailOpen = ref(false)
+const bulkEmailProgress = ref<{ done: number; total: number } | null>(null)
+
+/** Drafts and cancelled invoices are never emailed; they are left out and said so. */
+const emailable = computed(() => selectedInvoices.value.filter((invoice) => invoice.status !== 'draft' && invoice.status !== 'cancelled'))
+
+const bulkEmailBlastRadius = computed(() => {
+  const count = emailable.value.length
+  const again = emailable.value.filter((invoice) => email.stateOf(invoice.id).kind === 'sent').length
+  const skipped = selectedInvoices.value.length - count
+  const parts = [`${plural(count, 'fattura partirà', 'fatture partiranno')} via email ai pazienti, con il PDF allegato e il modello salvato.`]
+  if (again > 0) parts.push(`${plural(again, 'era già stata inviata', 'erano già state inviate')} e ${again === 1 ? 'arriverà' : 'arriveranno'} di nuovo.`)
+  if (skipped > 0) parts.push(`${plural(skipped, 'bozza o annullata resta', 'bozze o annullate restano')} fuori.`)
+  return parts.join(' ')
+})
+
+const bulkEmailMessage = computed(() =>
+  bulkEmailProgress.value
+    ? `Invio ${Math.min(bulkEmailProgress.value.done + 1, bulkEmailProgress.value.total)} di ${bulkEmailProgress.value.total}…`
+    : 'Chi non ha un indirizzo email nella scheda viene saltato.',
+)
+
+/** One login first, so a wrong password stops here instead of failing every invoice. */
+async function runBulkEmail(): Promise<void> {
+  const targets = [...emailable.value]
+  bulkEmailProgress.value = { done: 0, total: targets.length }
+  try {
+    const check = await checkEmailConnection()
+    if (!check.ok) {
+      toast.notifyError(check.message, 'Nessuna email inviata')
+      return
+    }
+    let sent = 0
+    const failures: string[] = []
+    for (const invoice of targets) {
+      try {
+        await email.sendPrepared(invoice.id)
+        sent += 1
+      } catch (error) {
+        failures.push(`N. ${invoice.invoice_number}: ${errorMessage(error)}`)
+      }
+      bulkEmailProgress.value = { done: bulkEmailProgress.value.done + 1, total: targets.length }
+    }
+    if (failures.length === 0) toast.notify(`${plural(sent, 'fattura inviata', 'fatture inviate')} ai pazienti`)
+    else toast.notifyError(`${plural(sent, 'inviata', 'inviate')}, ${plural(failures.length, 'non riuscita', 'non riuscite')}. ${failures[0]}`)
+    selected.value = new Set()
+    bulkEmailOpen.value = false
+  } catch (error) {
+    toast.notifyError(error, 'Invio non riuscito')
+  } finally {
+    bulkEmailProgress.value = null
   }
 }
 
@@ -311,6 +372,7 @@ function clearFilters(): void {
               </th>
               <th class="w-8 font-normal"><span class="sr-only">Stato</span></th>
               <th class="w-8 font-normal"><span class="sr-only">Sistema TS</span></th>
+              <th class="w-8 font-normal"><span class="sr-only">Email al paziente</span></th>
               <th class="w-24 font-medium">Numero</th>
               <th class="font-medium">Paziente</th>
               <th class="w-28 font-medium">Emessa</th>
@@ -340,6 +402,13 @@ function clearFilters(): void {
               </td>
               <td><InvoiceSeal :status="invoice.status" :issue-date="invoice.issue_date" :due-date="invoice.due_date" :size="18" /></td>
               <td><TsMark v-if="invoice.status === 'paid' || sts.stateOf(invoice.id).kind !== 'none'" :kind="sts.stateOf(invoice.id).kind" :size="18" /></td>
+              <td>
+                <MailMark
+                  v-if="email.loaded && ((invoice.status !== 'draft' && invoice.status !== 'cancelled') || email.stateOf(invoice.id).kind !== 'none')"
+                  :kind="email.stateOf(invoice.id).kind"
+                  :size="18"
+                />
+              </td>
               <td class="tabular text-text-muted">N. {{ invoice.invoice_number }}<span v-if="year === 0" class="text-text-subtle">/{{ invoice.year }}</span></td>
               <td>
                 <span class="flex min-w-0 items-center gap-2.5">
@@ -378,6 +447,10 @@ function clearFilters(): void {
           <span class="whitespace-nowrap text-sm text-text-muted">Segna come</span>
           <SegmentedControl v-model="bulkTarget" :options="BULK_OPTIONS" label="Nuovo stato" size="sm" />
           <AppButton variant="primary" size="sm" @click="bulkConfirmOpen = true">Applica</AppButton>
+          <span class="h-5 w-px bg-border" aria-hidden="true" />
+          <span :title="email.ready ? undefined : 'Configura prima la casella in Impostazioni → Email'">
+            <AppButton size="sm" :icon="Send" :disabled="!email.ready || emailable.length === 0" @click="bulkEmailOpen = true">Invia via email</AppButton>
+          </span>
           <AppButton variant="ghost" size="sm" :icon="X" label="Annulla selezione" @click="selected = new Set()" />
         </div>
       </Transition>
@@ -392,6 +465,17 @@ function clearFilters(): void {
       :loading="bulkRunning"
       @confirm="runBulk"
       @cancel="bulkConfirmOpen = false"
+    />
+    <ConfirmDialog
+      :open="bulkEmailOpen"
+      title="Inviare le fatture ai pazienti?"
+      :message="bulkEmailMessage"
+      :blast-radius="bulkEmailBlastRadius"
+      :confirm-label="`Invia ${emailable.length}`"
+      tone="accent"
+      :loading="bulkEmailProgress !== null"
+      @confirm="runBulkEmail"
+      @cancel="bulkEmailOpen = false"
     />
     <ConfirmDialog
       :open="toDelete !== null"

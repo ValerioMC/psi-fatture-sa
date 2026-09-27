@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * One secret kept in the app's encrypted store: whether it is there, and a field to
- * set or replace it. The value is never read back; replacing means typing
- * a new one, and removing asks first.
+ * One secret kept in the app's encrypted store (a password, a PINCODE): whether it is
+ * there, and a field to set or replace it. The value is never read back; replacing
+ * means typing a new one, and removing asks first.
  */
 import { ref } from 'vue'
 import { Eye, EyeOff } from 'lucide-vue-next'
@@ -13,6 +13,8 @@ import { errorMessage } from '@/stores/toast'
 
 const props = defineProps<{
   label: string
+  /** The field's label while typing, e.g. "Password Sistema TS". */
+  fieldLabel: string
   hint: string
   configured: boolean
   /** Rejects whitespace, as a PINCODE must. */
@@ -67,7 +69,7 @@ function close(): void {
     </div>
 
     <form v-if="editing || !configured" class="mt-2.5 space-y-2" novalidate @submit.prevent="submit">
-      <FormField v-slot="{ id, invalid, describedBy }" :label="`${label} Sistema TS`" :error="error" :hint="hint">
+      <FormField v-slot="{ id, invalid, describedBy }" :label="fieldLabel" :error="error" :hint="hint">
         <div class="relative">
           <input
             :id="id"

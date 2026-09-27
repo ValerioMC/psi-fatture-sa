@@ -168,7 +168,7 @@ async function confirmCancel(): Promise<void> {
   <div>
     <PageHeader title="Sistema TS" subtitle="Le spese sanitarie dei pazienti, per la dichiarazione precompilata." :icon="IdCard">
       <AppBadge v-if="sts.environment === 'test'" tone="warn" mono>AMBIENTE DI TEST</AppBadge>
-      <AppButton :icon="Settings2" to="/settings">Credenziali</AppButton>
+      <AppButton :icon="Settings2" to="/settings/sts">Credenziali</AppButton>
       <AppButton variant="primary" :icon="Send" :loading="sending || sts.dispatching" @click="sendNow">Invia ora</AppButton>
     </PageHeader>
 
@@ -189,7 +189,7 @@ async function confirmCancel(): Promise<void> {
         </div>
         <div class="flex shrink-0 gap-2">
           <AppButton variant="ghost" :icon="ExternalLink" @click="openPortal">Apri sistemats.it</AppButton>
-          <AppButton variant="primary" :icon-right="ArrowRight" :to="{ path: '/settings', query: { focus: 'sts' } }">Inserisci le credenziali</AppButton>
+          <AppButton variant="primary" :icon-right="ArrowRight" to="/settings/sts">Inserisci le credenziali</AppButton>
         </div>
       </section>
 

@@ -11,7 +11,7 @@ import type {
   TsSubmission,
   TsSubmissionStatus,
 } from '@/types'
-import { formatDateLong } from './format'
+import { formatDateLong, formatUtcTimestamp } from './format'
 import { plural, type StatusPresentation } from './labels'
 
 export const TS_SUBMISSION_STATUS: Readonly<Record<TsSubmissionStatus, StatusPresentation>> = {
@@ -199,9 +199,7 @@ export function describeDispatch(summary: TsDispatchSummary): SummaryLine {
 
 /** Backend timestamps are UTC `YYYY-MM-DD HH:MM:SS`; shows them in local time. */
 export function formatStsTimestamp(timestamp: string): string {
-  const moment = new Date(`${timestamp.replace(' ', 'T')}Z`)
-  if (Number.isNaN(moment.getTime())) return timestamp
-  return moment.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return formatUtcTimestamp(timestamp)
 }
 
 /** How a report or point-query row names the last operation on a document. */

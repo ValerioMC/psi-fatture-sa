@@ -217,7 +217,7 @@ const remoteTotal = computed(() => {
 
     <p v-if="sts.loaded && !sts.connected && (state.kind === 'none' || state.kind === 'queued')" class="mt-3 text-xs leading-relaxed text-text-muted">
       Mancano le credenziali del Sistema TS: l’invio parte appena le inserisci.
-      <RouterLink :to="{ path: '/settings', query: { focus: 'sts' } }" class="rounded-sm font-medium text-accent hover:underline focus-ring">Inseriscile</RouterLink>
+      <RouterLink to="/settings/sts" class="rounded-sm font-medium text-accent hover:underline focus-ring">Inseriscile</RouterLink>
     </p>
 
     <p v-if="deadline" class="mt-3 flex items-center gap-2 text-xs" :class="{

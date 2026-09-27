@@ -2,6 +2,8 @@ pub mod appointment_repository;
 pub mod client_repository;
 pub mod config_repository;
 pub mod dashboard_repository;
+pub mod document_file_repository;
+pub mod email;
 pub mod invoice;
 pub mod secret;
 pub mod service_repository;

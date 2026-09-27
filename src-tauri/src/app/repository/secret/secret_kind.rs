@@ -3,6 +3,7 @@
 pub enum SecretKind {
     TsPassword,
     TsPincode,
+    EmailPassword,
 }
 
 impl SecretKind {
@@ -11,6 +12,7 @@ impl SecretKind {
         match self {
             SecretKind::TsPassword => "password",
             SecretKind::TsPincode => "pincode",
+            SecretKind::EmailPassword => "email_password",
         }
     }
 }

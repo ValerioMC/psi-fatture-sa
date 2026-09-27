@@ -6,11 +6,14 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CircleCheck, Pencil, Printer, Send, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { CircleCheck, FileDown, Pencil, Printer, Send, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { save as chooseSavePath } from '@tauri-apps/plugin-dialog'
+import { getInvoicePdfName, saveInvoicePdf } from '@/api'
 import { useInvoicesStore } from '@/stores/invoices'
 import { errorMessage, useToastStore } from '@/stores/toast'
 import type { Invoice, InvoiceStatus } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import ActionButton from '@/components/ui/ActionButton.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -19,6 +22,7 @@ import InvoiceSeal from '@/components/ui/InvoiceSeal.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import StsInvoicePanel from '@/components/sts/StsInvoicePanel.vue'
+import InvoiceEmailPanel from '@/components/email/InvoiceEmailPanel.vue'
 import { formatCurrency, formatDateLong, todayIso } from '@/utils/format'
 import { PAYMENT_METHOD_LABEL } from '@/utils/labels'
 import { deriveSeal, describeSeal } from '@/utils/invoiceSeal'
@@ -80,6 +84,21 @@ async function changeStatus(status: InvoiceStatus, announce = true): Promise<voi
   }
 }
 
+/** Saves the invoice PDF where the professional chooses; closing the dialog is not a failure. */
+async function downloadPdf(): Promise<boolean | 'cancelled'> {
+  const current = invoice.value
+  if (current === null) return false
+  try {
+    const path = await chooseSavePath({ defaultPath: await getInvoicePdfName(current.id), filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+    if (path === null) return 'cancelled'
+    await saveInvoicePdf(current.id, path)
+    return true
+  } catch (error) {
+    toast.notifyError(error, 'PDF non salvato')
+    return false
+  }
+}
+
 async function confirmDelete(): Promise<void> {
   if (invoice.value === null) return
   deleting.value = true
@@ -127,7 +146,8 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
       :back="{ to: '/invoices', label: 'Fatture' }"
     >
       <template v-if="invoice">
-        <AppButton :icon="Printer" :to="`/invoices/${invoice.id}/print`">Stampa o PDF</AppButton>
+        <AppButton :icon="Printer" :to="`/invoices/${invoice.id}/print`">Stampa</AppButton>
+        <ActionButton variant="secondary" :icon="FileDown" :run="downloadPdf" done-label="Salvato" working-label="Salvataggio del PDF">Salva PDF</ActionButton>
         <AppButton :icon="Pencil" :to="`/invoices/${invoice.id}/edit`">Modifica</AppButton>
       </template>
     </PageHeader>
@@ -240,6 +260,8 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
               {{ nextStep.label }}
             </AppButton>
           </AppCard>
+
+          <InvoiceEmailPanel :invoice="invoice" />
 
           <StsInvoicePanel v-if="invoice.status !== 'draft'" :invoice="invoice" />
 

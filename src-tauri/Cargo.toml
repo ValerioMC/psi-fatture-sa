@@ -44,6 +44,9 @@ aes-gcm = "0.10"
 hkdf = "0.12"
 sha2 = "0.10"
 machine-uid = "0.5"
+krilla = { version = "0.8", default-features = false }
+skrifa = "0.42"
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "webpki-roots", "hostname"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }

@@ -217,13 +217,23 @@ e un solo colore d'accento (indaco inchiostro) per selezione, azione primaria e 
 - **Token**: `src/style.css` definisce una volta sola colori, tipografia, due raggi,
   tre ombre, la scala z-index e le transizioni. La palette standard di Tailwind è
   disattivata (`--color-*: initial`): una classe come `text-slate-500` non produce nulla.
-- **Componenti base**: `src/components/ui/` (AppButton, AppCard, FormField, ComboBox,
-  SegmentedControl, ToggleSwitch, AppDialog, ConfirmDialog, ToastHost, SkeletonRows,
-  EmptyState, InvoiceSeal…). Le schermate usano solo questi.
+- **Componenti base**: `src/components/ui/` (AppButton, ActionButton, AppCard, FormField,
+  ComboBox, SegmentedControl, ToggleSwitch, AppDialog, ConfirmDialog, ToastHost,
+  SkeletonRows, EmptyState, InvoiceSeal, TsMark, MailMark…). Le schermate usano solo questi;
+  varianti e misure dei bottoni stanno una volta sola in `buttonStyles.ts`.
+- **Bottoni che mostrano l'esito**: `ActionButton.vue` esegue l'azione e la racconta nel
+  bottone stesso, nel suo colore: con `motion="send"` l'aeroplano di carta esce a destra,
+  poi tre punti finché il server non risponde, poi un cerchio con la spunta che si
+  disegna. Lo usano l'invio email, i salvataggi della casella e del modello, "Salva PDF"
+  e le verifiche di collegamento (email e Sistema TS).
+- **Impostazioni per contesto**: `/settings/profile`, `/invoicing`, `/email`, `/sts`,
+  `/appearance`, con una navigazione laterale che segnala con un punto ciò che manca
+  (casella da configurare, credenziali TS). Il modulo del profilo è condiviso da Profilo e
+  Fatturazione (`useSettingsProfile.ts`) e si salva da un'unica barra.
 - **Sigillo della fattura**: `InvoiceSeal.vue` disegna lo stato di una fattura
   (bozza, emessa con l'arco verso la scadenza, pagata, scaduta, annullata); la logica
   sta in `src/utils/invoiceSeal.ts`.
-- **Tema**: chiaro, scuro o come il sistema, da Impostazioni. La scelta è salvata in
+- **Tema**: chiaro, scuro o come il sistema, da Impostazioni → Aspetto. La scelta è salvata in
   `localStorage` (chiave `psi-fatture.theme`).
 - **Scorciatoie**: ⌘K (Ctrl K su Windows) apre la ricerca di pazienti, azioni e sezioni.
 - **Finestra macOS**: `titleBarStyle: "Overlay"` in `tauri.conf.json`; i semafori stanno
@@ -240,11 +250,11 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   del Sistema TS mese per mese), il pannello nel dettaglio di ogni fattura (stato,
   scadenze, invio, sostituzione, annullamento, verifica online) e un segno a forma di
   tessera nella lista fatture.
-- **Credenziali**: in Impostazioni → *Sistema Tessera Sanitaria*: codice
+- **Credenziali**: in Impostazioni → *Sistema TS*: codice
   fiscale di accesso, partita IVA, password e PINCODE. Una guida passo passo nella card
   spiega dove trovarli (sistemats.it → *Profilo utente → Stampa credenziali*); finché
   mancano, la pagina *Sistema TS* e il pannello della fattura lo segnalano con un
-  rimando diretto alla card (`/settings?focus=sts`). Password e PINCODE li custodisce
+  rimando diretto alla pagina (`/settings/sts`). Password e PINCODE li custodisce
   l'app in `secrets.json`, accanto al database: AES-256-GCM con una chiave derivata
   (HKDF-SHA256) dall'identificativo del computer e da un sale casuale, file leggibile
   solo dall'utente. Mai in chiaro e nessun accesso al portachiavi di sistema: copiato
@@ -291,6 +301,49 @@ Test contro l'ambiente di test Sogei (servono rete e l'utenza pubblica del kit):
 cd src-tauri && cargo test live_ -- --ignored
 ```
 
+## Fatture via email ai pazienti
+
+Ogni fattura emessa si può mandare al paziente con il PDF allegato, dalla fattura o, per
+più fatture insieme, dalla barra di selezione della lista. Tutto passa dal binario Rust:
+SMTP diretto verso il provider della casella, nessun servizio di terze parti.
+
+- **Casella**: Impostazioni → *Email*. I provider noti portano con sé il server:
+  **psypec.it** (la PEC gratuita dell'Ordine, gestita da Namirial:
+  `smtps.sicurezzapostale.it`, porta 465, SSL/TLS), PEC Aruba (`smtps.pec.aruba.it`),
+  Gmail (`smtp.gmail.com`, solo con password per le app) e *Altro provider* con server,
+  porta, sicurezza e utente a mano. Il provider si riconosce dal dominio dell'indirizzo;
+  prima del primo salvataggio la casella è proposta dalla PEC del profilo. La password sta
+  in `secrets.json` come quelle del Sistema TS (voce `email_password`); "Verifica
+  collegamento" fa un accesso reale al server senza inviare nulla.
+- **PEC verso caselle normali**: il paziente riceve una busta di posta certificata con il
+  messaggio originale allegato (`postacert.eml`); l'app lo dice nelle impostazioni e
+  nell'invio.
+- **Modello**: oggetto e testo con segnaposto tra graffe (`{paziente}`, `{nome_paziente}`,
+  `{numero_fattura}`, `{data_fattura}`, `{importo}`, `{scadenza}`, `{professionista}`).
+  Un nome sconosciuto viene rifiutato al salvataggio; "Ripristina" torna al modello
+  predefinito. L'anteprima accanto all'editor è la resa del backend con un paziente di esempio.
+- **Invio**: il dialogo propone destinatario (dalla scheda del paziente), oggetto e testo,
+  tutti modificabili; il PDF si apre per controllarlo. Se il paziente non ha un indirizzo,
+  quello digitato si può salvare nella sua scheda. Bozze e fatture annullate non partono.
+  L'invio in blocco fa prima un accesso di prova, poi invia una fattura alla volta e salta
+  chi non ha un indirizzo.
+- **Registro**: tabella `invoice_emails`, una riga per tentativo (`sent` / `failed` con
+  l'errore). La fattura mostra stato e storico; la lista un segno a forma di busta
+  (`MailMark.vue`): tratteggiata se non inviata, inchiostrata con il sigillo se inviata,
+  rossa se l'unico tentativo è fallito.
+- **PDF**: generato nel backend (`service/pdf/`, libreria `krilla`) con la stessa
+  impaginazione della vista di stampa: A4, piè di pagina su ogni pagina, numerazione
+  delle pagine quando sono più d'una, righe che continuano sulla pagina seguente con
+  l'intestazione della tabella. I caratteri (Geist e Newsreader, licenza OFL) sono in
+  `src-tauri/resources/fonts/`, inclusi nel binario e ridotti ai soli glifi usati. Dalla
+  fattura, "Salva PDF" scrive lo stesso file dove si sceglie.
+
+Per rivedere l'impaginazione dopo una modifica:
+
+```bash
+cd src-tauri && cargo test preview_sample_invoice -- --ignored   # scrive target/invoice-preview.pdf
+```
+
 ## Screenshot per il sito vetrina
 
 `scripts/screenshots/capture.mjs` genera le immagini WebP di psifatture.it dal dev
@@ -311,12 +364,13 @@ psi-fatture-sa/
 │   ├── api.ts              # Wrapper chiamate Tauri invoke
 │   ├── types.ts            # Tipi condivisi frontend
 │   ├── style.css           # Token del design system, campi, movimenti
-│   ├── views/              # Pagine dell'applicazione
+│   ├── views/              # Pagine dell'applicazione (settings/: una per contesto)
 │   ├── components/
 │   │   ├── ui/             # Componenti base (bottoni, campi, dialoghi, sigillo…)
 │   │   ├── layout/         # Barra laterale, layout, palette ⌘K
 │   │   ├── dashboard/      # Grafico mensile, soglia forfettario, stima fiscale
-│   │   ├── profile/        # Sezioni del profilo, credenziali Sistema TS
+│   │   ├── profile/        # Sezioni del profilo, navigazione impostazioni, credenziali
+│   │   ├── email/          # Casella, modello, invio e storico delle email ai pazienti
 │   │   └── sts/            # Pannelli del Sistema Tessera Sanitaria
 │   ├── composables/        # Tema, focus trap, form profilo, smooth scroll
 │   ├── stores/             # State management (Pinia), notifiche
@@ -327,10 +381,11 @@ psi-fatture-sa/
 │   │   ├── app/
 │   │   │   ├── app_state.rs # Stato condiviso dai comandi (DB, credenziali, gateway)
 │   │   │   ├── controller/ # Comandi Tauri (API layer); ts/ per il Sistema TS
-│   │   │   ├── service/    # Logica di business; ts/ per il Sistema TS
+│   │   │   ├── service/    # Logica di business; ts/ Sistema TS, email/ invii, pdf/ fattura in PDF
 │   │   │   ├── repository/ # Accesso dati (SeaORM, SQL) e servizi esterni
 │   │   │   │   ├── invoice/    # Fatture e proiezione delle righe lette
 │   │   │   │   ├── secret/     # Archivio cifrato delle credenziali
+│   │   │   │   ├── email/      # Casella, modello, registro invii e gateway SMTP (lettre)
 │   │   │   │   └── ts/         # Coda STS; sistema_ts/ è il client SOAP
 │   │   │   ├── scheduler/  # Worker in background (invio coda STS)
 │   │   │   ├── entity/     # Entità database (una tabella per file)
@@ -366,9 +421,14 @@ psi-fatture-sa/
 npm test
 
 # Backend (cargo): calcolo totali fattura, validazione input, Sistema TS (buste SOAP,
-# risposte reali catturate, coda, invio con gateway finto). I test usano un archivio
+# risposte reali catturate, coda, invio con gateway finto), PDF della fattura, email
+# (casella, modello, invio con gateway SMTP finto). I test usano un archivio
 # credenziali in memoria o in un file temporaneo
 cd src-tauri && cargo test
+
+# Test contro servizi reali (rete): ambiente di test Sogei e server SMTP di psypec.it,
+# che deve rifiutare una password sbagliata come login e non come errore di rete
+cd src-tauri && cargo test live_ -- --ignored
 ```
 
 ## Qualità del codice Rust
@@ -421,9 +481,10 @@ Il file `.vscode/settings.json` già presente nel repo configura:
 
 - **Frontend**: Vue 3, TypeScript, Tailwind CSS 4, Pinia, Vite
 - **Backend**: Rust, Tauri 2, SeaORM, SQLite, aes-gcm + hkdf (credenziali cifrate),
-  reqwest + rustls, quick-xml, rsa (Sistema TS)
+  reqwest + rustls, quick-xml, rsa (Sistema TS), lettre + rustls (SMTP), krilla + skrifa (PDF)
 - **Build**: Tauri CLI, Vite, vue-tsc
 - **Test**: Vitest (frontend), cargo test (backend)
 
 I font (Geist, Geist Mono, Newsreader) sono self-hosted via `@fontsource-variable`:
-l'app rende correttamente anche offline, senza dipendere da Google Fonts.
+l'app rende correttamente anche offline, senza dipendere da Google Fonts. Il PDF usa gli
+stessi caratteri in formato TTF variabile, da `src-tauri/resources/fonts/`.

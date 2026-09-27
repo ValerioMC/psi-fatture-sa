@@ -21,7 +21,19 @@ const router = createRouter({
         { path: 'invoices/:id', name: 'invoices.detail', component: () => import('@/views/invoices/InvoiceDetailView.vue') },
         { path: 'sts', name: 'sts', component: () => import('@/views/sts/StsView.vue') },
         { path: 'agenda', name: 'agenda', component: () => import('@/views/agenda/AgendaView.vue') },
-        { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+        {
+          path: 'settings',
+          component: () => import('@/views/SettingsView.vue'),
+          children: [
+            // `?focus=sts` is the old link to the Sistema TS credentials.
+            { path: '', redirect: (to) => ({ path: to.query.focus === 'sts' ? '/settings/sts' : '/settings/profile', query: {} }) },
+            { path: 'profile', name: 'settings.profile', component: () => import('@/views/settings/SettingsProfileView.vue') },
+            { path: 'invoicing', name: 'settings.invoicing', component: () => import('@/views/settings/SettingsInvoicingView.vue') },
+            { path: 'email', name: 'settings.email', component: () => import('@/views/settings/SettingsEmailView.vue') },
+            { path: 'sts', name: 'settings.sts', component: () => import('@/views/settings/SettingsStsView.vue') },
+            { path: 'appearance', name: 'settings.appearance', component: () => import('@/views/settings/SettingsAppearanceView.vue') },
+          ],
+        },
       ],
     },
     {

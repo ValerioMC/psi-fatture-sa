@@ -1,6 +1,9 @@
 pub mod appointment;
 pub mod client;
+pub mod email_account;
+pub mod email_template;
 pub mod invoice;
+pub mod invoice_email;
 pub mod invoice_line;
 pub mod professional_config;
 pub mod recurrence_group;

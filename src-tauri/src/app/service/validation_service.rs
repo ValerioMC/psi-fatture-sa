@@ -259,6 +259,27 @@ fn cf_odd_value(c: char) -> u32 {
     }
 }
 
+/// Validates an email address when provided: something@domain.tld, no spaces.
+/// Mirrors `validateEmail` in `src/utils/validation.ts`.
+pub fn validate_email(value: &str) -> Result<(), String> {
+    let email = value.trim();
+    if email.is_empty() {
+        return Ok(());
+    }
+    let valid = email.split_once('@').is_some_and(|(local, domain)| {
+        let tld = domain.rsplit_once('.');
+        !local.is_empty()
+            && !email.chars().any(char::is_whitespace)
+            && !domain.contains('@')
+            && tld.is_some_and(|(name, tld)| !name.is_empty() && tld.chars().count() >= 2)
+    });
+    if valid {
+        Ok(())
+    } else {
+        Err(format!("Indirizzo email non valido: {email}"))
+    }
+}
+
 #[cfg(test)]
 #[path = "validation_service_test.rs"]
 mod tests;
