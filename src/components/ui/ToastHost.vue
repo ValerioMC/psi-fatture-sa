@@ -2,6 +2,8 @@
 /**
  * Where toasts appear: bottom-right, stacked, announced politely. Successes
  * leave on their own; errors stay longer and can be dismissed by hand.
+ * Never printed: the print view shares this webview, so a lingering toast
+ * would land on the invoice.
  */
 import { CircleCheck, CircleAlert, Info, X } from 'lucide-vue-next'
 import { useToastStore, type ToastKind } from '@/stores/toast'
@@ -18,7 +20,7 @@ const ICON_CLASS: Record<ToastKind, string> = {
 
 <template>
   <div
-    class="pointer-events-none fixed bottom-5 right-5 z-(--z-toast) flex w-[22rem] flex-col items-end gap-2"
+    class="print:hidden pointer-events-none fixed bottom-5 right-5 z-(--z-toast) flex w-[22rem] flex-col items-end gap-2"
     role="region"
     aria-label="Notifiche"
   >

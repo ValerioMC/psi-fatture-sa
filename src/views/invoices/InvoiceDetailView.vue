@@ -75,8 +75,9 @@ async function changeStatus(status: InvoiceStatus, announce = true): Promise<voi
   updating.value = true
   try {
     invoice.value = await invoicesStore.editInvoice(withStatus(current, status, status === 'paid' ? todayIso() : undefined))
-    if (!announce) return
-    const message = status === 'paid' ? 'Fattura segnata come pagata' : status === 'issued' ? 'Fattura emessa' : 'Stato aggiornato'
+    // Paid is announced by the seal's stamp; a toast would only repeat it.
+    if (!announce || status === 'paid') return
+    const message = status === 'issued' ? 'Fattura emessa' : 'Stato aggiornato'
     toast.notify(message, { label: 'Annulla', run: () => changeStatus(previous, false) })
   } catch (error) {
     toast.notifyError(error, 'Aggiornamento non riuscito')
