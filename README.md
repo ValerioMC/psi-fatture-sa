@@ -391,9 +391,13 @@ npm install --no-save playwright sharp
 node scripts/screenshots/capture.mjs ../psi-fatture-brochure/public/screenshots
 ```
 
-Oltre alle schermate intere lo script ritaglia quattro parti dell'app per la sezione
-Sistema TS ed email del sito: `sts-coda`, `sts-fattura`, `email-invio` ed `email-casella`,
-ciascuna chiara e `-dark`. `ONLY=shots` o `ONLY=excerpts` limita il giro a uno dei due gruppi.
+Oltre alle schermate intere lo script ritaglia parti dell'app, ciascuna chiara e `-dark`:
+`sts-coda`, `sts-fattura`, `email-invio` ed `email-casella` per la sezione Sistema TS ed
+email; `fattura-riepilogo`, `agenda-giorno`, `mensile-totale`, `soglia`, `stima` e
+`paziente-scheda` per la sezione Funzioni; `onboarding-fisco` per Come si inizia.
+`ONLY=shots` o `ONLY=excerpts` limita il giro a uno dei due gruppi, `NAMES=soglia,stima`
+ai ritagli indicati. I ritagli che leggono la data di oggi (agenda, mensile, soglia, stima)
+cambiano a ogni cattura, perché i dati demo partono dalla data corrente.
 Installa `playwright` e `sharp` nello stesso comando: un `npm install --no-save` successivo
 rimuove i pacchetti installati senza salvarli.
 

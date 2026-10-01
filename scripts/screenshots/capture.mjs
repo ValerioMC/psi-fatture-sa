@@ -8,6 +8,7 @@
  *   node scripts/screenshots/capture.mjs ../psi-fatture-brochure/public/screenshots
  *
  * ONLY=shots or ONLY=excerpts limits the run to the full screens or to the cropped excerpts.
+ * NAMES=soglia,stima limits the excerpts to the named ones.
  */
 import { chromium } from 'playwright'
 import sharp from 'sharp'
@@ -101,6 +102,72 @@ const EXCERPTS = [
       return { x: card.x, y: card.y, width: card.width, height: note.bottom - card.y }
     })),
   },
+  {
+    // The invoice form's live summary, with the regime note under it.
+    name: 'fattura-riepilogo',
+    route: async () => '/invoices/180/edit',
+    viewport: { width: 1440, height: 900 },
+    region: async (page) => padded(await page.evaluate(() =>
+      [...document.querySelectorAll('aside')].find((aside) => aside.textContent.includes('Riepilogo')).getBoundingClientRect().toJSON())),
+  },
+  {
+    name: 'agenda-giorno',
+    route: async () => '/agenda',
+    viewport: { width: 1440, height: 900 },
+    region: async (page) => padded(await page.evaluate(() => document.querySelector('main aside .sheet').getBoundingClientRect().toJSON())),
+  },
+  {
+    // The monthly run's total and its button, without the payment options above them.
+    name: 'mensile-totale',
+    route: async () => '/invoices/monthly',
+    viewport: { width: 1440, height: 900 },
+    // The crop starts under the divider, so the card runs off the top edge of the excerpt.
+    region: async (page) => padded(await page.evaluate(() => {
+      const card = document.querySelector('main aside .sheet').getBoundingClientRect()
+      const total = document.querySelector('main aside .sheet .border-t').getBoundingClientRect()
+      return { x: card.x, y: total.top + 1, width: card.width, height: card.bottom - total.top - 1 }
+    })),
+  },
+  {
+    name: 'soglia',
+    route: async () => '/dashboard',
+    viewport: { width: 1440, height: 1000 },
+    region: async (page) => padded(await page.evaluate(() =>
+      [...document.querySelectorAll('h2, h3, p')].find((node) => node.textContent.trim() === 'Soglia forfettario' && node.closest('main')).closest('.sheet').getBoundingClientRect().toJSON())),
+  },
+  {
+    name: 'stima',
+    route: async () => '/dashboard',
+    viewport: { width: 1440, height: 1000 },
+    region: async (page) => padded(await page.evaluate(() =>
+      [...document.querySelectorAll('h2, h3, p')].find((node) => node.textContent.trim() === 'Stima fiscale' && node.closest('main')).closest('.sheet').getBoundingClientRect().toJSON())),
+  },
+  {
+    name: 'paziente-scheda',
+    route: async () => '/clients/5/edit',
+    viewport: { width: 1440, height: 900 },
+    region: async (page) => padded(await page.evaluate(() => document.querySelector('.record-card').getBoundingClientRect().toJSON())),
+  },
+  {
+    // First run, step two: the first step done, the regime chosen.
+    name: 'onboarding-fisco',
+    route: async () => '/onboarding',
+    viewport: { width: 1440, height: 900 },
+    prepare: async (page) => {
+      await page.getByRole('textbox', { name: 'Nome', exact: true }).fill('Maria')
+      await page.getByRole('textbox', { name: 'Cognome', exact: true }).fill('Ferretti')
+      await page.getByRole('textbox', { name: 'Partita IVA', exact: true }).fill('12345678903')
+      await page.getByRole('textbox', { name: 'Codice fiscale', exact: true }).fill('FRRMRA80A41F205B')
+      await page.getByRole('button', { name: 'Avanti' }).click()
+      await page.waitForTimeout(800)
+    },
+    region: async (page) => padded(await page.evaluate(() => {
+      const steps = document.querySelector('[aria-label="Passaggi"]').getBoundingClientRect()
+      const form = document.querySelector('main form').getBoundingClientRect()
+      const section = document.querySelector('main form section > div:last-child').getBoundingClientRect()
+      return { x: steps.left, y: steps.top, width: form.width, height: section.bottom - steps.top }
+    })),
+  },
 ]
 
 const only = process.env.ONLY
@@ -124,7 +191,8 @@ for (const shot of only === 'excerpts' ? [] : SHOTS) {
   await context.close()
 }
 
-for (const excerpt of only === 'shots' ? [] : EXCERPTS) {
+const names = process.env.NAMES?.split(',')
+for (const excerpt of only === 'shots' ? [] : EXCERPTS.filter((item) => !names || names.includes(item.name))) {
   for (const theme of ['light', 'dark']) {
     const context = await browser.newContext({ viewport: excerpt.viewport, deviceScaleFactor: 2, colorScheme: theme, reducedMotion: 'reduce' })
     await context.addInitScript(readFileSync(join(here, 'mock-tauri.js'), 'utf8'))
