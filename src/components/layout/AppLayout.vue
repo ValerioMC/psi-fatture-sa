@@ -21,6 +21,11 @@ watch(
   },
 )
 
+/** Settings keeps one mounted frame, so moving between its sections swaps only the content. */
+function paneKey(path: string): string {
+  return path.startsWith('/settings') ? '/settings' : path
+}
+
 function onKeydown(event: KeyboardEvent): void {
   if (event.key.toLowerCase() === 'k' && hasPrimaryModifier(event)) {
     event.preventDefault()
@@ -35,11 +40,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 <template>
   <div class="flex h-screen overflow-hidden">
     <AppSidebar @open-palette="paletteOpen = true" />
-    <main ref="scrollWrapperRef" class="min-w-0 flex-1 overflow-y-auto">
+    <main ref="scrollWrapperRef" class="min-w-0 flex-1 overflow-y-scroll [scrollbar-gutter:stable]">
       <div ref="scrollContentRef" class="min-h-full">
         <RouterView v-slot="{ Component, route: current }">
           <Transition name="pane" mode="out-in">
-            <component :is="Component" :key="current.path" />
+            <component :is="Component" :key="paneKey(current.path)" />
           </Transition>
         </RouterView>
       </div>

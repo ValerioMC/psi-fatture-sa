@@ -3,7 +3,9 @@
  * The professional profile's fields, grouped in the sections asked for.
  * Settings renders them all; onboarding renders a few per step.
  */
+import { computed } from 'vue'
 import type { TaxRegime, Profession, UpsertConfigInput } from '@/types'
+import { useToastStore } from '@/stores/toast'
 import FormField from '@/components/ui/FormField.vue'
 import FormSection from '@/components/ui/FormSection.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
@@ -11,7 +13,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import type { SegmentOption } from '@/components/ui/types'
 import type { ProfileField, ProfileSection } from '@/composables/useProfileForm'
 
-defineProps<{
+const props = defineProps<{
   form: UpsertConfigInput
   errors: Partial<Record<ProfileField, string>>
   sections: readonly ProfileSection[]
@@ -19,12 +21,27 @@ defineProps<{
 
 const emit = defineEmits<{ check: [field: ProfileField] }>()
 
+const toast = useToastStore()
+const ORDINARIO_CONTACT = 'admin@psifatture.it'
+
 const TITLES = ['Dott.ssa', 'Dott.', 'Dr.ssa', 'Dr.', 'Prof.ssa', 'Prof.']
 
 const REGIMES: SegmentOption<TaxRegime>[] = [
   { value: 'forfettario', label: 'Forfettario' },
   { value: 'ordinario', label: 'Ordinario' },
 ]
+
+/** The ordinario regime stays selectable on screen but is refused until it is enabled on request. */
+const regime = computed<TaxRegime>({
+  get: () => props.form.tax_regime,
+  set: (next) => {
+    if (next === 'ordinario') {
+      toast.notifyError(`Il regime fiscale ordinario attualmente non è abilitato. Per chiedere l'abilitazione contatta ${ORDINARIO_CONTACT}.`)
+      return
+    }
+    props.form.tax_regime = next
+  },
+})
 
 const PROFESSIONS: SegmentOption<Profession>[] = [
   { value: 'psicologo', label: 'Psicologo/a' },
@@ -97,7 +114,7 @@ const PROFESSIONS: SegmentOption<Profession>[] = [
     </FormSection>
 
     <FormSection v-if="sections.includes('tax')" title="Regime fiscale" description="Decide cosa compare in fattura: IVA, ritenuta d'acconto, marca da bollo e diciture di legge.">
-      <SegmentedControl v-model="form.tax_regime" :options="REGIMES" label="Regime fiscale" />
+      <SegmentedControl v-model="regime" :options="REGIMES" label="Regime fiscale" />
       <FormField
         v-slot="{ id, invalid, describedBy }"
         class="mt-5 max-w-56"
