@@ -361,6 +361,24 @@ Per rivedere l'impaginazione dopo una modifica:
 cd src-tauri && cargo test preview_sample_invoice -- --ignored   # scrive target/invoice-preview.pdf
 ```
 
+## Condizioni d'uso e licenza
+
+Il codice è distribuito con licenza MIT (`LICENSE`), che esclude ogni garanzia. Le condizioni
+d'uso stanno in `src/legal/terms.ts` e si accettano prima di qualsiasi altra schermata.
+
+- **Accettazione**: `TermsView.vue` mostra il testo con due caselle separate, una per le
+  condizioni e una per l'approvazione specifica delle clausole di limitazione (artt. 1341 e
+  1342 c.c.). Il router non apre nessuna pagina, onboarding compreso, finché la versione
+  corrente non è accettata.
+- **Registro**: tabella `terms_acceptances`, una riga per versione accettata con data e
+  approvazione specifica. `terms_service` rifiuta l'accettazione se una delle due caselle
+  manca; accettare due volte la stessa versione tiene la prima riga.
+- **Nuova versione**: se il testo cambia, aggiorna `TERMS_VERSION`. Chi aggiorna l'app vede
+  di nuovo la schermata alla prima apertura, anche con un database già pieno.
+- **Rilettura**: Impostazioni → *Condizioni d'uso* mostra il testo e la data di accettazione.
+
+Il testo delle condizioni non è stato rivisto da un legale.
+
 ## Screenshot per il sito vetrina
 
 `scripts/screenshots/capture.mjs` genera le immagini WebP di psifatture.it dal dev
@@ -372,6 +390,12 @@ npm run dev -- --port 1421        # in un altro terminale
 npm install --no-save playwright sharp
 node scripts/screenshots/capture.mjs ../psi-fatture-brochure/public/screenshots
 ```
+
+Oltre alle schermate intere lo script ritaglia quattro parti dell'app per la sezione
+Sistema TS ed email del sito: `sts-coda`, `sts-fattura`, `email-invio` ed `email-casella`,
+ciascuna chiara e `-dark`. `ONLY=shots` o `ONLY=excerpts` limita il giro a uno dei due gruppi.
+Installa `playwright` e `sharp` nello stesso comando: un `npm install --no-save` successivo
+rimuove i pacchetti installati senza salvarli.
 
 ## Struttura del progetto
 
@@ -388,8 +412,10 @@ psi-fatture-sa/
 │   │   ├── dashboard/      # Grafico mensile, soglia forfettario, stima fiscale
 │   │   ├── profile/        # Sezioni del profilo, navigazione impostazioni, credenziali
 │   │   ├── email/          # Casella, modello, invio e storico delle email ai pazienti
+│   │   ├── legal/          # Testo delle condizioni d'uso, uguale in accettazione e in Impostazioni
 │   │   └── sts/            # Pannelli del Sistema Tessera Sanitaria
 │   ├── composables/        # Tema, focus trap, form profilo, smooth scroll
+│   ├── legal/              # Condizioni d'uso e loro versione
 │   ├── stores/             # State management (Pinia), notifiche
 │   └── utils/              # Formattazione, fisco, validazione, stato fatture
 ├── src-tauri/              # Backend Rust + Tauri
@@ -412,6 +438,7 @@ psi-fatture-sa/
 │   │   └── test_support/   # Test double e fixture condivisi (solo in `cargo test`)
 │   ├── tauri.conf.json     # Configurazione Tauri
 │   └── Cargo.toml          # Dipendenze Rust
+├── LICENSE                 # Licenza MIT
 └── package.json            # Dipendenze frontend
 ```
 

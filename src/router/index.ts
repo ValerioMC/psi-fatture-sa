@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { useConfigStore } from '@/stores/config'
+import { useTermsStore } from '@/stores/terms'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -32,9 +33,15 @@ const router = createRouter({
             { path: 'email', name: 'settings.email', component: () => import('@/views/settings/SettingsEmailView.vue') },
             { path: 'sts', name: 'settings.sts', component: () => import('@/views/settings/SettingsStsView.vue') },
             { path: 'appearance', name: 'settings.appearance', component: () => import('@/views/settings/SettingsAppearanceView.vue') },
+            { path: 'legal', name: 'settings.legal', component: () => import('@/views/settings/SettingsLegalView.vue') },
           ],
         },
       ],
+    },
+    {
+      path: '/terms',
+      name: 'terms',
+      component: () => import('@/views/TermsView.vue'),
     },
     {
       path: '/onboarding',
@@ -49,7 +56,17 @@ const router = createRouter({
   ],
 })
 
+// The terms of use come first, then the profile: nothing else opens until both are done.
 router.beforeEach(async (to) => {
+  const termsStore = useTermsStore()
+  if (!termsStore.loaded) {
+    await termsStore.load()
+  }
+  if (!termsStore.accepted) {
+    return to.name === 'terms' ? true : { name: 'terms' }
+  }
+  if (to.name === 'terms') return { path: '/' }
+
   if (to.name === 'onboarding') return true
 
   const configStore = useConfigStore()

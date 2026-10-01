@@ -92,7 +92,7 @@
         invoices.push({
           id: nextId, client_id: c.id, client_name: clientName(c), invoice_number: String(counters[y]), year: y, issue_date: issue, due_date: due,
           status, payment_method: rand() < 0.8 ? 'bonifico' : 'pos', notes: '', apply_enpap: true, hide_quantity: false, ...t,
-          paid_date: status === 'paid' ? addDays(issue, Math.floor(rand() * 20)) : undefined, lines, created_at: issue, updated_at: issue,
+          paid_date: status === 'paid' ? [addDays(issue, Math.floor(rand() * 20)), todayIso].sort()[0] : undefined, lines, created_at: issue, updated_at: issue,
         })
         nextId++
       }
@@ -208,7 +208,17 @@
   }
   const sendDelay = () => new Promise((r) => setTimeout(r, window.__MOCK_SEND_DELAY ?? 1400))
 
+  // ─── Terms of use: accepted, unless a test asks for the first launch ───
+  let termsAcceptance = window.__MOCK_TERMS_PENDING ? null : { version: '2026-10-01', clauses_approved: true, accepted_at: '2026-10-01 09:00:00' }
+
   const handlers = {
+    get_terms_acceptance: ({ version }) => (termsAcceptance?.version === version ? termsAcceptance : null),
+    accept_terms: ({ input }) => {
+      if (!input.terms_accepted) throw new Error("Per usare l'app accetta le condizioni d'uso")
+      if (!input.clauses_approved) throw new Error("Per usare l'app approva le clausole indicate (artt. 1341 e 1342 c.c.)")
+      termsAcceptance ??= { version: input.version, clauses_approved: true, accepted_at: new Date().toISOString().slice(0, 19).replace('T', ' ') }
+      return termsAcceptance
+    },
     get_email_providers: () => EMAIL_PRESETS,
     get_email_account: () => emailAccount,
     update_email_account: ({ input }) => {

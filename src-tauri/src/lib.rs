@@ -11,7 +11,7 @@ use app::app_state::AppState;
 use app::controller::{
     appointment_controller::*, client_controller::*, config_controller::*, dashboard_controller::*,
     email_controller::*, invoice_controller::*, invoice_pdf_controller::*, print_controller::*,
-    service_controller::*, ts::ts_controller::*,
+    service_controller::*, terms_controller::*, ts::ts_controller::*,
 };
 use app::repository::email::{LettreMailGateway, MailGateway};
 use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
@@ -107,6 +107,8 @@ pub fn run() {
             open_invoice_pdf,
             save_invoice_pdf,
             get_invoice_pdf_name,
+            get_terms_acceptance,
+            accept_terms,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

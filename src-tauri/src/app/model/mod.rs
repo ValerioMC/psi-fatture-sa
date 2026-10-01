@@ -6,4 +6,5 @@ pub mod email;
 pub mod invoice;
 pub mod service;
 pub mod tax;
+pub mod terms;
 pub mod ts;

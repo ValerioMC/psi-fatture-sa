@@ -5,7 +5,7 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
-import { IdCard, KeyRound, Mail, Palette, ReceiptText, Settings } from 'lucide-vue-next'
+import { IdCard, KeyRound, Mail, Palette, ReceiptText, Scale, Settings } from 'lucide-vue-next'
 import { useEmailStore } from '@/stores/email'
 import { useStsStore } from '@/stores/sts'
 import { useToastStore } from '@/stores/toast'
@@ -46,6 +46,7 @@ const items = computed<SettingsNavItem[]>(() => [
     status: sts.loaded && !sts.connected ? { tone: 'warn', label: 'Credenziali mancanti' } : undefined,
   },
   { to: '/settings/appearance', label: 'Aspetto', hint: 'Tema chiaro o scuro', icon: Palette },
+  { to: '/settings/legal', label: 'Condizioni d’uso', hint: 'Il testo che hai accettato', icon: Scale },
 ])
 
 async function save(): Promise<void> {

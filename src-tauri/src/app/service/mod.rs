@@ -8,5 +8,6 @@ pub mod italian_format;
 pub mod pdf;
 pub mod service_service;
 pub mod tax_service;
+pub mod terms_service;
 pub mod ts;
 pub mod validation_service;

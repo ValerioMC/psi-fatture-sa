@@ -3,6 +3,7 @@ name = "psi-fatture-sa"
 version = "0.1.0"
 description = "PSI Fatture - Gestionale fatture per psicologi"
 authors = ["Valerio"]
+license = "MIT"
 edition = "2021"
 
 [lib]

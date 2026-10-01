@@ -1,6 +1,7 @@
 /** Thin wrapper around Tauri invoke for all backend commands. */
 import { invoke } from '@tauri-apps/api/core'
 import type {
+  AcceptTermsInput,
   Appointment,
   BulkUpdateStatusInput,
   Client,
@@ -26,6 +27,7 @@ import type {
   ProfessionalConfig,
   SendInvoiceEmailInput,
   Service,
+  TermsAcceptance,
   TsConnectionCheck,
   TsCredentialsStatus,
   TsDispatchSummary,
@@ -187,3 +189,7 @@ export const sendPreparedInvoiceEmail = (invoiceId: number) =>
   invoke<InvoiceEmail>('send_prepared_invoice_email', { invoiceId })
 export const listInvoiceEmails = (invoiceId?: number) =>
   invoke<InvoiceEmail[]>('list_invoice_emails', { filters: { invoice_id: invoiceId ?? null } })
+
+export const getTermsAcceptance = (version: string) =>
+  invoke<TermsAcceptance | null>('get_terms_acceptance', { version })
+export const acceptTerms = (input: AcceptTermsInput) => invoke<TermsAcceptance>('accept_terms', { input })

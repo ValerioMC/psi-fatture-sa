@@ -7,4 +7,5 @@ pub mod email;
 pub mod invoice;
 pub mod secret;
 pub mod service_repository;
+pub mod terms_acceptance_repository;
 pub mod ts;

@@ -8,5 +8,6 @@ pub mod invoice_line;
 pub mod professional_config;
 pub mod recurrence_group;
 pub mod service;
+pub mod terms_acceptance;
 pub mod ts_setting;
 pub mod ts_submission;

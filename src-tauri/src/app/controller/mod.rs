@@ -7,4 +7,5 @@ pub mod invoice_controller;
 pub mod invoice_pdf_controller;
 pub mod print_controller;
 pub mod service_controller;
+pub mod terms_controller;
 pub mod ts;
