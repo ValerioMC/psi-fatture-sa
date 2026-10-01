@@ -11,6 +11,7 @@ fn line(net: f64, rate: f64) -> InvoiceLine {
         unit_price: net,
         vat_rate: rate,
         line_total: net,
+        amount_override: None,
     }
 }
 
@@ -35,6 +36,7 @@ fn invoice() -> Invoice {
         total_gross: 81.64,
         total_due: 83.64,
         paid_date: Some("2026-03-02".to_string()),
+        hide_quantity: false,
         lines: vec![line(80.0, 0.0)],
         created_at: String::new(),
         updated_at: String::new(),
@@ -59,6 +61,7 @@ fn client() -> Client {
         phone: String::new(),
         notes: None,
         sts_authorization: true,
+        hide_quantity_in_invoice: None,
         created_at: String::new(),
         updated_at: String::new(),
     }

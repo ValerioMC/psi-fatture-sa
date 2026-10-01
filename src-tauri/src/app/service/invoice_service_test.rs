@@ -68,12 +68,14 @@ fn invoice_input(issue_date: &str) -> CreateInvoiceInput {
         payment_method: crate::app::model::invoice::PaymentMethod::Bonifico,
         notes: String::new(),
         apply_enpap: true,
+        hide_quantity: None,
         lines: vec![InvoiceLineInput {
             service_id: None,
             description: "Seduta di psicoterapia".to_string(),
             quantity: 1,
             unit_price: 70.0,
             vat_rate: 0.0,
+            amount_override: None,
         }],
     }
 }
@@ -89,6 +91,7 @@ fn update_input_from(invoice: &Invoice, new_number: Option<&str>) -> UpdateInvoi
         payment_method: crate::app::model::invoice::PaymentMethod::Bonifico,
         notes: String::new(),
         apply_enpap: true,
+        hide_quantity: None,
         paid_date: None,
         lines: invoice
             .lines
@@ -99,6 +102,7 @@ fn update_input_from(invoice: &Invoice, new_number: Option<&str>) -> UpdateInvoi
                 quantity: l.quantity,
                 unit_price: l.unit_price,
                 vat_rate: l.vat_rate,
+                amount_override: l.amount_override,
             })
             .collect(),
     }
@@ -150,4 +154,109 @@ async fn moving_issue_date_to_another_year_updates_year_column() {
     input.issue_date = "2025-12-31".to_string();
     let moved = update(&db, input).await.unwrap();
     assert_eq!(moved.year, 2025);
+}
+
+async fn set_profile(db: &DatabaseConnection, tax_regime: &str, enpap_excludes_bollo: bool) {
+    db.execute_unprepared(&format!(
+        "INSERT INTO professional_config (id, tax_regime, enpap_excludes_bollo)
+         VALUES (1, '{tax_regime}', {})",
+        enpap_excludes_bollo as i32
+    ))
+    .await
+    .unwrap();
+}
+
+fn package_input() -> CreateInvoiceInput {
+    let mut input = invoice_input("2026-03-01");
+    input.lines[0].quantity = 4;
+    input.lines[0].amount_override = Some(250.0);
+    input
+}
+
+#[tokio::test]
+async fn hand_typed_amount_is_taxed_and_kept_on_the_line() {
+    let db = test_db().await;
+
+    let invoice = create(&db, package_input()).await.unwrap();
+    assert_eq!(invoice.total_net, 250.0);
+    assert_eq!(invoice.contributo_enpap, 5.04);
+    assert_eq!(invoice.total_due, 257.04);
+    assert_eq!(invoice.lines[0].amount_override, Some(250.0));
+    assert_eq!(invoice.lines[0].line_total, 250.0);
+
+    // Saving it again unchanged keeps the amount instead of recomputing 4 × 70.
+    let resaved = update(&db, update_input_from(&invoice, None))
+        .await
+        .unwrap();
+    assert_eq!(resaved.total_net, 250.0);
+}
+
+#[tokio::test]
+async fn invalid_hand_typed_amount_is_refused() {
+    let db = test_db().await;
+    let mut input = package_input();
+    input.lines[0].amount_override = Some(-1.0);
+    assert!(create(&db, input).await.is_err());
+}
+
+#[tokio::test]
+async fn ordinario_leaves_bollo_out_of_enpap() {
+    let db = test_db().await;
+    set_profile(&db, "ordinario", false).await;
+
+    let mut input = invoice_input("2026-03-01");
+    input.lines[0].unit_price = 100.0;
+    let invoice = create(&db, input).await.unwrap();
+    assert!(invoice.marca_da_bollo);
+    assert_eq!(invoice.contributo_enpap, 2.0);
+}
+
+#[tokio::test]
+async fn forfettario_profile_can_force_bollo_out_of_enpap() {
+    let db = test_db().await;
+    set_profile(&db, "forfettario", true).await;
+
+    let mut input = invoice_input("2026-03-01");
+    input.lines[0].unit_price = 100.0;
+    let invoice = create(&db, input).await.unwrap();
+    assert_eq!(invoice.contributo_enpap, 2.0);
+}
+
+#[tokio::test]
+async fn quantity_visibility_follows_patient_then_profile() {
+    let db = test_db().await;
+    set_profile(&db, "forfettario", false).await;
+    db.execute_unprepared("UPDATE professional_config SET hide_quantity_in_invoice = 1")
+        .await
+        .unwrap();
+
+    let from_profile = create(&db, invoice_input("2026-03-01")).await.unwrap();
+    assert!(from_profile.hide_quantity);
+
+    db.execute_unprepared("UPDATE clients SET hide_quantity_in_invoice = 0")
+        .await
+        .unwrap();
+    let from_patient = create(&db, invoice_input("2026-03-02")).await.unwrap();
+    assert!(!from_patient.hide_quantity);
+
+    let mut explicit = invoice_input("2026-03-03");
+    explicit.hide_quantity = Some(true);
+    assert!(create(&db, explicit).await.unwrap().hide_quantity);
+}
+
+#[tokio::test]
+async fn update_without_visibility_keeps_the_saved_one() {
+    let db = test_db().await;
+    let mut input = invoice_input("2026-03-01");
+    input.hide_quantity = Some(true);
+    let invoice = create(&db, input).await.unwrap();
+
+    let kept = update(&db, update_input_from(&invoice, None))
+        .await
+        .unwrap();
+    assert!(kept.hide_quantity);
+
+    let mut shown = update_input_from(&invoice, None);
+    shown.hide_quantity = Some(false);
+    assert!(!update(&db, shown).await.unwrap().hide_quantity);
 }

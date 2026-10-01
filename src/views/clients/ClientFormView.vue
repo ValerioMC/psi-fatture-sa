@@ -8,6 +8,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Check, FilePlus, FileText, IdCard, MapPin, ShieldCheck, ShieldOff, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { useClientsStore } from '@/stores/clients'
+import { useConfigStore } from '@/stores/config'
 import { errorMessage, useToastStore } from '@/stores/toast'
 import { getClient, listInvoices } from '@/api'
 import type { ClientType, CreateClientInput, Invoice } from '@/types'
@@ -39,6 +40,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const clientsStore = useClientsStore()
+const configStore = useConfigStore()
 const toast = useToastStore()
 
 const editId = route.params.id ? Number(route.params.id) : null
@@ -65,7 +67,10 @@ const form = reactive<CreateClientInput>({
   phone: '',
   notes: undefined,
   sts_authorization: false,
+  hide_quantity_in_invoice: null,
 })
+
+const profileHidesQuantity = computed(() => configStore.config?.hide_quantity_in_invoice ?? false)
 
 const TYPE_OPTIONS: SegmentOption<ClientType>[] = [
   { value: 'persona_fisica', label: 'Persona fisica' },
@@ -123,6 +128,7 @@ const historyTotal = computed(() =>
 )
 
 onMounted(async () => {
+  if (configStore.config === null) void configStore.loadConfig().catch(() => undefined)
   if (editId === null) return
   void listInvoices({ client_id: editId })
     .then((invoices) => {
@@ -147,6 +153,7 @@ onMounted(async () => {
       phone: client.phone,
       notes: client.notes,
       sts_authorization: client.sts_authorization,
+      hide_quantity_in_invoice: client.hide_quantity_in_invoice,
     })
   } catch (error) {
     loadError.value = errorMessage(error)
@@ -302,6 +309,16 @@ async function confirmDelete(): Promise<void> {
                 label="Il paziente autorizza la trasmissione"
                 description="In fattura comparirà la casella “Autorizza” spuntata; altrimenti “Non autorizza”."
               />
+            </FormSection>
+
+            <FormSection title="Fattura" description="Come si presentano le fatture di questo paziente. Puoi cambiarlo anche sulla singola fattura.">
+              <FormField v-slot="{ id }" class="max-w-80" label="Quantità e prezzo unitario">
+                <select :id="id" v-model="form.hide_quantity_in_invoice" class="field">
+                  <option :value="null">Come da impostazioni ({{ profileHidesQuantity ? 'nascosti' : 'mostrati' }})</option>
+                  <option :value="false">Mostrali</option>
+                  <option :value="true">Nascondili</option>
+                </select>
+              </FormField>
             </FormSection>
           </form>
         </AppCard>

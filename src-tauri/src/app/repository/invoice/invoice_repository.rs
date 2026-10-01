@@ -5,7 +5,9 @@ use sea_orm::{
 
 use super::InvoiceRow;
 use crate::app::entity::{invoice as invoices, invoice_line};
+use crate::app::model::config::TaxRegime;
 use crate::app::model::invoice::{Invoice, InvoiceFilters, InvoiceLine, InvoiceLineInput};
+use crate::app::model::tax::{round_cents, InvoiceLineData, TaxProfile};
 
 /// Returns invoice ids matching the given filters.
 pub async fn find_ids(
@@ -172,8 +174,7 @@ pub async fn insert_lines(
     lines: &[InvoiceLineInput],
 ) -> Result<(), String> {
     for line in lines {
-        let line_net = round2(line.quantity as f64 * line.unit_price);
-        let line_vat = round2(line_net * line.vat_rate / 100.0);
+        let amounts = InvoiceLineData::from(line);
 
         let active = invoice_line::ActiveModel {
             invoice_id: Set(invoice_id),
@@ -182,7 +183,8 @@ pub async fn insert_lines(
             quantity: Set(line.quantity),
             unit_price: Set(line.unit_price),
             vat_rate: Set(line.vat_rate),
-            line_total: Set(line_net + line_vat),
+            line_total: Set(amounts.net_amount() + amounts.vat_amount()),
+            amount_override: Set(line.amount_override.map(round_cents)),
             ..Default::default()
         };
 
@@ -261,24 +263,58 @@ pub async fn invoice_number_taken(
     Ok(row.map(|r| r.n).unwrap_or(0) > 0)
 }
 
-/// Returns the tax_regime from professional_config (defaults to "forfettario").
-pub async fn get_tax_regime(db: &impl sea_orm::ConnectionTrait) -> Result<String, String> {
+/// The profile's tax settings; a missing profile taxes as forfettario with the bollo in the ENPAP base.
+pub async fn get_tax_profile(db: &impl sea_orm::ConnectionTrait) -> Result<TaxProfile, String> {
     #[derive(FromQueryResult)]
-    struct RegimeRow {
+    struct ProfileRow {
         tax_regime: String,
+        enpap_excludes_bollo: i32,
     }
 
-    let row = RegimeRow::find_by_statement(Statement::from_string(
+    let row = ProfileRow::find_by_statement(Statement::from_string(
         sea_orm::DatabaseBackend::Sqlite,
-        "SELECT tax_regime FROM professional_config WHERE id = 1".to_owned(),
+        "SELECT tax_regime, enpap_excludes_bollo FROM professional_config WHERE id = 1".to_owned(),
     ))
     .one(db)
     .await
     .map_err(|e| e.to_string())?;
 
-    Ok(row
-        .map(|r| r.tax_regime)
-        .unwrap_or_else(|| "forfettario".to_string()))
+    Ok(match row {
+        Some(r) => TaxProfile {
+            tax_regime: TaxRegime::from(r.tax_regime),
+            enpap_excludes_bollo: r.enpap_excludes_bollo != 0,
+        },
+        None => TaxProfile {
+            tax_regime: TaxRegime::Forfettario,
+            enpap_excludes_bollo: false,
+        },
+    })
+}
+
+/// Whether a new invoice for this client hides quantity and unit price:
+/// the client's own choice when it has one, otherwise the profile's.
+pub async fn default_hide_quantity(
+    db: &impl sea_orm::ConnectionTrait,
+    client_id: i64,
+) -> Result<bool, String> {
+    #[derive(FromQueryResult)]
+    struct HideRow {
+        hide: i32,
+    }
+
+    let row = HideRow::find_by_statement(Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Sqlite,
+        "SELECT COALESCE(
+           (SELECT hide_quantity_in_invoice FROM clients WHERE id = ?),
+           (SELECT hide_quantity_in_invoice FROM professional_config WHERE id = 1),
+           0) AS hide",
+        [client_id.into()],
+    ))
+    .one(db)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(row.is_some_and(|r| r.hide != 0))
 }
 
 /// Updates the status (and optionally paid_date) for multiple invoices in one
@@ -344,11 +380,8 @@ fn into_line(m: invoice_line::Model) -> InvoiceLine {
         unit_price: m.unit_price,
         vat_rate: m.vat_rate,
         line_total: m.line_total,
+        amount_override: m.amount_override,
     }
-}
-
-fn round2(v: f64) -> f64 {
-    (v * 100.0).round() / 100.0
 }
 
 /// The invoice issued on `issue_date` with `number`, if any: how a Sistema TS

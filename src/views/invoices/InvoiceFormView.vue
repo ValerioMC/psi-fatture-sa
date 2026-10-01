@@ -2,9 +2,10 @@
 /**
  * Writing an invoice. The form on the left, a live summary on the right that
  * recomputes ENPAP, bollo and ritenuta as you type, with the save button next
- * to the total it saves. Errors are shown on the field they belong to.
+ * to the total it saves. A line's amount can be typed by hand, replacing
+ * quantity × price; quantity visibility starts from the patient, then the profile.
  */
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Check, ClipboardList, NotebookPen, Plus, Receipt, Trash2, TriangleAlert, UserRound } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/stores/invoices'
@@ -25,7 +26,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { ComboOption, SegmentOption } from '@/components/ui/types'
 import { formatCurrency, todayIso } from '@/utils/format'
-import { calculateInvoiceTotals } from '@/utils/tax'
+import { calculateInvoiceTotals, enpapIncludesBollo, hasAmountOverride, lineNetAmount } from '@/utils/tax'
 import { clientDisplayName } from '@/utils/client'
 import { INVOICE_STATUS, INVOICE_STATUS_ORDER, PAYMENT_METHOD_LABEL, PAYMENT_METHOD_ORDER } from '@/utils/labels'
 
@@ -50,7 +51,7 @@ interface FormLine extends InvoiceLineInput {
 
 let lineKey = 0
 function blankLine(): FormLine {
-  return { key: lineKey++, service_id: undefined, description: '', quantity: 1, unit_price: 0, vat_rate: 0 }
+  return { key: lineKey++, service_id: undefined, description: '', quantity: 1, unit_price: 0, vat_rate: 0, amount_override: null }
 }
 
 const form = reactive({
@@ -62,9 +63,13 @@ const form = reactive({
   payment_method: 'bonifico' as PaymentMethod,
   notes: '',
   apply_enpap: true,
+  hide_quantity: false,
   paid_date: '',
   lines: [blankLine()] as FormLine[],
 })
+
+/** Set once the user flips the switch, so a patient change stops overriding their choice. */
+const hideQuantityChosen = ref(isEdit)
 
 type FieldKey = 'client' | 'invoice_number' | 'issue_date' | 'due_date' | `line-${number}`
 const errors = reactive<Partial<Record<FieldKey, string>>>({})
@@ -80,7 +85,46 @@ const STATUS_OPTIONS: SegmentOption<InvoiceStatus>[] = INVOICE_STATUS_ORDER.map(
 }))
 
 const taxRegime = computed(() => configStore.config?.tax_regime ?? 'forfettario')
-const totals = computed(() => calculateInvoiceTotals(form.lines, taxRegime.value, form.apply_enpap))
+const taxProfile = computed(() => ({
+  tax_regime: taxRegime.value,
+  enpap_excludes_bollo: configStore.config?.enpap_excludes_bollo ?? false,
+}))
+const totals = computed(() => calculateInvoiceTotals(form.lines, taxProfile.value, form.apply_enpap))
+const enpapDescription = computed(() =>
+  enpapIncludesBollo(taxProfile.value)
+    ? 'Addebitato al paziente su imponibile e marca da bollo, che nel forfettario è compenso.'
+    : 'Addebitato al paziente sul solo imponibile, senza la marca da bollo.',
+)
+
+const selectedClient = computed(() => clientsStore.clients.find((client) => client.id === form.client_id))
+const patientHideQuantity = computed(() => selectedClient.value?.hide_quantity_in_invoice ?? null)
+const defaultHideQuantity = computed(() => patientHideQuantity.value ?? configStore.config?.hide_quantity_in_invoice ?? false)
+const hideQuantityOrigin = computed(() =>
+  patientHideQuantity.value === null ? 'Predefinito dalle impostazioni di fatturazione.' : 'Predefinito per questo paziente.',
+)
+
+watch(defaultHideQuantity, (hide) => {
+  if (!hideQuantityChosen.value) form.hide_quantity = hide
+}, { immediate: true })
+
+function chooseHideQuantity(hide: boolean): void {
+  hideQuantityChosen.value = true
+  form.hide_quantity = hide
+}
+
+/** Live while typing; an emptied field waits for `resetAmount` on change. */
+function typeAmount(line: FormLine, event: Event): void {
+  const amount = (event.target as HTMLInputElement).valueAsNumber
+  if (Number.isFinite(amount)) line.amount_override = amount
+}
+
+function commitAmount(line: FormLine, event: Event): void {
+  if ((event.target as HTMLInputElement).value.trim() === '') resetAmount(line)
+}
+
+function resetAmount(line: FormLine): void {
+  line.amount_override = null
+}
 
 function addLine(): void {
   form.lines.push(blankLine())
@@ -121,6 +165,7 @@ onMounted(async () => {
       payment_method: invoice.payment_method,
       notes: invoice.notes,
       apply_enpap: invoice.apply_enpap,
+      hide_quantity: invoice.hide_quantity,
       paid_date: invoice.paid_date ?? '',
       lines: invoice.lines.map((line) => ({
         key: lineKey++,
@@ -129,6 +174,7 @@ onMounted(async () => {
         quantity: line.quantity,
         unit_price: line.unit_price,
         vat_rate: line.vat_rate,
+        amount_override: line.amount_override ?? null,
       })),
     })
   } catch (error) {
@@ -153,6 +199,7 @@ function validate(): boolean {
     else if (!Number.isInteger(line.quantity) || line.quantity < 1) errors[key] = 'La quantità è un intero da 1 in su.'
     else if (!Number.isFinite(line.unit_price) || line.unit_price < 0) errors[key] = 'Prezzo non valido.'
     else if (!Number.isFinite(line.vat_rate) || line.vat_rate < 0 || line.vat_rate > 100) errors[key] = 'IVA tra 0 e 100.'
+    else if (hasAmountOverride(line) && (!Number.isFinite(line.amount_override) || line.amount_override < 0)) errors[key] = 'Importo non valido.'
   })
   return Object.keys(errors).length === 0
 }
@@ -173,6 +220,7 @@ async function onSubmit(): Promise<void> {
     payment_method: form.payment_method,
     notes: form.notes,
     apply_enpap: form.apply_enpap,
+    hide_quantity: form.hide_quantity,
     lines,
   }
 
@@ -267,12 +315,12 @@ async function onSubmit(): Promise<void> {
             <CardHeader title="Prestazioni" :subtitle="`${form.lines.length} ${form.lines.length === 1 ? 'riga' : 'righe'} in fattura`" :icon="ClipboardList">
               <AppButton size="sm" :icon="Plus" @click="addLine">Aggiungi riga</AppButton>
             </CardHeader>
-            <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2rem] gap-2 border-y border-border bg-[color-mix(in_srgb,var(--surface-sunken)_55%,var(--surface-raised))] px-5 py-2 text-xs font-medium text-text-subtle" aria-hidden="true">
-              <span>Descrizione</span><span class="text-right">Qtà</span><span class="text-right">Prezzo €</span><span class="text-right">IVA %</span><span />
+            <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_4.5rem_7rem_2rem] gap-2 border-y border-border bg-[color-mix(in_srgb,var(--surface-sunken)_55%,var(--surface-raised))] px-5 py-2 text-xs font-medium text-text-subtle" aria-hidden="true">
+              <span>Descrizione</span><span class="text-right">Qtà</span><span class="text-right">Prezzo €</span><span class="text-right">IVA %</span><span class="text-right">Importo €</span><span />
             </div>
             <TransitionGroup name="list" tag="div" class="relative">
               <div v-for="(line, index) in form.lines" :key="line.key" class="border-b border-border px-5 py-3 last:border-b-0">
-                <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2rem] items-start gap-2">
+                <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_4.5rem_7rem_2rem] items-start gap-2">
                   <div class="space-y-2">
                     <select
                       v-model="line.service_id"
@@ -295,6 +343,17 @@ async function onSubmit(): Promise<void> {
                   <input v-model.number="line.quantity" type="number" min="1" step="1" class="field field-sm tabular text-right" :aria-label="`Quantità, riga ${index + 1}`" />
                   <input v-model.number="line.unit_price" type="number" min="0" step="0.01" class="field field-sm tabular text-right" :aria-label="`Prezzo unitario, riga ${index + 1}`" />
                   <input v-model.number="line.vat_rate" type="number" min="0" max="100" step="1" class="field field-sm tabular text-right" :aria-label="`Aliquota IVA, riga ${index + 1}`" />
+                  <input
+                    :value="hasAmountOverride(line) ? line.amount_override : lineNetAmount(line)"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="field field-sm tabular text-right"
+                    :class="hasAmountOverride(line) ? 'font-medium text-text' : 'text-text-muted'"
+                    :aria-label="`Importo, riga ${index + 1}`"
+                    @input="typeAmount(line, $event)"
+                    @change="commitAmount(line, $event)"
+                  />
                   <AppButton
                     variant="danger-quiet"
                     size="sm"
@@ -304,6 +363,10 @@ async function onSubmit(): Promise<void> {
                     @click="removeLine(line.key)"
                   />
                 </div>
+                <p v-if="hasAmountOverride(line)" class="mt-1.5 text-xs text-text-subtle">
+                  Importo scritto a mano al posto di {{ line.quantity }} × {{ formatCurrency(line.unit_price) }}.
+                  <button type="button" class="font-medium text-accent underline-offset-2 hover:underline focus-ring" @click="resetAmount(line)">Ricalcola</button>
+                </p>
                 <p v-if="errors[`line-${index}`]" class="mt-1.5 text-xs text-danger" role="alert">{{ errors[`line-${index}`] }}</p>
               </div>
             </TransitionGroup>
@@ -320,7 +383,13 @@ async function onSubmit(): Promise<void> {
               <FormField v-if="form.status === 'paid'" v-slot="{ id, describedBy }" label="Pagata il" hint="Se la lasci vuota vale la data di oggi." class="max-w-60">
                 <input :id="id" v-model="form.paid_date" type="date" class="field" :aria-describedby="describedBy" />
               </FormField>
-              <ToggleSwitch v-model="form.apply_enpap" label="Contributo integrativo ENPAP 2%" description="Addebitato al paziente sull'imponibile, come previsto per gli psicologi." />
+              <ToggleSwitch v-model="form.apply_enpap" label="Contributo integrativo ENPAP 2%" :description="enpapDescription" />
+              <ToggleSwitch
+                :model-value="form.hide_quantity"
+                label="Nascondi quantità e prezzo unitario"
+                :description="`In fattura resta solo l'importo per riga. ${hideQuantityChosen ? 'Scelto per questa fattura.' : hideQuantityOrigin}`"
+                @update:model-value="chooseHideQuantity"
+              />
               <FormField v-slot="{ id }" label="Note" optional>
                 <textarea :id="id" v-model="form.notes" rows="2" class="field" placeholder="Compaiono in fondo alla fattura" />
               </FormField>

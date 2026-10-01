@@ -10,6 +10,13 @@ export interface LineData {
   quantity: number
   unit_price: number
   vat_rate: number
+  amount_override?: number | null
+}
+
+/** The profile settings that decide how an invoice is taxed. */
+export interface TaxProfile {
+  tax_regime: string
+  enpap_excludes_bollo: boolean
 }
 
 export interface InvoiceTotals {
@@ -27,6 +34,26 @@ const RITENUTA_RATE = 0.2
 const MARCA_DA_BOLLO_AMOUNT = 2.0
 const MARCA_DA_BOLLO_THRESHOLD = 77.47
 
+/** The line's taxable amount: the hand-typed one when set, otherwise quantity × unit price. */
+export function lineNetAmount(line: LineData): number {
+  const amount = hasAmountOverride(line)
+    ? line.amount_override
+    : sanitize(line.quantity) * sanitize(line.unit_price)
+  return round2(sanitize(amount))
+}
+
+export function hasAmountOverride(line: LineData): line is LineData & { amount_override: number } {
+  return line.amount_override !== undefined && line.amount_override !== null
+}
+
+/**
+ * Whether the bollo concurs to the ENPAP base: in the forfettario regime it is
+ * compenso (Interpello AdE) unless the profile opts out; in ordinario never.
+ */
+export function enpapIncludesBollo(profile: TaxProfile): boolean {
+  return profile.tax_regime === 'forfettario' && !profile.enpap_excludes_bollo
+}
+
 /**
  * Calculates all invoice totals including ENPAP, ritenuta d'acconto, and marca da bollo.
  *
@@ -35,13 +62,13 @@ const MARCA_DA_BOLLO_THRESHOLD = 77.47
  */
 export function calculateInvoiceTotals(
   lines: LineData[],
-  taxRegime: string,
+  profile: TaxProfile,
   applyEnpap: boolean,
 ): InvoiceTotals {
   let total_net = 0
   let total_tax = 0
   for (const line of lines) {
-    const lineNet = round2(sanitize(line.quantity) * sanitize(line.unit_price))
+    const lineNet = lineNetAmount(line)
     const lineVat = round2(lineNet * sanitize(line.vat_rate) / 100)
     total_net += lineNet
     total_tax += lineVat
@@ -52,16 +79,13 @@ export function calculateInvoiceTotals(
     !hasVat && total_net > MARCA_DA_BOLLO_THRESHOLD
   const marca_da_bollo = appliesMarcaDaBollo ? MARCA_DA_BOLLO_AMOUNT : 0
 
-  // Marca da bollo charged to the client is additional compenso for a
-  // forfettario professional, so it concurs to the ENPAP base too.
-  const contributo_enpap = applyEnpap
-    ? round2((total_net + marca_da_bollo) * ENPAP_RATE)
-    : 0
+  const enpapBase = enpapIncludesBollo(profile) ? total_net + marca_da_bollo : total_net
+  const contributo_enpap = applyEnpap ? round2(enpapBase * ENPAP_RATE) : 0
   const total_gross = total_net + total_tax + contributo_enpap
 
   const ritenuta_base = total_net + contributo_enpap
   const ritenuta_acconto =
-    taxRegime === 'ordinario' ? round2(ritenuta_base * RITENUTA_RATE) : 0
+    profile.tax_regime === 'ordinario' ? round2(ritenuta_base * RITENUTA_RATE) : 0
 
   const total_due = total_gross - ritenuta_acconto + marca_da_bollo
 

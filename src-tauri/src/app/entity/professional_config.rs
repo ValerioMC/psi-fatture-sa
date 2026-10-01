@@ -26,6 +26,7 @@ pub struct Model {
     pub is_psicoanalista: i32,
     pub specialization: String,
     pub hide_quantity_in_invoice: i32,
+    pub enpap_excludes_bollo: i32,
     pub initial_invoice_number: i64,
     pub created_at: String,
     pub updated_at: String,

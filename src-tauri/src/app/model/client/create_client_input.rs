@@ -19,4 +19,7 @@ pub struct CreateClientInput {
     pub phone: String,
     pub notes: Option<String>,
     pub sts_authorization: bool,
+    /// None follows the profile's setting.
+    #[serde(default)]
+    pub hide_quantity_in_invoice: Option<bool>,
 }

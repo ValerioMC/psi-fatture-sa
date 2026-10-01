@@ -7,6 +7,7 @@ fn valid_line() -> InvoiceLineInput {
         quantity: 1,
         unit_price: 70.0,
         vat_rate: 0.0,
+        amount_override: None,
     }
 }
 
@@ -75,6 +76,10 @@ fn rejects_invalid_line_values() {
     let mut bad_vat = valid_line();
     bad_vat.vat_rate = 101.0;
     assert!(validate_invoice_lines(&[bad_vat]).is_err());
+
+    let mut bad_amount = valid_line();
+    bad_amount.amount_override = Some(f64::NAN);
+    assert!(validate_invoice_lines(&[bad_amount]).is_err());
 
     assert!(validate_invoice_lines(&[valid_line()]).is_ok());
 }

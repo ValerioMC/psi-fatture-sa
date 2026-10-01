@@ -110,6 +110,13 @@ const PROFESSIONS: SegmentOption<Profession>[] = [
           <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-text-subtle">%</span>
         </div>
       </FormField>
+      <ToggleSwitch
+        v-if="form.tax_regime === 'forfettario'"
+        v-model="form.enpap_excludes_bollo"
+        class="mt-5"
+        label="Escludi la marca da bollo dal calcolo ENPAP"
+        description="Nel forfettario il bollo addebitato al paziente è compenso e concorre al 2% ENPAP: attivalo solo se calcoli il contributo sul solo imponibile. Nel regime ordinario il bollo è sempre escluso."
+      />
     </FormSection>
 
     <FormSection v-if="sections.includes('numbering')" title="Numerazione" description="Se usi l'app da metà anno, riparti dal numero successivo all'ultima fattura emessa.">
@@ -128,7 +135,7 @@ const PROFESSIONS: SegmentOption<Profession>[] = [
       <ToggleSwitch
         v-model="form.hide_quantity_in_invoice"
         label="Non mostrare la quantità in fattura"
-        description="Nasconde le colonne Quantità e Prezzo unitario; resta solo l'importo per riga."
+        description="Nasconde le colonne Quantità e Prezzo unitario; resta solo l'importo per riga. È il valore di partenza: puoi cambiarlo per singolo paziente e per singola fattura."
       />
     </FormSection>
 

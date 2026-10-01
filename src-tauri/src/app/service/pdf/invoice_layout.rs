@@ -469,7 +469,7 @@ const CELL_PAD: f32 = 9.0;
 const EDGE_PAD: f32 = 11.25;
 
 fn lines_table(flow: &mut PageFlow, document: &InvoiceDocument, fonts: &PdfFonts) {
-    let columns = Columns::new(!document.config.hide_quantity_in_invoice);
+    let columns = Columns::new(!document.invoice.hide_quantity);
     let mut label = Block::new(fonts);
     label.text(
         LEFT,
@@ -587,7 +587,8 @@ fn table_row<'f>(
             &line.quantity.to_string(),
         );
     }
-    if let Some((_, end)) = columns.unit_price {
+    // A hand-typed amount is not quantity × unit price, so no unit price is printed beside it.
+    if let (Some((_, end)), None) = (columns.unit_price, line.amount_override) {
         block.text_right(end - CELL_PAD, first, secondary, &currency(line.unit_price));
     }
     vat_cell(&mut block, columns.vat, first, line.vat_rate);

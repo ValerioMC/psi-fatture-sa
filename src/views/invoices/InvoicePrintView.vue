@@ -8,6 +8,7 @@ import AppSpinner from '@/components/ui/AppSpinner.vue'
 import { getInvoice, getClient, getConfig } from '@/api'
 import type { Invoice, Client, ProfessionalConfig } from '@/types'
 import { formatCurrency, formatDateLong } from '@/utils/format'
+import { hasAmountOverride } from '@/utils/tax'
 import { useSmoothScroll } from '@/composables/useSmoothScroll'
 
 const route = useRoute()
@@ -227,8 +228,8 @@ async function handlePrint(): Promise<void> {
             <thead>
               <tr>
                 <th class="th-desc">Descrizione</th>
-                <th v-if="!config.hide_quantity_in_invoice" class="th-center">Qtà</th>
-                <th v-if="!config.hide_quantity_in_invoice" class="th-right">Prezzo unit.</th>
+                <th v-if="!invoice.hide_quantity" class="th-center">Qtà</th>
+                <th v-if="!invoice.hide_quantity" class="th-right">Prezzo unit.</th>
                 <th class="th-center">IVA</th>
                 <th class="th-right th-last">Importo</th>
               </tr>
@@ -240,8 +241,8 @@ async function handlePrint(): Promise<void> {
                 :class="i % 2 === 1 ? 'tr-alt' : ''"
               >
                 <td class="td-desc">{{ line.description }}</td>
-                <td v-if="!config.hide_quantity_in_invoice" class="td-center td-secondary">{{ line.quantity }}</td>
-                <td v-if="!config.hide_quantity_in_invoice" class="td-right td-secondary">{{ formatCurrency(line.unit_price) }}</td>
+                <td v-if="!invoice.hide_quantity" class="td-center td-secondary">{{ line.quantity }}</td>
+                <td v-if="!invoice.hide_quantity" class="td-right td-secondary">{{ hasAmountOverride(line) ? '' : formatCurrency(line.unit_price) }}</td>
                 <td class="td-center td-secondary">
                   <span v-if="line.vat_rate === 0" class="vat-exempt">Esente</span>
                   <template v-else>{{ line.vat_rate }}%</template>

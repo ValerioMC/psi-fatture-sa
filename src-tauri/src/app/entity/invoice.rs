@@ -22,6 +22,7 @@ pub struct Model {
     pub total_gross: f64,
     pub total_due: f64,
     pub paid_date: Option<String>,
+    pub hide_quantity: i32,
     pub created_at: String,
     pub updated_at: String,
 }

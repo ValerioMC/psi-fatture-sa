@@ -50,6 +50,7 @@ export function emptyProfile(): UpsertConfigInput {
     is_psicoanalista: false,
     specialization: '',
     hide_quantity_in_invoice: false,
+    enpap_excludes_bollo: false,
     initial_invoice_number: 1,
   }
 }

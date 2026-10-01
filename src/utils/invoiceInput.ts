@@ -16,6 +16,7 @@ export function withStatus(invoice: Invoice, status: InvoiceStatus, paidDate?: s
     payment_method: invoice.payment_method,
     notes: invoice.notes,
     apply_enpap: invoice.apply_enpap,
+    hide_quantity: invoice.hide_quantity,
     paid_date: status === 'paid' ? paidDate ?? invoice.paid_date : undefined,
     lines: invoice.lines.map((line) => ({
       service_id: line.service_id,
@@ -23,6 +24,7 @@ export function withStatus(invoice: Invoice, status: InvoiceStatus, paidDate?: s
       quantity: line.quantity,
       unit_price: line.unit_price,
       vat_rate: line.vat_rate,
+      amount_override: line.amount_override,
     })),
   }
 }

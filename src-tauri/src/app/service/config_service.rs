@@ -72,6 +72,7 @@ fn build_active_model(input: &UpsertConfigInput) -> ActiveModel {
         is_psicoanalista: Set(input.is_psicoanalista as i32),
         specialization: Set(input.specialization.clone()),
         hide_quantity_in_invoice: Set(input.hide_quantity_in_invoice as i32),
+        enpap_excludes_bollo: Set(input.enpap_excludes_bollo as i32),
         initial_invoice_number: Set(input.initial_invoice_number),
         updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
         ..Default::default()
@@ -102,6 +103,7 @@ pub(crate) fn into_domain(m: professional_config::Model) -> ProfessionalConfig {
         is_psicoanalista: m.is_psicoanalista != 0,
         specialization: m.specialization,
         hide_quantity_in_invoice: m.hide_quantity_in_invoice != 0,
+        enpap_excludes_bollo: m.enpap_excludes_bollo != 0,
         initial_invoice_number: m.initial_invoice_number,
         created_at: m.created_at,
         updated_at: m.updated_at,

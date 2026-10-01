@@ -12,9 +12,7 @@ use crate::app::model::invoice::{
 use crate::app::model::tax::{InvoiceLineData, InvoiceTotals};
 use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::{appointment_repository, service_repository};
-use crate::app::service::tax_service::{
-    calculate_invoice_totals, ritenuta_rate_for_regime, ENPAP_RATE,
-};
+use crate::app::service::tax_service::{calculate_invoice_totals, rules_for};
 use crate::app::service::ts::ts_submission_service;
 use crate::app::service::validation_service as validate;
 
@@ -77,6 +75,7 @@ pub async fn update(db: &DatabaseConnection, input: UpdateInvoiceInput) -> Resul
     let totals = compute_totals(&tx, &input.lines, input.apply_enpap).await?;
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let paid_date = resolve_paid_date(&input.status, input.paid_date.clone());
+    let hide_quantity = input.hide_quantity.unwrap_or(current.hide_quantity);
 
     let active = invoices::ActiveModel {
         id: Set(input.id),
@@ -97,6 +96,7 @@ pub async fn update(db: &DatabaseConnection, input: UpdateInvoiceInput) -> Resul
         total_gross: Set(totals.total_gross),
         total_due: Set(totals.total_due),
         paid_date: Set(paid_date),
+        hide_quantity: Set(hide_quantity as i32),
         updated_at: Set(now),
         ..Default::default()
     };
@@ -148,8 +148,7 @@ pub async fn preview_monthly(
         return Ok(vec![]);
     }
 
-    let regime = invoice_repository::get_tax_regime(db).await?;
-    let ritenuta_rate = ritenuta_rate_for_regime(&regime);
+    let rules = rules_for(&invoice_repository::get_tax_profile(db).await?, true);
 
     let mut by_client: BTreeMap<i64, (String, Vec<_>)> = BTreeMap::new();
     for appt in &appointments {
@@ -166,7 +165,7 @@ pub async fn preview_monthly(
     for (client_id, (client_name, appts)) in &by_client {
         let lines = build_lines_from_appointments(appts, &svc_map);
         let line_data = to_line_data(&lines);
-        let totals = calculate_invoice_totals(&line_data, ENPAP_RATE, ritenuta_rate);
+        let totals = calculate_invoice_totals(&line_data, &rules);
 
         previews.push(MonthlyInvoicePreview {
             client_id: *client_id,
@@ -221,6 +220,7 @@ pub async fn generate_monthly(
             payment_method: input.payment_method.clone(),
             notes: String::new(),
             apply_enpap: input.apply_enpap,
+            hide_quantity: None,
             lines,
         };
 
@@ -290,6 +290,10 @@ async fn create_in_tx<C: ConnectionTrait>(
     let invoice_number = invoice_repository::next_invoice_number(tx, year).await?;
     let totals = compute_totals(tx, &input.lines, input.apply_enpap).await?;
     let paid_date = resolve_paid_date(&input.status, None);
+    let hide_quantity = match input.hide_quantity {
+        Some(hide) => hide,
+        None => invoice_repository::default_hide_quantity(tx, input.client_id).await?,
+    };
 
     let active = invoices::ActiveModel {
         client_id: Set(input.client_id),
@@ -309,6 +313,7 @@ async fn create_in_tx<C: ConnectionTrait>(
         total_gross: Set(totals.total_gross),
         total_due: Set(totals.total_due),
         paid_date: Set(paid_date),
+        hide_quantity: Set(hide_quantity as i32),
         ..Default::default()
     };
 
@@ -387,20 +392,14 @@ fn build_lines_from_appointments(
                 quantity: qty,
                 unit_price: g.price,
                 vat_rate: g.vat_rate,
+                amount_override: None,
             }
         })
         .collect()
 }
 
 fn to_line_data(lines: &[InvoiceLineInput]) -> Vec<InvoiceLineData> {
-    lines
-        .iter()
-        .map(|l| InvoiceLineData {
-            quantity: l.quantity,
-            unit_price: l.unit_price,
-            vat_rate: l.vat_rate,
-        })
-        .collect()
+    lines.iter().map(InvoiceLineData::from).collect()
 }
 
 /// Returns the last day of the given month as an ISO date string.
@@ -431,14 +430,10 @@ async fn compute_totals(
     lines: &[InvoiceLineInput],
     apply_enpap: bool,
 ) -> Result<InvoiceTotals, String> {
-    let regime = invoice_repository::get_tax_regime(db).await?;
-    let enpap_rate = if apply_enpap { ENPAP_RATE } else { 0.0 };
-    let ritenuta_rate = ritenuta_rate_for_regime(&regime);
-
+    let profile = invoice_repository::get_tax_profile(db).await?;
     Ok(calculate_invoice_totals(
         &to_line_data(lines),
-        enpap_rate,
-        ritenuta_rate,
+        &rules_for(&profile, apply_enpap),
     ))
 }
 

@@ -24,6 +24,7 @@ pub(super) struct InvoiceRow {
     total_gross: f64,
     total_due: f64,
     paid_date: Option<String>,
+    hide_quantity: i32,
     created_at: String,
     updated_at: String,
 }
@@ -50,6 +51,7 @@ impl InvoiceRow {
             total_gross: self.total_gross,
             total_due: self.total_due,
             paid_date: self.paid_date,
+            hide_quantity: self.hide_quantity != 0,
             lines,
             created_at: self.created_at,
             updated_at: self.updated_at,

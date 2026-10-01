@@ -12,6 +12,7 @@ pub struct Model {
     pub unit_price: f64,
     pub vat_rate: f64,
     pub line_total: f64,
+    pub amount_override: Option<f64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

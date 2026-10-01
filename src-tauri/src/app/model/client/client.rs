@@ -20,6 +20,8 @@ pub struct Client {
     pub phone: String,
     pub notes: Option<String>,
     pub sts_authorization: bool,
+    /// None follows the profile's setting.
+    pub hide_quantity_in_invoice: Option<bool>,
     pub created_at: String,
     pub updated_at: String,
 }

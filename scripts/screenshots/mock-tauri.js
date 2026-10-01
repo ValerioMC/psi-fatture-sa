@@ -33,7 +33,7 @@
       address: `${pick(streets)} ${1 + Math.floor(rand() * 90)}`, city, province: prov, zip_code: zip,
       email: rand() < 0.8 ? `${first.toLowerCase()}.${last.toLowerCase().replace(/[^a-z]/g, '')}@email.it` : undefined,
       phone: `+39 3${Math.floor(rand() * 5) + 3}${Math.floor(1000000 + rand() * 8999999)}`,
-      notes: '', sts_authorization: rand() < 0.8, created_at: '2025-01-10T09:00:00', updated_at: '2025-01-10T09:00:00',
+      notes: '', sts_authorization: rand() < 0.8, hide_quantity_in_invoice: null, created_at: '2025-01-10T09:00:00', updated_at: '2025-01-10T09:00:00',
     })
   }
   const clientName = (c) => c.client_type === 'azienda' ? c.last_name : `${c.last_name} ${c.first_name}`
@@ -55,7 +55,7 @@
     id: 1, title: 'Dott.ssa', first_name: 'Maria', last_name: 'Ferretti', vat_number: '12345678903', fiscal_code: 'FRRMRA80A41F205Z',
     tax_regime: 'forfettario', albo_number: '12345', albo_region: 'Lombardia', address: 'Via Solferino 24', city: 'Milano', province: 'MI', zip_code: '20121', country: 'IT',
     phone: '+39 02 1234567', pec_email: 'maria.ferretti@pec.it', iban: 'IT60X0542811101000000123456', coefficient: 78, profession: 'psicoterapeuta', is_psicoanalista: false,
-    specialization: '', hide_quantity_in_invoice: false,
+    specialization: '', hide_quantity_in_invoice: false, enpap_excludes_bollo: false,
     initial_invoice_number: 1, created_at: '2025-01-01', updated_at: '2025-01-01',
   }
 
@@ -91,7 +91,7 @@
         const t = totals(lines, true)
         invoices.push({
           id: nextId, client_id: c.id, client_name: clientName(c), invoice_number: String(counters[y]), year: y, issue_date: issue, due_date: due,
-          status, payment_method: rand() < 0.8 ? 'bonifico' : 'pos', notes: '', apply_enpap: true, ...t,
+          status, payment_method: rand() < 0.8 ? 'bonifico' : 'pos', notes: '', apply_enpap: true, hide_quantity: false, ...t,
           paid_date: status === 'paid' ? addDays(issue, Math.floor(rand() * 20)) : undefined, lines, created_at: issue, updated_at: issue,
         })
         nextId++
@@ -104,7 +104,7 @@
     const lines = [{ id: nextId * 10, service_id: 1, description: svc.name, quantity: 1, unit_price: 80, vat_rate: 0, line_total: 80 }]
     counters[TY] = (counters[TY] ?? 0) + 1
     invoices.push({ id: nextId, client_id: c.id, client_name: clientName(c), invoice_number: String(counters[TY]), year: TY, issue_date: iso(TY, TM, Math.max(1, TD - 3)), due_date: undefined,
-      status: c.id === 47 ? 'cancelled' : 'draft', payment_method: 'bonifico', notes: '', apply_enpap: true, ...totals(lines, true), lines, created_at: todayIso, updated_at: todayIso })
+      status: c.id === 47 ? 'cancelled' : 'draft', payment_method: 'bonifico', notes: '', apply_enpap: true, hide_quantity: false, ...totals(lines, true), lines, created_at: todayIso, updated_at: todayIso })
     nextId++
   }
 
@@ -328,7 +328,7 @@
       .sort((a, b) => b.issue_date.localeCompare(a.issue_date) || Number(b.invoice_number) - Number(a.invoice_number)),
     get_invoice: ({ id }) => invoices.find((i) => i.id === id),
     update_invoice: ({ input }) => { const i = invoices.findIndex((x) => x.id === input.id); invoices[i] = { ...invoices[i], ...input, lines: input.lines.map((l) => ({ ...l, line_total: l.quantity * l.unit_price })), ...totals(input.lines, input.apply_enpap) }; return invoices[i] },
-    create_invoice: ({ input }) => { const inv = { ...input, id: nextId++, invoice_number: String(++counters[TY]), year: TY, client_name: clientName(clients.find((c) => c.id === input.client_id)), lines: input.lines.map((l) => ({ ...l, line_total: l.quantity * l.unit_price })), ...totals(input.lines, input.apply_enpap) }; invoices.push(inv); return inv },
+    create_invoice: ({ input }) => { const inv = { hide_quantity: false, ...input, id: nextId++, invoice_number: String(++counters[TY]), year: TY, client_name: clientName(clients.find((c) => c.id === input.client_id)), lines: input.lines.map((l) => ({ ...l, line_total: l.quantity * l.unit_price })), ...totals(input.lines, input.apply_enpap) }; invoices.push(inv); return inv },
     delete_invoice: ({ id }) => { invoices.splice(invoices.findIndex((i) => i.id === id), 1) },
     get_next_invoice_number: () => String((counters[TY] ?? 0) + 1),
     bulk_update_invoice_status: ({ input }) => { for (const i of invoices) if (input.ids.includes(i.id)) { i.status = input.status; i.paid_date = input.paid_date } return input.ids.length },

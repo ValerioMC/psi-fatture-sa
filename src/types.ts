@@ -30,6 +30,8 @@ export interface ProfessionalConfig {
   is_psicoanalista: boolean
   specialization: string
   hide_quantity_in_invoice: boolean
+  /** Leaves the bollo out of the ENPAP base in the forfettario regime too. */
+  enpap_excludes_bollo: boolean
   initial_invoice_number: number
   created_at: string
   updated_at: string
@@ -54,6 +56,8 @@ export interface Client {
   phone: string
   notes?: string
   sts_authorization: boolean
+  /** Null follows the profile's setting. */
+  hide_quantity_in_invoice: boolean | null
   created_at: string
   updated_at: string
 }
@@ -81,6 +85,8 @@ export interface InvoiceLineInput {
   quantity: number
   unit_price: number
   vat_rate: number
+  /** Net amount typed by hand, replacing quantity × unit price. */
+  amount_override?: number | null
 }
 
 export interface InvoiceLine extends InvoiceLineInput {
@@ -97,6 +103,8 @@ export interface CreateInvoiceInput {
   payment_method: PaymentMethod
   notes: string
   apply_enpap: boolean
+  /** Omitted: the patient's setting, then the profile's (on update: the saved one). */
+  hide_quantity?: boolean
   lines: InvoiceLineInput[]
 }
 
@@ -127,6 +135,7 @@ export interface Invoice {
   total_gross: number
   total_due: number
   paid_date?: string
+  hide_quantity: boolean
   lines: InvoiceLine[]
   created_at: string
   updated_at: string

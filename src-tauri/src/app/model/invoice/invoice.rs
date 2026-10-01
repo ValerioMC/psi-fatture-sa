@@ -25,6 +25,8 @@ pub struct Invoice {
     pub total_gross: f64,
     pub total_due: f64,
     pub paid_date: Option<String>,
+    /// Whether the quantity and unit-price columns are left off the printed invoice.
+    pub hide_quantity: bool,
     pub lines: Vec<InvoiceLine>,
     pub created_at: String,
     pub updated_at: String,

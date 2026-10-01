@@ -93,6 +93,11 @@ pub fn validate_invoice_lines(lines: &[InvoiceLineInput]) -> Result<(), String> 
         if !l.vat_rate.is_finite() || !(0.0..=100.0).contains(&l.vat_rate) {
             return Err(format!("Riga {row}: aliquota IVA non valida (0-100)"));
         }
+        if l.amount_override
+            .is_some_and(|amount| !amount.is_finite() || amount < 0.0)
+        {
+            return Err(format!("Riga {row}: importo non valido"));
+        }
     }
     Ok(())
 }

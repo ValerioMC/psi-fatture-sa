@@ -46,6 +46,7 @@ pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result
         phone: Set(input.phone),
         notes: Set(input.notes),
         sts_authorization: Set(input.sts_authorization as i32),
+        hide_quantity_in_invoice: Set(input.hide_quantity_in_invoice.map(i32::from)),
         ..Default::default()
     };
 
@@ -82,6 +83,7 @@ pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result
         phone: Set(input.phone),
         notes: Set(input.notes),
         sts_authorization: Set(input.sts_authorization as i32),
+        hide_quantity_in_invoice: Set(input.hide_quantity_in_invoice.map(i32::from)),
         updated_at: Set(now),
         ..Default::default()
     };
@@ -139,6 +141,7 @@ pub(crate) fn into_domain(m: client::Model) -> Client {
         phone: m.phone,
         notes: m.notes,
         sts_authorization: m.sts_authorization != 0,
+        hide_quantity_in_invoice: m.hide_quantity_in_invoice.map(|hide| hide != 0),
         created_at: m.created_at,
         updated_at: m.updated_at,
     }

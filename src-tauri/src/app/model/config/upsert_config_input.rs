@@ -28,5 +28,8 @@ pub struct UpsertConfigInput {
     /// line when `is_psicoanalista` is false.
     pub specialization: String,
     pub hide_quantity_in_invoice: bool,
+    /// Leaves the marca da bollo out of the ENPAP base even in the forfettario regime.
+    #[serde(default)]
+    pub enpap_excludes_bollo: bool,
     pub initial_invoice_number: i64,
 }

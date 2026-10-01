@@ -7,4 +7,7 @@ pub struct InvoiceLineInput {
     pub quantity: i64,
     pub unit_price: f64,
     pub vat_rate: f64,
+    /// Net amount typed by hand, replacing quantity × unit price.
+    #[serde(default)]
+    pub amount_override: Option<f64>,
 }

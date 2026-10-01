@@ -20,6 +20,7 @@ pub struct Model {
     pub phone: String,
     pub notes: Option<String>,
     pub sts_authorization: i32,
+    pub hide_quantity_in_invoice: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
 }

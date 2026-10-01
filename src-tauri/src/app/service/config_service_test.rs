@@ -23,6 +23,7 @@ fn valid_input() -> UpsertConfigInput {
         is_psicoanalista: true,
         specialization: String::new(),
         hide_quantity_in_invoice: false,
+        enpap_excludes_bollo: false,
         initial_invoice_number: 1,
     }
 }

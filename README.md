@@ -240,6 +240,23 @@ e un solo colore d'accento (indaco inchiostro) per selezione, azione primaria e 
   sopra la barra laterale e intestazioni e barra laterale trascinano la finestra
   (permesso `core:window:allow-start-dragging`).
 
+## Calcolo della fattura
+
+Il backend (`src-tauri/src/app/service/tax_service.rs`) calcola i totali salvati;
+`src/utils/tax.ts` ripete la stessa logica per l'anteprima nel modulo e va tenuto allineato.
+
+- **Base ENPAP 2%**: nel forfettario la marca da bollo addebitata al paziente è compenso
+  (Interpello AdE) e concorre alla base; nell'ordinario la base è il solo imponibile.
+  Impostazioni → Fatturazione → *Escludi la marca da bollo dal calcolo ENPAP* toglie il
+  bollo dalla base anche nel forfettario.
+- **Importo a mano**: ogni riga ha un campo *Importo* che vale quantità × prezzo finché non
+  lo si scrive a mano; da lì l'importo scritto (`invoice_lines.amount_override`) sostituisce
+  il prodotto in tutti i calcoli, e in fattura la riga non mostra il prezzo unitario.
+  *Ricalcola* torna al prodotto.
+- **Quantità e prezzo unitario in fattura**: la scelta è salvata sulla fattura
+  (`invoices.hide_quantity`). Una fattura nuova parte dall'impostazione del paziente
+  (scheda paziente → *Fattura*), se c'è, altrimenti da quella in Impostazioni → Fatturazione.
+
 ## Sistema Tessera Sanitaria
 
 Le spese sanitarie delle fatture pagate si trasmettono al Sistema TS (Sogei) tramite il

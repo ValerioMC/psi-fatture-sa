@@ -27,6 +27,7 @@ import { formatCurrency, formatDateLong, todayIso } from '@/utils/format'
 import { PAYMENT_METHOD_LABEL } from '@/utils/labels'
 import { deriveSeal, describeSeal } from '@/utils/invoiceSeal'
 import { withStatus } from '@/utils/invoiceInput'
+import { hasAmountOverride } from '@/utils/tax'
 
 const route = useRoute()
 const router = useRouter()
@@ -202,7 +203,8 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
               <tr v-for="(line, index) in invoice.lines" :key="line.id ?? index" class="border-b border-border">
                 <td class="py-3 pl-8 text-text">{{ line.description }}</td>
                 <td class="tabular text-right text-text-muted">{{ line.quantity }}</td>
-                <td class="tabular text-right text-text-muted">{{ formatCurrency(line.unit_price) }}</td>
+                <td v-if="hasAmountOverride(line)" class="text-right text-sm text-text-subtle" title="Importo scritto a mano, non quantità × prezzo">a corpo</td>
+                <td v-else class="tabular text-right text-text-muted">{{ formatCurrency(line.unit_price) }}</td>
                 <td class="text-right text-sm text-text-subtle">{{ line.vat_rate > 0 ? `${line.vat_rate}%` : 'esente' }}</td>
                 <td class="tabular pr-8 text-right font-medium text-text">{{ formatCurrency(line.line_total) }}</td>
               </tr>

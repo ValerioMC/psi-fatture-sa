@@ -18,6 +18,9 @@ pub struct UpdateInvoiceInput {
     pub payment_method: PaymentMethod,
     pub notes: String,
     pub apply_enpap: bool,
+    /// None takes the patient's setting, then the profile's (on update: keeps the saved one).
+    #[serde(default)]
+    pub hide_quantity: Option<bool>,
     pub paid_date: Option<String>,
     pub lines: Vec<InvoiceLineInput>,
 }
