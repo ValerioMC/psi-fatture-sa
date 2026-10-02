@@ -35,7 +35,7 @@ async function saveBackup(): Promise<void> {
     <CardHeader title="Backup dell'archivio" subtitle="Pazienti, fatture, agenda e impostazioni in un solo file" :icon="DatabaseBackup" />
     <div class="space-y-4 px-5 pb-5 text-sm leading-relaxed text-text-muted">
       <p>
-        L’archivio vive solo su questo computer: se il disco si guasta o il Mac viene perso, le fatture se ne vanno con lui.
+        L’archivio vive solo su questo computer: se il disco si guasta o il computer viene perso, le fatture se ne vanno con lui.
         Salva una copia almeno una volta al mese su un disco esterno o in una cartella sincronizzata.
       </p>
       <p class="text-xs text-text-subtle">

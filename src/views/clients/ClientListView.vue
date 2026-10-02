@@ -5,10 +5,11 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Building2, Cake, MapPin, Pencil, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-vue-next'
+import { Activity, Building2, ClipboardList, Pencil, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-vue-next'
+import { listInvoices } from '@/api'
 import { useClientsStore } from '@/stores/clients'
 import { useToastStore } from '@/stores/toast'
-import type { Client } from '@/types'
+import type { Client, Invoice } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -20,19 +21,35 @@ import AppBadge from '@/components/ui/AppBadge.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { ageOn, clientDisplayName } from '@/utils/client'
 import { plural } from '@/utils/labels'
+import { missingFields, patientsInCare, type MissingField } from '@/utils/patientRegister'
+
+const CARE_WINDOW_DAYS = 90
 
 const router = useRouter()
 const clientsStore = useClientsStore()
 const toast = useToastStore()
 
 const search = ref('')
+const onlyIncomplete = ref(false)
 const toDelete = ref<Client | null>(null)
 const deleting = ref(false)
+const invoices = ref<Invoice[]>([])
 
 onMounted(async () => {
-  await clientsStore.fetchClients()
+  await Promise.all([clientsStore.fetchClients(), loadInvoices()])
   if (clientsStore.error) toast.notifyError(clientsStore.error, 'Caricamento non riuscito')
 })
+
+async function loadInvoices(): Promise<void> {
+  try {
+    invoices.value = await listInvoices({})
+  } catch (error) {
+    toast.notifyError(error, 'Fatture non caricate')
+  }
+}
+
+const gapsById = computed(() => new Map<number, MissingField[]>(clientsStore.clients.map((client) => [client.id, missingFields(client)])))
+const gapsOf = (client: Client): MissingField[] => gapsById.value.get(client.id) ?? []
 
 function normalise(text: string): string {
   return text.toLocaleLowerCase('it-IT').normalize('NFD').replace(/\p{Diacritic}/gu, '')
@@ -44,8 +61,9 @@ const sorted = computed(() =>
 
 const visible = computed(() => {
   const needle = normalise(search.value.trim())
-  if (needle === '') return sorted.value
-  return sorted.value.filter((client) =>
+  const pool = onlyIncomplete.value ? sorted.value.filter((client) => gapsOf(client).length > 0) : sorted.value
+  if (needle === '') return pool
+  return pool.filter((client) =>
     normalise(`${clientDisplayName(client)} ${client.fiscal_code} ${client.city} ${client.email ?? ''}`).includes(needle),
   )
 })
@@ -57,32 +75,36 @@ const subtitle = computed(() => {
   return `${plural(all.length, 'paziente', 'pazienti')} · ${sts} con consenso al Sistema Tessera Sanitaria`
 })
 
-/** The register at a glance: size, consent, who the patients are and where they come from. */
+/** The register at a glance: size, consent, who is in care now, and which records block invoicing. */
 const stats = computed(() => {
   const all = clientsStore.clients
-  const people = all.filter((client) => client.client_type === 'persona_fisica')
-  const ages = people.map((client) => ageOn(client.birth_date)).filter((age): age is number => age !== null)
-  const cities = new Map<string, number>()
-  for (const client of all) if (client.city) cities.set(client.city, (cities.get(client.city) ?? 0) + 1)
-  const topCity = [...cities.entries()].sort((a, b) => b[1] - a[1])[0]
+  const companies = all.filter((client) => client.client_type === 'azienda').length
   const sts = all.filter((client) => client.sts_authorization).length
+  const known = new Set(all.map((client) => client.id))
+  const inCare = [...patientsInCare(invoices.value, CARE_WINDOW_DAYS)].filter((id) => known.has(id)).length
+  const incomplete = all.filter((client) => gapsOf(client).length > 0)
+  const countMissing = (field: MissingField): number => incomplete.filter((client) => gapsOf(client).includes(field)).length
   return {
     total: all.length,
-    companies: all.length - people.length,
+    companies,
     sts,
     stsShare: all.length > 0 ? Math.round((sts / all.length) * 100) : 0,
-    averageAge: ages.length > 0 ? Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length) : null,
-    ageBands: [
-      { label: '<30', count: ages.filter((age) => age < 30).length },
-      { label: '30–44', count: ages.filter((age) => age >= 30 && age < 45).length },
-      { label: '45–59', count: ages.filter((age) => age >= 45 && age < 60).length },
-      { label: '60+', count: ages.filter((age) => age >= 60).length },
-    ],
-    topCity: topCity ? { name: topCity[0], count: topCity[1] } : null,
-    cityCount: cities.size,
+    inCare,
+    inCareShare: all.length > 0 ? Math.round((inCare / all.length) * 100) : 0,
+    incomplete: incomplete.length,
+    missingEmail: countMissing('email'),
+    missingForInvoice: incomplete.filter((client) => gapsOf(client).some((field) => field !== 'email')).length,
   }
 })
-const maxBand = computed(() => Math.max(1, ...stats.value.ageBands.map((band) => band.count)))
+
+const incompleteHint = computed(() => {
+  const { incomplete, missingEmail, missingForInvoice } = stats.value
+  if (incomplete === 0) return 'Anagrafiche pronte per fattura ed email'
+  const parts: string[] = []
+  if (missingForInvoice > 0) parts.push(`${missingForInvoice} senza CF o indirizzo`)
+  if (missingEmail > 0) parts.push(`${missingEmail} senza email`)
+  return parts.join(' · ')
+})
 
 function describe(client: Client): string {
   if (client.client_type === 'azienda') return 'Azienda o ente'
@@ -122,19 +144,29 @@ async function confirmDelete(): Promise<void> {
             <div class="h-full rounded-full bg-gradient-to-r from-safe/70 to-safe transition-[width] duration-700 ease-out-expo" :style="{ width: `${stats.stsShare}%` }" />
           </div>
         </StatTile>
-        <StatTile label="Età media" :value="stats.averageAge !== null ? `${stats.averageAge} anni` : '—'" :icon="Cake" tone="warn">
-          <div class="flex h-7 items-end gap-1" role="img" :aria-label="stats.ageBands.map((band) => `${band.label}: ${band.count}`).join(', ')">
-            <span v-for="band in stats.ageBands" :key="band.label" class="flex flex-1 flex-col items-center gap-0.5" :title="`${band.label} anni: ${band.count}`">
-              <span class="w-full rounded-t-[3px] bg-warn/35" :style="{ height: `${Math.max(8, (band.count / maxBand) * 100) * 0.2}px` }" />
-              <span class="text-[9px] leading-none text-text-subtle">{{ band.label }}</span>
-            </span>
+        <StatTile label="In carico" :value="String(stats.inCare)" :icon="Activity" tone="accent" :hint="`fatturati negli ultimi ${CARE_WINDOW_DAYS} giorni · ${stats.total - stats.inCare} inattivi`">
+          <div class="h-1.5 overflow-hidden rounded-full bg-accent-soft">
+            <div class="h-full rounded-full bg-gradient-to-r from-accent/70 to-accent transition-[width] duration-700 ease-out-expo" :style="{ width: `${stats.inCareShare}%` }" />
           </div>
         </StatTile>
-        <StatTile label="Provenienza" :value="stats.topCity?.name ?? '—'" :icon="MapPin" tone="neutral">
-          <template #hint>
-            <template v-if="stats.topCity">{{ plural(stats.topCity.count, 'paziente', 'pazienti') }} · {{ plural(stats.cityCount, 'città', 'città') }} in tutto</template>
-          </template>
-        </StatTile>
+        <button
+          type="button"
+          class="min-w-0 rounded-[inherit] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default"
+          :disabled="stats.incomplete === 0 && !onlyIncomplete"
+          :aria-pressed="onlyIncomplete"
+          :title="stats.incomplete > 0 ? 'Mostra solo le anagrafiche da completare' : undefined"
+          @click="onlyIncomplete = !onlyIncomplete"
+        >
+          <StatTile
+            label="Da completare"
+            :value="String(stats.incomplete)"
+            :icon="ClipboardList"
+            :tone="stats.incomplete > 0 ? 'warn' : 'safe'"
+            :hint="incompleteHint"
+            class="h-full"
+            :class="{ 'ring-2 ring-warn/50': onlyIncomplete }"
+          />
+        </button>
       </div>
 
       <div class="settle mb-3 flex items-center gap-3" style="--settle: 1">
@@ -142,7 +174,8 @@ async function confirmDelete(): Promise<void> {
           <Search :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle" aria-hidden="true" />
           <input v-model="search" type="search" class="field field-sm pl-8" placeholder="Nome, codice fiscale, città" aria-label="Cerca pazienti" />
         </div>
-        <span v-if="search" class="text-sm text-text-subtle">{{ plural(visible.length, 'risultato', 'risultati') }}</span>
+        <AppButton v-if="onlyIncomplete" size="sm" @click="onlyIncomplete = false">Mostra tutti</AppButton>
+        <span v-if="search || onlyIncomplete" class="text-sm text-text-subtle">{{ plural(visible.length, 'risultato', 'risultati') }}</span>
       </div>
 
       <AppCard :padded="false" class="settle overflow-hidden" style="--settle: 2">
@@ -158,8 +191,8 @@ async function confirmDelete(): Promise<void> {
           <AppButton variant="primary" :icon="UserPlus" to="/clients/new">Nuovo paziente</AppButton>
         </EmptyState>
 
-        <EmptyState v-else-if="visible.length === 0" :icon="Search" :bordered="false" :title="`Nessun paziente per “${search}”`">
-          <AppButton @click="search = ''">Azzera la ricerca</AppButton>
+        <EmptyState v-else-if="visible.length === 0" :icon="Search" :bordered="false" :title="search ? `Nessun paziente per “${search}”` : 'Nessuna anagrafica da completare'">
+          <AppButton @click="search = ''; onlyIncomplete = false">Azzera i filtri</AppButton>
         </EmptyState>
 
         <table v-else class="data-table text-base">
@@ -198,6 +231,7 @@ async function confirmDelete(): Promise<void> {
                     </span>
                     <span class="flex items-center gap-1 text-xs text-text-subtle">
                       <Building2 v-if="client.client_type === 'azienda'" :size="11" aria-hidden="true" />{{ describe(client) }}
+                      <span v-if="gapsOf(client).length > 0" class="text-warn">· manca {{ gapsOf(client).join(', ') }}</span>
                     </span>
                   </span>
                 </span>

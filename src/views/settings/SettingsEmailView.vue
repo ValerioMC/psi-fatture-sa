@@ -34,7 +34,7 @@ const STEPS = [
   <div class="space-y-5">
     <div class="grid grid-cols-1 items-start gap-5 @min-[72rem]/settings:grid-cols-[minmax(0,1fr)_20rem]">
       <EmailAccountCard class="settle min-w-0" />
-      <AppCard :padded="false" class="settle @min-[72rem]/settings:sticky @min-[72rem]/settings:top-32" style="--settle: 1">
+      <AppCard :padded="false" class="settle @min-[72rem]/settings:sticky @min-[72rem]/settings:top-6" style="--settle: 1">
         <CardHeader title="Come funziona" subtitle="Tre passi, una volta sola" :icon="Send" />
         <ol class="space-y-4 px-5 pb-5">
           <li v-for="(step, index) in STEPS" :key="step.title" class="flex gap-3">

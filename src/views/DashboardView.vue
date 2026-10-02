@@ -22,6 +22,7 @@ import { errorMessage } from '@/stores/toast'
 import { formatCurrency, formatDateShort, splitCurrency, ITALIAN_MONTHS } from '@/utils/format'
 import { estimateForfettarioTax, estimateOrdinarioTax } from '@/utils/tax'
 import { summariseAttention, type Attention } from '@/utils/attention'
+import { pendingByMonth } from '@/utils/monthlyPending'
 import { plural } from '@/utils/labels'
 
 const router = useRouter()
@@ -114,6 +115,7 @@ const taxEstimate = computed(() => {
 })
 
 const attention = computed<Attention>(() => summariseAttention(yearInvoices.value))
+const monthlyPending = computed(() => pendingByMonth(yearInvoices.value))
 const nothingToDo = computed(
   () => attention.value.overdue.count === 0 && attention.value.drafts.count === 0 && unbilled.value === null,
 )
@@ -197,10 +199,10 @@ onMounted(load)
           </div>
 
           <div class="flex flex-col border-t border-border lg:border-t-0 lg:border-l">
-            <CardHeader title="Incassato per mese" subtitle="Fatture pagate, per mese di emissione" :icon="BarChart3" />
+            <CardHeader title="Fatturato per mese" subtitle="Incassato e da incassare, per mese di emissione" :icon="BarChart3" />
             <MonthlyBars
               class="flex-1 px-5 pb-5"
-              :months="data.monthly_revenue" :current-month="selectedYear === currentYear ? currentMonth : null" />
+              :months="data.monthly_revenue" :pending="monthlyPending" :current-month="selectedYear === currentYear ? currentMonth : null" />
           </div>
         </AppCard>
 

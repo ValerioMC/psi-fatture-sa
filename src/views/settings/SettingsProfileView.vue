@@ -13,7 +13,7 @@ const { form, errors, check } = useSettingsProfile()
     <AppCard class="settle min-w-0 px-8 py-4">
       <ProfileSections :form="form" :errors="errors" :sections="PAGE_SECTIONS.profile" @check="check" />
     </AppCard>
-    <aside class="settle @min-[72rem]/settings:sticky @min-[72rem]/settings:top-32" style="--settle: 1">
+    <aside class="settle @min-[72rem]/settings:sticky @min-[72rem]/settings:top-6" style="--settle: 1">
       <LetterheadPreview :form="form" />
     </aside>
   </div>

@@ -3,8 +3,8 @@
  * Settings, one context per page. The profile form spans "Profilo" and "Fatturazione"
  * and is saved from one bar that rises when something differs; leaving with changes asks first.
  */
-import { computed, onMounted, ref } from 'vue'
-import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { DatabaseBackup, IdCard, KeyRound, Mail, Palette, ReceiptText, Scale, Settings } from 'lucide-vue-next'
 import { useEmailStore } from '@/stores/email'
 import { useStsStore } from '@/stores/sts'
@@ -14,8 +14,24 @@ import AppButton from '@/components/ui/AppButton.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import SettingsNav, { type SettingsNavItem } from '@/components/profile/SettingsNav.vue'
 import { provideSettingsProfile } from '@/composables/useSettingsProfile'
+import { useSmoothScroll } from '@/composables/useSmoothScroll'
 
 const router = useRouter()
+const route = useRoute()
+
+// Nested in the app's Lenis: it takes the wheel only while the pane can scroll, so the stacked narrow layout still scrolls the page.
+const paneWrapperRef = ref<HTMLElement | null>(null)
+const paneContentRef = ref<HTMLElement | null>(null)
+const paneScroll = useSmoothScroll({ wrapper: paneWrapperRef, content: paneContentRef })
+
+watch(
+  () => route.path,
+  () => {
+    if (paneScroll.value !== null) paneScroll.value.scrollTo(0, { immediate: true })
+    else paneWrapperRef.value?.scrollTo({ top: 0 })
+  },
+)
+
 const toast = useToastStore()
 const email = useEmailStore()
 const sts = useStsStore()
@@ -77,19 +93,25 @@ function discardAndLeave(): void {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col @min-[48rem]/pane:h-screen">
     <PageHeader title="Impostazioni" subtitle="Il tuo profilo, come fatturi, la casella email, il Sistema TS e l'aspetto dell'app." :icon="Settings" />
 
-    <div class="page grid grid-cols-1 items-start gap-6 pt-6 pb-28 @min-[48rem]/pane:grid-cols-[14rem_minmax(0,1fr)]">
-      <aside class="settle @min-[48rem]/pane:sticky @min-[48rem]/pane:top-32">
+    <!-- Side by side, the frame fills the window and only the section pane scrolls: the nav sits outside it, so no section can move it. -->
+    <div class="page grid min-h-0 flex-1 grid-cols-1 gap-6 @min-[48rem]/pane:grid-cols-[14rem_minmax(0,1fr)]">
+      <aside class="settle pt-6 @min-[48rem]/pane:overflow-y-auto">
         <SettingsNav :items="items" />
       </aside>
-      <div class="@container/settings min-w-0">
-        <RouterView v-slot="{ Component }">
-          <Transition name="pane" mode="out-in">
-            <component :is="Component" />
-          </Transition>
-        </RouterView>
+      <div
+        ref="paneWrapperRef"
+        class="min-w-0 @min-[48rem]/pane:-mr-(--spacing-gutter) @min-[48rem]/pane:overflow-y-auto @min-[48rem]/pane:pr-(--spacing-gutter)"
+      >
+        <div ref="paneContentRef" class="@container/settings pt-6 pb-28">
+          <RouterView v-slot="{ Component }">
+            <Transition name="pane" mode="out-in">
+              <component :is="Component" />
+            </Transition>
+          </RouterView>
+        </div>
       </div>
     </div>
 
