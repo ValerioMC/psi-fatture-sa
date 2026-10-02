@@ -153,7 +153,7 @@ async function generate(): Promise<void> {
         </div>
       </AppCard>
 
-      <div v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div v-else class="grid grid-cols-1 items-start gap-5 @min-[64rem]/pane:grid-cols-[minmax(0,1fr)_19rem] @min-[84rem]/pane:grid-cols-[minmax(0,1fr)_22rem]">
         <AppCard :padded="false" class="settle overflow-hidden">
           <CardHeader title="Sedute da fatturare" :subtitle="`Svolte a ${label.toLocaleLowerCase('it-IT')} e non ancora in fattura`" :icon="CalendarCheck">
             <label v-if="previews.length > 0" class="flex cursor-pointer items-center gap-2 text-sm text-text-muted">
@@ -206,7 +206,7 @@ async function generate(): Promise<void> {
           </ul>
         </AppCard>
 
-        <aside class="settle lg:sticky lg:top-30" style="--settle: 1">
+        <aside class="settle @min-[64rem]/pane:sticky @min-[64rem]/pane:top-30" style="--settle: 1">
           <AppCard class="space-y-5">
             <FormField v-slot="{ id, describedBy }" label="Data di emissione" hint="Non può precedere l’ultima fattura dell’anno.">
               <input :id="id" v-model="issueDate" type="date" class="field" :aria-describedby="describedBy" />

@@ -212,7 +212,7 @@ async function confirmDelete(): Promise<void> {
       </AppButton>
     </PageHeader>
 
-    <div class="page grid grid-cols-1 items-start gap-5 pt-6 pb-12 xl:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+    <div class="page grid grid-cols-1 items-start gap-5 pt-6 pb-12 @min-[78rem]/pane:grid-cols-[minmax(0,1fr)_21rem] @min-[90rem]/pane:grid-cols-[minmax(0,1fr)_24rem]">
       <div class="min-w-0">
         <div v-if="loading" class="sheet h-96 p-6" role="status" aria-busy="true">
           <span class="sr-only">Caricamento del paziente</span>
@@ -329,7 +329,7 @@ async function confirmDelete(): Promise<void> {
       </div>
 
       <!-- ── The record card and the history, beside the form ─────────────── -->
-      <aside v-if="!loadError" class="settle space-y-5 xl:sticky xl:top-32" style="--settle: 1">
+      <aside v-if="!loadError" class="settle space-y-5 @min-[78rem]/pane:sticky @min-[78rem]/pane:top-32" style="--settle: 1">
         <AppCard :padded="false" class="record-card overflow-hidden">
           <div class="record-band" aria-hidden="true" />
           <div class="-mt-8 px-5 pb-5">

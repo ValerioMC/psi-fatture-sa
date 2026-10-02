@@ -8,7 +8,8 @@ defineProps<{ title: string; description?: string }>()
 </script>
 
 <template>
-  <section class="grid grid-cols-1 gap-x-10 gap-y-4 border-b border-border py-8 first:pt-2 last:border-b-0 md:grid-cols-[15rem_1fr]">
+  <section class="@container/section border-b border-border py-8 first:pt-2 last:border-b-0">
+    <div class="grid grid-cols-1 gap-x-10 gap-y-4 @min-[48rem]/section:grid-cols-[15rem_1fr]">
     <div>
       <h2 class="text-md font-medium text-text">{{ title }}</h2>
       <p v-if="description" class="mt-1 text-sm text-text-muted">{{ description }}</p>
@@ -16,6 +17,7 @@ defineProps<{ title: string; description?: string }>()
     </div>
     <div class="min-w-0">
       <slot />
+    </div>
     </div>
   </section>
 </template>

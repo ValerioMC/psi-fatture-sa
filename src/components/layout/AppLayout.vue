@@ -41,7 +41,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   <div class="flex h-screen overflow-hidden">
     <AppSidebar @open-palette="paletteOpen = true" />
     <main ref="scrollWrapperRef" class="min-w-0 flex-1 overflow-y-scroll [scrollbar-gutter:stable]">
-      <div ref="scrollContentRef" class="min-h-full">
+      <div ref="scrollContentRef" class="@container/pane min-h-full">
         <RouterView v-slot="{ Component, route: current }">
           <Transition name="pane" mode="out-in">
             <component :is="Component" :key="paneKey(current.path)" />

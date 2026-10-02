@@ -181,7 +181,7 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
     </PageHeader>
 
     <div class="page pt-6 pb-12">
-      <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_25rem]">
+      <div class="grid grid-cols-1 items-start gap-5 @min-[78rem]/pane:grid-cols-[minmax(0,1fr)_22rem] @min-[92rem]/pane:grid-cols-[minmax(0,1fr)_25rem]">
         <!-- ── Month ─────────────────────────────────────────────────────── -->
         <AppCard :padded="false" class="settle overflow-hidden">
           <div class="flex items-center justify-between gap-4 px-5 py-4">
@@ -243,7 +243,7 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
                 :class="[CHIP_SLIP[appointment.status], cell.inMonth ? '' : 'opacity-60']"
               >
                 <span class="size-1.5 shrink-0 rounded-full" :class="CHIP_DOT[appointment.status]" aria-hidden="true" />
-                <span class="tabular hidden shrink-0 text-text-subtle 2xl:inline">{{ appointment.start_time.slice(0, 5) }}</span>
+                <span class="tabular hidden shrink-0 text-text-subtle @min-[92rem]/pane:inline">{{ appointment.start_time.slice(0, 5) }}</span>
                 <span class="truncate" :title="`${appointment.start_time.slice(0, 5)} ${appointment.client_name}`">{{ appointment.client_name.split(' ')[0] }}</span>
               </span>
               <span v-if="(byDate.get(cell.date) ?? []).length > 3" class="px-1 text-2xs text-text-subtle">
@@ -254,7 +254,7 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
         </AppCard>
 
         <!-- ── Day ───────────────────────────────────────────────────────── -->
-        <aside class="settle xl:sticky xl:top-24" style="--settle: 1">
+        <aside class="settle @min-[78rem]/pane:sticky @min-[78rem]/pane:top-24" style="--settle: 1">
           <AppCard :padded="false">
             <div class="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
               <Transition name="swap" mode="out-in">

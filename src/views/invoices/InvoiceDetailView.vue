@@ -165,7 +165,7 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
         <AppButton to="/invoices">Torna alle fatture</AppButton>
       </EmptyState>
 
-      <div v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] 2xl:grid-cols-[minmax(0,1fr)_21rem]">
+      <div v-else class="grid grid-cols-1 items-start gap-5 @min-[64rem]/pane:grid-cols-[minmax(0,1fr)_18rem] @min-[84rem]/pane:grid-cols-[minmax(0,1fr)_21rem]">
         <!-- ── The document ─────────────────────────────────────────────────── -->
         <AppCard as="article" :padded="false" class="settle overflow-hidden">
           <header class="flex items-start justify-between gap-6 px-8 pt-7 pb-6">
@@ -233,7 +233,7 @@ const MILESTONE_DOT: Record<Milestone['state'], string> = {
         </AppCard>
 
         <!-- ── Its life and what to do next ─────────────────────────────────── -->
-        <aside class="settle space-y-4 lg:sticky lg:top-30" style="--settle: 1">
+        <aside class="settle space-y-4 @min-[64rem]/pane:sticky @min-[64rem]/pane:top-30" style="--settle: 1">
           <AppCard>
             <div class="flex items-center gap-3.5">
               <InvoiceSeal :status="invoice.status" :issue-date="invoice.issue_date" :due-date="invoice.due_date" :size="40" live />

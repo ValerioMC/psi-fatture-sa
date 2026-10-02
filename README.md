@@ -227,12 +227,18 @@ e un solo colore d'accento (indaco inchiostro) per selezione, azione primaria e 
   disegna. Lo usano l'invio email, i salvataggi della casella e del modello, "Salva PDF"
   e le verifiche di collegamento (email e Sistema TS).
 - **Impostazioni per contesto**: `/settings/profile`, `/invoicing`, `/email`, `/sts`,
-  `/appearance`, con una navigazione laterale che segnala con un punto ciò che manca
+  `/data`, `/appearance`, con una navigazione laterale che segnala con un punto ciò che manca
   (casella da configurare, credenziali TS). Il modulo del profilo è condiviso da Profilo e
   Fatturazione (`useSettingsProfile.ts`) e si salva da un'unica barra.
 - **Sigillo della fattura**: `InvoiceSeal.vue` disegna lo stato di una fattura
   (bozza, emessa con l'arco verso la scadenza, pagata, scaduta, annullata); la logica
   sta in `src/utils/invoiceSeal.ts`.
+- **Layout adattivo**: le colonne affiancate (riepilogo, anteprima, giorno in agenda)
+  dipendono dalla larghezza dell'area di contenuto, non della finestra: container query
+  su `@container/pane` (`AppLayout.vue`), `@container/settings` (Impostazioni) e
+  `@container/section` (`FormSection.vue`). La colonna laterale scende sotto prima che i
+  campi principali si restringano; le righe prestazione della fattura vanno su due righe
+  quando la card è stretta.
 - **Tema**: chiaro, scuro o come il sistema, da Impostazioni → Aspetto. La scelta è salvata in
   `localStorage` (chiave `psi-fatture.theme`).
 - **Scorciatoie**: ⌘K (Ctrl K su Windows) apre la ricerca di pazienti, azioni e sezioni.

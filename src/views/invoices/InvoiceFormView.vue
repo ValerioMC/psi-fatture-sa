@@ -277,7 +277,7 @@ async function onSubmit(): Promise<void> {
         <AppButton to="/invoices">Torna alle fatture</AppButton>
       </EmptyState>
 
-      <form v-else class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]" novalidate @submit.prevent="onSubmit">
+      <form v-else class="grid grid-cols-1 items-start gap-5 @min-[72rem]/pane:grid-cols-[minmax(0,1fr)_19rem] @min-[84rem]/pane:grid-cols-[minmax(0,1fr)_22rem]" novalidate @submit.prevent="onSubmit">
         <div class="space-y-5">
           <!-- ── Who and when ─────────────────────────────────────────────── -->
           <AppCard class="settle" :padded="false">
@@ -329,61 +329,75 @@ async function onSubmit(): Promise<void> {
             <CardHeader title="Prestazioni" :subtitle="`${form.lines.length} ${form.lines.length === 1 ? 'riga' : 'righe'} in fattura`" :icon="ClipboardList">
               <AppButton size="sm" :icon="Plus" @click="addLine">Aggiungi riga</AppButton>
             </CardHeader>
-            <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_4.5rem_7rem_2rem] gap-2 border-y border-border bg-[color-mix(in_srgb,var(--surface-sunken)_55%,var(--surface-raised))] px-5 py-2 text-xs font-medium text-text-subtle" aria-hidden="true">
-              <span>Descrizione</span><span class="text-right">Qtà</span><span class="text-right">Prezzo €</span><span class="text-right">IVA %</span><span class="text-right">Importo €</span><span />
-            </div>
-            <TransitionGroup name="list" tag="div" class="relative">
-              <div v-for="(line, index) in form.lines" :key="line.key" class="border-b border-border px-5 py-3 last:border-b-0">
-                <div class="grid grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_4.5rem_7rem_2rem] items-start gap-2">
-                  <div class="space-y-2">
-                    <select
-                      v-model="line.service_id"
-                      class="field field-sm text-text-muted"
-                      :aria-label="`Prestazione dal catalogo, riga ${index + 1}`"
-                      @change="applyService(line)"
-                    >
-                      <option :value="undefined">Dal catalogo…</option>
-                      <option v-for="service in servicesStore.services" :key="service.id" :value="service.id">{{ service.name }}</option>
-                    </select>
-                    <input
-                      v-model="line.description"
-                      type="text"
-                      class="field field-sm"
-                      placeholder="Descrizione della prestazione"
-                      :aria-label="`Descrizione, riga ${index + 1}`"
-                      :aria-invalid="errors[`line-${index}`] ? true : undefined"
+            <div class="@container/lines">
+              <div class="hidden grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_4.5rem_7rem_2rem] gap-2 border-y border-border @min-[44rem]/lines:grid bg-[color-mix(in_srgb,var(--surface-sunken)_55%,var(--surface-raised))] px-5 py-2 text-xs font-medium text-text-subtle" aria-hidden="true">
+                <span>Descrizione</span><span class="text-right">Qtà</span><span class="text-right">Prezzo €</span><span class="text-right">IVA %</span><span class="text-right">Importo €</span><span />
+              </div>
+              <TransitionGroup name="list" tag="div" class="relative border-t border-border @min-[44rem]/lines:border-t-0">
+                <div v-for="(line, index) in form.lines" :key="line.key" class="border-b border-border px-5 py-3 last:border-b-0">
+                  <div class="grid grid-cols-[repeat(4,minmax(0,1fr))_2rem] items-end gap-2 @min-[44rem]/lines:grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_4.5rem_7rem_2rem] @min-[44rem]/lines:items-start">
+                    <div class="col-span-5 space-y-2 @min-[44rem]/lines:col-span-1">
+                      <select
+                        v-model="line.service_id"
+                        class="field field-sm text-text-muted"
+                        :aria-label="`Prestazione dal catalogo, riga ${index + 1}`"
+                        @change="applyService(line)"
+                      >
+                        <option :value="undefined">Dal catalogo…</option>
+                        <option v-for="service in servicesStore.services" :key="service.id" :value="service.id">{{ service.name }}</option>
+                      </select>
+                      <input
+                        v-model="line.description"
+                        type="text"
+                        class="field field-sm"
+                        placeholder="Descrizione della prestazione"
+                        :aria-label="`Descrizione, riga ${index + 1}`"
+                        :aria-invalid="errors[`line-${index}`] ? true : undefined"
+                      />
+                    </div>
+                    <label class="block">
+                      <span class="mb-1 block text-2xs text-text-subtle @min-[44rem]/lines:sr-only">Qtà</span>
+                      <input v-model.number="line.quantity" type="number" min="1" step="1" class="field field-sm tabular text-right" :aria-label="`Quantità, riga ${index + 1}`" />
+                    </label>
+                    <label class="block">
+                      <span class="mb-1 block text-2xs text-text-subtle @min-[44rem]/lines:sr-only">Prezzo €</span>
+                      <input v-model.number="line.unit_price" type="number" min="0" step="0.01" class="field field-sm tabular text-right" :aria-label="`Prezzo unitario, riga ${index + 1}`" />
+                    </label>
+                    <label class="block">
+                      <span class="mb-1 block text-2xs text-text-subtle @min-[44rem]/lines:sr-only">IVA %</span>
+                      <input v-model.number="line.vat_rate" type="number" min="0" max="100" step="1" class="field field-sm tabular text-right" :aria-label="`Aliquota IVA, riga ${index + 1}`" />
+                    </label>
+                    <label class="block">
+                      <span class="mb-1 block text-2xs text-text-subtle @min-[44rem]/lines:sr-only">Importo €</span>
+                      <input
+                        :value="hasAmountOverride(line) ? line.amount_override : lineNetAmount(line)"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        class="field field-sm tabular text-right"
+                        :class="hasAmountOverride(line) ? 'font-medium text-text' : 'text-text-muted'"
+                        :aria-label="`Importo, riga ${index + 1}`"
+                        @input="typeAmount(line, $event)"
+                        @change="commitAmount(line, $event)"
+                      />
+                    </label>
+                    <AppButton
+                      variant="danger-quiet"
+                      size="sm"
+                      :icon="Trash2"
+                      :label="`Rimuovi riga ${index + 1}`"
+                      :disabled="form.lines.length === 1"
+                      @click="removeLine(line.key)"
                     />
                   </div>
-                  <input v-model.number="line.quantity" type="number" min="1" step="1" class="field field-sm tabular text-right" :aria-label="`Quantità, riga ${index + 1}`" />
-                  <input v-model.number="line.unit_price" type="number" min="0" step="0.01" class="field field-sm tabular text-right" :aria-label="`Prezzo unitario, riga ${index + 1}`" />
-                  <input v-model.number="line.vat_rate" type="number" min="0" max="100" step="1" class="field field-sm tabular text-right" :aria-label="`Aliquota IVA, riga ${index + 1}`" />
-                  <input
-                    :value="hasAmountOverride(line) ? line.amount_override : lineNetAmount(line)"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    class="field field-sm tabular text-right"
-                    :class="hasAmountOverride(line) ? 'font-medium text-text' : 'text-text-muted'"
-                    :aria-label="`Importo, riga ${index + 1}`"
-                    @input="typeAmount(line, $event)"
-                    @change="commitAmount(line, $event)"
-                  />
-                  <AppButton
-                    variant="danger-quiet"
-                    size="sm"
-                    :icon="Trash2"
-                    :label="`Rimuovi riga ${index + 1}`"
-                    :disabled="form.lines.length === 1"
-                    @click="removeLine(line.key)"
-                  />
+                  <p v-if="hasAmountOverride(line)" class="mt-1.5 text-xs text-text-subtle">
+                    Importo scritto a mano al posto di {{ line.quantity }} × {{ formatCurrency(line.unit_price) }}.
+                    <button type="button" class="font-medium text-accent underline-offset-2 hover:underline focus-ring" @click="resetAmount(line)">Ricalcola</button>
+                  </p>
+                  <p v-if="errors[`line-${index}`]" class="mt-1.5 text-xs text-danger" role="alert">{{ errors[`line-${index}`] }}</p>
                 </div>
-                <p v-if="hasAmountOverride(line)" class="mt-1.5 text-xs text-text-subtle">
-                  Importo scritto a mano al posto di {{ line.quantity }} × {{ formatCurrency(line.unit_price) }}.
-                  <button type="button" class="font-medium text-accent underline-offset-2 hover:underline focus-ring" @click="resetAmount(line)">Ricalcola</button>
-                </p>
-                <p v-if="errors[`line-${index}`]" class="mt-1.5 text-xs text-danger" role="alert">{{ errors[`line-${index}`] }}</p>
-              </div>
-            </TransitionGroup>
+              </TransitionGroup>
+            </div>
           </AppCard>
 
           <!-- ── Status and notes ─────────────────────────────────────────── -->
@@ -412,7 +426,7 @@ async function onSubmit(): Promise<void> {
         </div>
 
         <!-- ── Live summary and save ─────────────────────────────────────── -->
-        <aside class="settle lg:sticky lg:top-30" style="--settle: 1">
+        <aside class="settle @min-[72rem]/pane:sticky @min-[72rem]/pane:top-30" style="--settle: 1">
           <AppCard :padded="false">
             <CardHeader title="Riepilogo" subtitle="Si aggiorna mentre scrivi" :icon="Receipt" />
             <div class="px-5 pb-5">

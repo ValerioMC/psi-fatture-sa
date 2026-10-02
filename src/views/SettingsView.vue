@@ -80,11 +80,11 @@ function discardAndLeave(): void {
   <div>
     <PageHeader title="Impostazioni" subtitle="Il tuo profilo, come fatturi, la casella email, il Sistema TS e l'aspetto dell'app." :icon="Settings" />
 
-    <div class="page grid grid-cols-1 items-start gap-6 pt-6 pb-28 lg:grid-cols-[14rem_minmax(0,1fr)]">
-      <aside class="settle lg:sticky lg:top-32">
+    <div class="page grid grid-cols-1 items-start gap-6 pt-6 pb-28 @min-[48rem]/pane:grid-cols-[14rem_minmax(0,1fr)]">
+      <aside class="settle @min-[48rem]/pane:sticky @min-[48rem]/pane:top-32">
         <SettingsNav :items="items" />
       </aside>
-      <div class="min-w-0">
+      <div class="@container/settings min-w-0">
         <RouterView v-slot="{ Component }">
           <Transition name="pane" mode="out-in">
             <component :is="Component" />
