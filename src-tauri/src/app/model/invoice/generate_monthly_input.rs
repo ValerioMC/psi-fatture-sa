@@ -10,4 +10,7 @@ pub struct GenerateMonthlyInput {
     pub client_ids: Vec<i64>,
     pub payment_method: PaymentMethod,
     pub apply_enpap: bool,
+    /// Defaults to the last day of the month.
+    #[serde(default)]
+    pub issue_date: Option<String>,
 }

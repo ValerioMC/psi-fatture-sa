@@ -1,8 +1,10 @@
 pub mod appointment_service;
+pub mod backup_service;
 pub mod client_service;
 pub mod config_service;
 pub mod dashboard_service;
 pub mod email;
+pub mod invoice_guard_service;
 pub mod invoice_service;
 pub mod italian_format;
 pub mod pdf;

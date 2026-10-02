@@ -9,6 +9,7 @@ use sea_orm::DatabaseConnection;
 use tokio::sync::Mutex;
 
 use super::{TsDispatchAttempt, TsDispatchRequest};
+use crate::app::common::AppError;
 use crate::app::model::ts::{
     TsCallResponse, TsDispatchSummary, TsOperation, TsOutcome, TsSettings, TsSubmission,
 };
@@ -34,7 +35,7 @@ pub async fn dispatch_due(
     store: &dyn SecretStore,
     gateway: &dyn SistemaTsGateway,
     now: NaiveDateTime,
-) -> Result<TsDispatchSummary, String> {
+) -> Result<TsDispatchSummary, AppError> {
     let _pass = DISPATCH_LOCK.lock().await;
     let settings = ts_settings_service::get(db).await?;
     let (due, elsewhere): (Vec<TsSubmission>, Vec<TsSubmission>) = transition::due(db, now)
@@ -52,7 +53,7 @@ pub async fn dispatch_due(
     let session = match ts_credential_service::session(store, &settings) {
         Ok(session) => session,
         Err(reason) => {
-            summary.blocked = Some(reason);
+            summary.blocked = Some(reason.to_string());
             return Ok(summary);
         }
     };
@@ -65,7 +66,7 @@ pub async fn dispatch_due(
             TsDispatchAttempt::Skipped => {}
             TsDispatchAttempt::StopPass(reason) => {
                 summary.retrying += 1;
-                summary.blocked = Some(reason);
+                summary.blocked = Some(reason.to_string());
                 break;
             }
         }
@@ -80,15 +81,23 @@ async fn dispatch_one(
     settings: &TsSettings,
     submission: &TsSubmission,
     now: NaiveDateTime,
-) -> Result<TsDispatchAttempt, String> {
+) -> Result<TsDispatchAttempt, AppError> {
     let request = match prepare(db, settings, submission).await {
         Ok(request) => request,
         Err(reason) => {
-            transition::reject_locally(db, submission.id, &reason, now).await?;
+            transition::reject_locally(db, submission.id, &reason.to_string(), now).await?;
             return Ok(TsDispatchAttempt::Rejected);
         }
     };
-    if !transition::claim(db, submission.id, request.document_id(), now).await? {
+    if !transition::claim(
+        db,
+        submission.id,
+        request.document_id(),
+        request.fingerprint(),
+        now,
+    )
+    .await?
+    {
         return Ok(TsDispatchAttempt::Skipped);
     }
 
@@ -106,11 +115,13 @@ async fn prepare(
     db: &DatabaseConnection,
     settings: &TsSettings,
     submission: &TsSubmission,
-) -> Result<TsDispatchRequest, String> {
+) -> Result<TsDispatchRequest, AppError> {
     let target_id = match submission.target_submission_id {
         Some(target) => {
             let row = ts_submission_repository::find_row(db, target).await?;
-            Some(document_id_of(&row).ok_or("La trasmissione originale non ha un identificativo")?)
+            Some(document_id_of(&row).ok_or_else(|| {
+                AppError::Invalid("La trasmissione originale non ha un identificativo".to_string())
+            })?)
         }
         None => None,
     };
@@ -121,15 +132,17 @@ async fn prepare(
                 .map(TsDispatchRequest::Insert)
         }
         TsOperation::Sostituzione => {
-            let id = target_id.ok_or("Sostituzione senza trasmissione originale")?;
+            let id = target_id.ok_or_else(|| {
+                AppError::Invalid("Sostituzione senza trasmissione originale".to_string())
+            })?;
             let vat_number = id.vat_number.clone();
             ts_document_service::build(db, submission.invoice_id, &vat_number, Some(id))
                 .await
                 .map(TsDispatchRequest::Update)
         }
-        TsOperation::Annullamento => target_id
-            .map(TsDispatchRequest::Cancel)
-            .ok_or_else(|| "Annullamento senza trasmissione originale".to_string()),
+        TsOperation::Annullamento => target_id.map(TsDispatchRequest::Cancel).ok_or_else(|| {
+            AppError::Conflict("Annullamento senza trasmissione originale".to_string())
+        }),
     }
 }
 
@@ -138,7 +151,7 @@ async fn settle(
     submission: &TsSubmission,
     result: Result<TsCallResponse, TsGatewayError>,
     now: NaiveDateTime,
-) -> Result<TsDispatchAttempt, String> {
+) -> Result<TsDispatchAttempt, AppError> {
     let response = match result {
         Ok(response) => response,
         Err(error) => {

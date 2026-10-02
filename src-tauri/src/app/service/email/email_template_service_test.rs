@@ -36,7 +36,10 @@ async fn refuses_unknown_placeholders_naming_them() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error, "Segnaposto sconosciuti: {numero}, {saldo}");
+    assert_eq!(
+        error.to_string(),
+        "Segnaposto sconosciuti: {numero}, {saldo}"
+    );
 }
 
 #[tokio::test]

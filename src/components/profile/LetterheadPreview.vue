@@ -33,7 +33,7 @@ const letterhead = computed(() => {
     <div class="px-5 pb-5">
       <div class="letterhead rounded-[10px] px-4 py-4">
         <p class="display text-lg leading-tight text-[#1d1b24]">{{ letterhead.name }}</p>
-        <p class="mt-0.5 text-2xs font-medium tracking-[0.06em] text-[#3a3e9f] uppercase">{{ letterhead.profession }}</p>
+        <p class="mt-0.5 text-2xs font-medium tracking-[0.06em] text-[#3d35b0] uppercase">{{ letterhead.profession }}</p>
         <div class="my-3 h-px bg-[#e4e0d7]" />
         <p v-for="line in letterhead.lines" :key="line" class="truncate text-2xs leading-[1.1rem] text-[#56525e]">{{ line }}</p>
         <p v-if="letterhead.regime" class="mt-2 inline-block rounded-full bg-[#edeae3] px-2 text-[10px] leading-4 text-[#56525e]">{{ letterhead.regime }}</p>

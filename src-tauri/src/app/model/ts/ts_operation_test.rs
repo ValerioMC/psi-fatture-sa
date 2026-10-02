@@ -7,7 +7,7 @@ fn round_trips_through_storage_string() {
         TsOperation::Sostituzione,
         TsOperation::Annullamento,
     ] {
-        assert_eq!(TsOperation::parse(operation.as_str()), Ok(operation));
+        assert_eq!(TsOperation::parse(operation.as_str()).ok(), Some(operation));
     }
     assert!(TsOperation::parse("variazione").is_err());
 }

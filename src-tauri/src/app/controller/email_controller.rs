@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::app::app_state::AppState;
+use crate::app::common::AppError;
 use crate::app::model::email::{
     EmailAccount, EmailConnectionCheck, EmailCredentialsStatus, EmailDraft, EmailPlaceholderInfo,
     EmailPreview, EmailProviderPreset, EmailTemplate, InvoiceEmail, InvoiceEmailFilters,
@@ -16,7 +17,7 @@ pub fn get_email_providers() -> Vec<EmailProviderPreset> {
 }
 
 #[tauri::command]
-pub async fn get_email_account(state: State<'_, AppState>) -> Result<EmailAccount, String> {
+pub async fn get_email_account(state: State<'_, AppState>) -> Result<EmailAccount, AppError> {
     email_account_service::get(&state.db).await
 }
 
@@ -24,7 +25,7 @@ pub async fn get_email_account(state: State<'_, AppState>) -> Result<EmailAccoun
 pub async fn update_email_account(
     state: State<'_, AppState>,
     input: UpdateEmailAccountInput,
-) -> Result<EmailAccount, String> {
+) -> Result<EmailAccount, AppError> {
     email_account_service::update(&state.db, input).await
 }
 
@@ -32,7 +33,7 @@ pub async fn update_email_account(
 #[tauri::command]
 pub fn get_email_credentials_status(
     state: State<'_, AppState>,
-) -> Result<EmailCredentialsStatus, String> {
+) -> Result<EmailCredentialsStatus, AppError> {
     email_credential_service::status(state.secrets.as_ref())
 }
 
@@ -40,12 +41,14 @@ pub fn get_email_credentials_status(
 pub fn save_email_password(
     state: State<'_, AppState>,
     password: String,
-) -> Result<EmailCredentialsStatus, String> {
+) -> Result<EmailCredentialsStatus, AppError> {
     email_credential_service::save_password(state.secrets.as_ref(), &password)
 }
 
 #[tauri::command]
-pub fn delete_email_password(state: State<'_, AppState>) -> Result<EmailCredentialsStatus, String> {
+pub fn delete_email_password(
+    state: State<'_, AppState>,
+) -> Result<EmailCredentialsStatus, AppError> {
     email_credential_service::delete_password(state.secrets.as_ref())
 }
 
@@ -53,7 +56,7 @@ pub fn delete_email_password(state: State<'_, AppState>) -> Result<EmailCredenti
 #[tauri::command]
 pub async fn check_email_connection(
     state: State<'_, AppState>,
-) -> Result<EmailConnectionCheck, String> {
+) -> Result<EmailConnectionCheck, AppError> {
     invoice_email_service::check_connection(
         &state.db,
         state.secrets.as_ref(),
@@ -63,7 +66,7 @@ pub async fn check_email_connection(
 }
 
 #[tauri::command]
-pub async fn get_email_template(state: State<'_, AppState>) -> Result<EmailTemplate, String> {
+pub async fn get_email_template(state: State<'_, AppState>) -> Result<EmailTemplate, AppError> {
     email_template_service::get(&state.db).await
 }
 
@@ -71,12 +74,12 @@ pub async fn get_email_template(state: State<'_, AppState>) -> Result<EmailTempl
 pub async fn update_email_template(
     state: State<'_, AppState>,
     template: EmailTemplate,
-) -> Result<EmailTemplate, String> {
+) -> Result<EmailTemplate, AppError> {
     email_template_service::update(&state.db, template).await
 }
 
 #[tauri::command]
-pub async fn reset_email_template(state: State<'_, AppState>) -> Result<EmailTemplate, String> {
+pub async fn reset_email_template(state: State<'_, AppState>) -> Result<EmailTemplate, AppError> {
     email_template_service::reset(&state.db).await
 }
 
@@ -90,7 +93,7 @@ pub fn get_email_placeholders() -> Vec<EmailPlaceholderInfo> {
 pub async fn preview_email_template(
     state: State<'_, AppState>,
     template: EmailTemplate,
-) -> Result<EmailPreview, String> {
+) -> Result<EmailPreview, AppError> {
     email_template_service::preview(&state.db, template).await
 }
 
@@ -98,7 +101,7 @@ pub async fn preview_email_template(
 pub async fn prepare_invoice_email(
     state: State<'_, AppState>,
     invoice_id: i64,
-) -> Result<EmailDraft, String> {
+) -> Result<EmailDraft, AppError> {
     invoice_email_service::prepare(&state.db, invoice_id).await
 }
 
@@ -106,7 +109,7 @@ pub async fn prepare_invoice_email(
 pub async fn send_invoice_email(
     state: State<'_, AppState>,
     input: SendInvoiceEmailInput,
-) -> Result<InvoiceEmail, String> {
+) -> Result<InvoiceEmail, AppError> {
     invoice_email_service::send(
         &state.db,
         state.secrets.as_ref(),
@@ -121,7 +124,7 @@ pub async fn send_invoice_email(
 pub async fn send_prepared_invoice_email(
     state: State<'_, AppState>,
     invoice_id: i64,
-) -> Result<InvoiceEmail, String> {
+) -> Result<InvoiceEmail, AppError> {
     invoice_email_service::send_prepared(
         &state.db,
         state.secrets.as_ref(),
@@ -135,6 +138,6 @@ pub async fn send_prepared_invoice_email(
 pub async fn list_invoice_emails(
     state: State<'_, AppState>,
     filters: Option<InvoiceEmailFilters>,
-) -> Result<Vec<InvoiceEmail>, String> {
+) -> Result<Vec<InvoiceEmail>, AppError> {
     invoice_email_service::list(&state.db, filters.unwrap_or_default()).await
 }

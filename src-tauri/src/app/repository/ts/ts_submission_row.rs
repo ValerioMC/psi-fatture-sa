@@ -1,5 +1,6 @@
 use sea_orm::FromQueryResult;
 
+use crate::app::common::AppError;
 use crate::app::model::ts::{
     TsDocumentId, TsEnvironment, TsOperation, TsSubmission, TsSubmissionStatus,
 };
@@ -33,7 +34,7 @@ pub(super) struct TsSubmissionRow {
 }
 
 impl TsSubmissionRow {
-    pub(super) fn into_submission(self) -> Result<TsSubmission, String> {
+    pub(super) fn into_submission(self) -> Result<TsSubmission, AppError> {
         let document = match (
             self.document_vat_number,
             self.document_issue_date,

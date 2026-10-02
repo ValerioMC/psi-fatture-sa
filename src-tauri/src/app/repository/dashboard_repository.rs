@@ -3,27 +3,28 @@
 
 use sea_orm::{DatabaseConnection, FromQueryResult, Statement};
 
+use crate::app::common::AppError;
 use crate::app::model::dashboard::MonthTotal;
 
 const RECENT_INVOICES_LIMIT: i64 = 5;
 
-pub async fn revenue(db: &DatabaseConnection, year: i64) -> Result<f64, String> {
+pub async fn revenue(db: &DatabaseConnection, year: i64) -> Result<f64, AppError> {
     query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await
 }
 
-pub async fn net_revenue(db: &DatabaseConnection, year: i64) -> Result<f64, String> {
+pub async fn net_revenue(db: &DatabaseConnection, year: i64) -> Result<f64, AppError> {
     query_f64(db, "SELECT CAST(COALESCE(SUM(total_net),0) AS REAL) AS val FROM invoices WHERE year=? AND status!='cancelled'", year).await
 }
 
-pub async fn paid_revenue(db: &DatabaseConnection, year: i64) -> Result<f64, String> {
+pub async fn paid_revenue(db: &DatabaseConnection, year: i64) -> Result<f64, AppError> {
     query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status='paid'", year).await
 }
 
-pub async fn unpaid_revenue(db: &DatabaseConnection, year: i64) -> Result<f64, String> {
+pub async fn unpaid_revenue(db: &DatabaseConnection, year: i64) -> Result<f64, AppError> {
     query_f64(db, "SELECT CAST(COALESCE(SUM(total_due),0) AS REAL) AS val FROM invoices WHERE year=? AND status IN ('issued','overdue')", year).await
 }
 
-pub async fn invoice_count(db: &DatabaseConnection, year: i64) -> Result<i64, String> {
+pub async fn invoice_count(db: &DatabaseConnection, year: i64) -> Result<i64, AppError> {
     query_i64(
         db,
         "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status!='cancelled'",
@@ -32,7 +33,7 @@ pub async fn invoice_count(db: &DatabaseConnection, year: i64) -> Result<i64, St
     .await
 }
 
-pub async fn paid_invoice_count(db: &DatabaseConnection, year: i64) -> Result<i64, String> {
+pub async fn paid_invoice_count(db: &DatabaseConnection, year: i64) -> Result<i64, AppError> {
     query_i64(
         db,
         "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='paid'",
@@ -41,7 +42,7 @@ pub async fn paid_invoice_count(db: &DatabaseConnection, year: i64) -> Result<i6
     .await
 }
 
-pub async fn draft_invoice_count(db: &DatabaseConnection, year: i64) -> Result<i64, String> {
+pub async fn draft_invoice_count(db: &DatabaseConnection, year: i64) -> Result<i64, AppError> {
     query_i64(
         db,
         "SELECT COUNT(*) AS val FROM invoices WHERE year=? AND status='draft'",
@@ -54,7 +55,7 @@ pub async fn draft_invoice_count(db: &DatabaseConnection, year: i64) -> Result<i
 pub async fn paid_totals_by_month(
     db: &DatabaseConnection,
     year: i64,
-) -> Result<Vec<MonthTotal>, String> {
+) -> Result<Vec<MonthTotal>, AppError> {
     #[derive(FromQueryResult)]
     struct Row {
         month: i64,
@@ -72,8 +73,7 @@ pub async fn paid_totals_by_month(
         [year.into()],
     ))
     .all(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     Ok(rows
         .into_iter()
@@ -86,7 +86,7 @@ pub async fn paid_totals_by_month(
 }
 
 /// The ids of the latest invoices issued in `year`, newest first.
-pub async fn recent_invoice_ids(db: &DatabaseConnection, year: i64) -> Result<Vec<i64>, String> {
+pub async fn recent_invoice_ids(db: &DatabaseConnection, year: i64) -> Result<Vec<i64>, AppError> {
     #[derive(FromQueryResult)]
     struct IdRow {
         id: i64,
@@ -98,12 +98,11 @@ pub async fn recent_invoice_ids(db: &DatabaseConnection, year: i64) -> Result<Ve
         [year.into(), RECENT_INVOICES_LIMIT.into()],
     ))
     .all(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
     Ok(rows.into_iter().map(|r| r.id).collect())
 }
 
-async fn query_f64(db: &DatabaseConnection, sql: &str, year: i64) -> Result<f64, String> {
+async fn query_f64(db: &DatabaseConnection, sql: &str, year: i64) -> Result<f64, AppError> {
     #[derive(FromQueryResult)]
     struct Row {
         val: f64,
@@ -114,12 +113,11 @@ async fn query_f64(db: &DatabaseConnection, sql: &str, year: i64) -> Result<f64,
         [year.into()],
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
     Ok(row.map(|r| r.val).unwrap_or(0.0))
 }
 
-async fn query_i64(db: &DatabaseConnection, sql: &str, year: i64) -> Result<i64, String> {
+async fn query_i64(db: &DatabaseConnection, sql: &str, year: i64) -> Result<i64, AppError> {
     #[derive(FromQueryResult)]
     struct Row {
         val: i64,
@@ -130,7 +128,6 @@ async fn query_i64(db: &DatabaseConnection, sql: &str, year: i64) -> Result<i64,
         [year.into()],
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
     Ok(row.map(|r| r.val).unwrap_or(0))
 }

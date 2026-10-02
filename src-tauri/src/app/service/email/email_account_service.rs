@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
+use crate::app::common::AppError;
 use crate::app::entity::email_account::{self, ActiveModel};
 use crate::app::model::email::{
     EmailAccount, EmailProvider, EmailProviderPreset, EmailSecurity, UpdateEmailAccountInput,
@@ -18,7 +19,7 @@ pub fn providers() -> Vec<EmailProviderPreset> {
 }
 
 /// The saved mailbox, or one proposed from the profile's PEC address before the first save.
-pub async fn get(db: &impl ConnectionTrait) -> Result<EmailAccount, String> {
+pub async fn get(db: &impl ConnectionTrait) -> Result<EmailAccount, AppError> {
     match email_account_repository::find(db).await? {
         Some(row) => from_row(row),
         None => proposed(db).await,
@@ -26,12 +27,14 @@ pub async fn get(db: &impl ConnectionTrait) -> Result<EmailAccount, String> {
 }
 
 /// The mailbox to send from, refused until the professional has saved one.
-pub async fn saved(db: &impl ConnectionTrait) -> Result<EmailAccount, String> {
+pub async fn saved(db: &impl ConnectionTrait) -> Result<EmailAccount, AppError> {
     let account = get(db).await?;
     if account.saved {
         Ok(account)
     } else {
-        Err("Configura la casella email in Impostazioni → Email prima di inviare".to_string())
+        Err(AppError::Invalid(
+            "Configura la casella email in Impostazioni → Email prima di inviare".to_string(),
+        ))
     }
 }
 
@@ -39,7 +42,7 @@ pub async fn saved(db: &impl ConnectionTrait) -> Result<EmailAccount, String> {
 pub async fn update(
     db: &impl ConnectionTrait,
     input: UpdateEmailAccountInput,
-) -> Result<EmailAccount, String> {
+) -> Result<EmailAccount, AppError> {
     let account = normalise(input);
     validate_account(&account)?;
     let active = ActiveModel {
@@ -87,13 +90,13 @@ fn normalise(input: UpdateEmailAccountInput) -> EmailAccount {
     }
 }
 
-fn validate_account(account: &EmailAccount) -> Result<(), String> {
+fn validate_account(account: &EmailAccount) -> Result<(), AppError> {
     validate::validate_required(&account.sender_address, "Indirizzo email")?;
     validate::validate_email(&account.sender_address)?;
     if account.sender_name.chars().count() > NAME_MAX_LENGTH {
-        return Err(format!(
+        return Err(AppError::Invalid(format!(
             "Nome del mittente: massimo {NAME_MAX_LENGTH} caratteri"
-        ));
+        )));
     }
     validate::validate_required(&account.smtp_host, "Server SMTP")?;
     let host_is_plain = account
@@ -101,18 +104,19 @@ fn validate_account(account: &EmailAccount) -> Result<(), String> {
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
     if !host_is_plain || !account.smtp_host.contains('.') {
-        return Err(format!("Server SMTP non valido: {}", account.smtp_host));
+        return Err(AppError::Invalid(format!(
+            "Server SMTP non valido: {}",
+            account.smtp_host
+        )));
     }
     if account.smtp_port == 0 {
-        return Err("Porta SMTP non valida".to_string());
+        return Err(AppError::Invalid("Porta SMTP non valida".to_string()));
     }
     validate::validate_required(&account.username, "Nome utente")
 }
 
-async fn proposed(db: &impl ConnectionTrait) -> Result<EmailAccount, String> {
-    let profile = config_repository::find(db)
-        .await
-        .map_err(|e| e.to_string())?;
+async fn proposed(db: &impl ConnectionTrait) -> Result<EmailAccount, AppError> {
+    let profile = config_repository::find(db).await?;
     let sender_address = profile
         .as_ref()
         .map(|p| p.pec_email.trim().to_lowercase())
@@ -143,13 +147,14 @@ async fn proposed(db: &impl ConnectionTrait) -> Result<EmailAccount, String> {
     })
 }
 
-fn from_row(row: email_account::Model) -> Result<EmailAccount, String> {
+fn from_row(row: email_account::Model) -> Result<EmailAccount, AppError> {
     Ok(EmailAccount {
         provider: EmailProvider::parse(&row.provider)?,
         sender_address: row.sender_address,
         sender_name: row.sender_name,
         smtp_host: row.smtp_host,
-        smtp_port: u16::try_from(row.smtp_port).map_err(|_| "Porta SMTP salvata non valida")?,
+        smtp_port: u16::try_from(row.smtp_port)
+            .map_err(|_| AppError::Invalid("Porta SMTP salvata non valida".to_string()))?,
         security: EmailSecurity::parse(&row.security)?,
         username: row.username,
         bcc_self: row.bcc_self != 0,

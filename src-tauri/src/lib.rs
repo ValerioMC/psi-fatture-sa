@@ -9,9 +9,9 @@ use std::sync::Arc;
 
 use app::app_state::AppState;
 use app::controller::{
-    appointment_controller::*, client_controller::*, config_controller::*, dashboard_controller::*,
-    email_controller::*, invoice_controller::*, invoice_pdf_controller::*, print_controller::*,
-    service_controller::*, terms_controller::*, ts::ts_controller::*,
+    appointment_controller::*, backup_controller::*, client_controller::*, config_controller::*,
+    dashboard_controller::*, email_controller::*, invoice_controller::*, invoice_pdf_controller::*,
+    print_controller::*, service_controller::*, terms_controller::*, ts::ts_controller::*,
 };
 use app::repository::email::{LettreMailGateway, MailGateway};
 use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
@@ -83,6 +83,10 @@ pub fn run() {
             list_ts_submissions,
             enqueue_ts_submission,
             enqueue_ts_replacement,
+            export_backup,
+            get_backup_file_name,
+            preview_invoice_totals,
+            is_ts_invoice_out_of_date,
             enqueue_ts_cancellation,
             withdraw_ts_submission,
             dispatch_ts_queue,

@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::app::app_state::AppState;
+use crate::app::common::AppError;
 use crate::app::model::ts::{
     TsConnectionCheck, TsCredentialsStatus, TsDispatchSummary, TsEnvironment, TsQueryResult,
     TsReportBasis, TsReportRow, TsSettings, TsSubmission, TsSubmissionFilters,
@@ -11,11 +12,20 @@ use crate::app::service::ts::{
     ts_submission_service,
 };
 
+/// Whether the invoice changed after the Sistema TS accepted it.
+#[tauri::command]
+pub async fn is_ts_invoice_out_of_date(
+    state: State<'_, AppState>,
+    invoice_id: i64,
+) -> Result<bool, AppError> {
+    ts_submission_service::invoice_out_of_date(&state.db, invoice_id).await
+}
+
 /// Reports which secrets are stored; their values never leave the backend.
 #[tauri::command]
 pub fn get_ts_credentials_status(
     state: State<'_, AppState>,
-) -> Result<TsCredentialsStatus, String> {
+) -> Result<TsCredentialsStatus, AppError> {
     ts_credential_service::status(state.secrets.as_ref())
 }
 
@@ -23,12 +33,12 @@ pub fn get_ts_credentials_status(
 pub fn save_ts_pincode(
     state: State<'_, AppState>,
     pincode: String,
-) -> Result<TsCredentialsStatus, String> {
+) -> Result<TsCredentialsStatus, AppError> {
     ts_credential_service::save_pincode(state.secrets.as_ref(), &pincode)
 }
 
 #[tauri::command]
-pub fn delete_ts_pincode(state: State<'_, AppState>) -> Result<TsCredentialsStatus, String> {
+pub fn delete_ts_pincode(state: State<'_, AppState>) -> Result<TsCredentialsStatus, AppError> {
     ts_credential_service::delete_pincode(state.secrets.as_ref())
 }
 
@@ -36,12 +46,12 @@ pub fn delete_ts_pincode(state: State<'_, AppState>) -> Result<TsCredentialsStat
 pub fn save_ts_password(
     state: State<'_, AppState>,
     password: String,
-) -> Result<TsCredentialsStatus, String> {
+) -> Result<TsCredentialsStatus, AppError> {
     ts_credential_service::save_password(state.secrets.as_ref(), &password)
 }
 
 #[tauri::command]
-pub fn delete_ts_password(state: State<'_, AppState>) -> Result<TsCredentialsStatus, String> {
+pub fn delete_ts_password(state: State<'_, AppState>) -> Result<TsCredentialsStatus, AppError> {
     ts_credential_service::delete_password(state.secrets.as_ref())
 }
 
@@ -52,7 +62,7 @@ pub fn get_ts_environments() -> Vec<TsEnvironment> {
 }
 
 #[tauri::command]
-pub async fn get_ts_settings(state: State<'_, AppState>) -> Result<TsSettings, String> {
+pub async fn get_ts_settings(state: State<'_, AppState>) -> Result<TsSettings, AppError> {
     ts_settings_service::get(&state.db).await
 }
 
@@ -60,13 +70,15 @@ pub async fn get_ts_settings(state: State<'_, AppState>) -> Result<TsSettings, S
 pub async fn update_ts_settings(
     state: State<'_, AppState>,
     input: UpdateTsSettingsInput,
-) -> Result<TsSettings, String> {
+) -> Result<TsSettings, AppError> {
     ts_settings_service::update(&state.db, input).await
 }
 
 /// Calls the Sistema TS once to tell whether the stored credentials work.
 #[tauri::command]
-pub async fn check_ts_connection(state: State<'_, AppState>) -> Result<TsConnectionCheck, String> {
+pub async fn check_ts_connection(
+    state: State<'_, AppState>,
+) -> Result<TsConnectionCheck, AppError> {
     ts_remote_service::check_connection(
         &state.db,
         state.secrets.as_ref(),
@@ -79,7 +91,7 @@ pub async fn check_ts_connection(state: State<'_, AppState>) -> Result<TsConnect
 pub async fn list_ts_submissions(
     state: State<'_, AppState>,
     filters: Option<TsSubmissionFilters>,
-) -> Result<Vec<TsSubmission>, String> {
+) -> Result<Vec<TsSubmission>, AppError> {
     ts_submission_service::list(&state.db, filters.unwrap_or_default()).await
 }
 
@@ -87,7 +99,7 @@ pub async fn list_ts_submissions(
 pub async fn enqueue_ts_submission(
     state: State<'_, AppState>,
     invoice_id: i64,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     ts_submission_service::enqueue_invio(&state.db, invoice_id).await
 }
 
@@ -95,7 +107,7 @@ pub async fn enqueue_ts_submission(
 pub async fn enqueue_ts_replacement(
     state: State<'_, AppState>,
     submission_id: i64,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     ts_submission_service::enqueue_replacement(&state.db, submission_id).await
 }
 
@@ -103,7 +115,7 @@ pub async fn enqueue_ts_replacement(
 pub async fn enqueue_ts_cancellation(
     state: State<'_, AppState>,
     submission_id: i64,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     ts_submission_service::enqueue_cancellation(&state.db, submission_id).await
 }
 
@@ -112,13 +124,13 @@ pub async fn enqueue_ts_cancellation(
 pub async fn withdraw_ts_submission(
     state: State<'_, AppState>,
     submission_id: i64,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     ts_submission_service::withdraw(&state.db, submission_id).await
 }
 
 /// Sends what is due now instead of waiting for the background worker.
 #[tauri::command]
-pub async fn dispatch_ts_queue(state: State<'_, AppState>) -> Result<TsDispatchSummary, String> {
+pub async fn dispatch_ts_queue(state: State<'_, AppState>) -> Result<TsDispatchSummary, AppError> {
     ts_dispatch_service::dispatch_due(
         &state.db,
         state.secrets.as_ref(),
@@ -132,7 +144,7 @@ pub async fn dispatch_ts_queue(state: State<'_, AppState>) -> Result<TsDispatchS
 pub async fn query_ts_invoice(
     state: State<'_, AppState>,
     invoice_id: i64,
-) -> Result<TsQueryResult, String> {
+) -> Result<TsQueryResult, AppError> {
     ts_remote_service::query_invoice(
         &state.db,
         state.secrets.as_ref(),
@@ -148,7 +160,7 @@ pub async fn get_ts_monthly_report(
     year: i32,
     month: u32,
     basis: TsReportBasis,
-) -> Result<Vec<TsReportRow>, String> {
+) -> Result<Vec<TsReportRow>, AppError> {
     ts_remote_service::monthly_report(
         &state.db,
         state.secrets.as_ref(),

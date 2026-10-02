@@ -1,12 +1,15 @@
 use tauri::State;
 
 use crate::app::app_state::AppState;
+use crate::app::common::AppError;
 use crate::app::model::config::{ProfessionalConfig, UpsertConfigInput};
 use crate::app::service::config_service;
 
 /// Returns the professional config, or None if not yet configured.
 #[tauri::command]
-pub async fn get_config(state: State<'_, AppState>) -> Result<Option<ProfessionalConfig>, String> {
+pub async fn get_config(
+    state: State<'_, AppState>,
+) -> Result<Option<ProfessionalConfig>, AppError> {
     config_service::get(&state.db).await
 }
 
@@ -15,6 +18,6 @@ pub async fn get_config(state: State<'_, AppState>) -> Result<Option<Professiona
 pub async fn upsert_config(
     state: State<'_, AppState>,
     input: UpsertConfigInput,
-) -> Result<ProfessionalConfig, String> {
+) -> Result<ProfessionalConfig, AppError> {
     config_service::upsert(&state.db, input).await
 }

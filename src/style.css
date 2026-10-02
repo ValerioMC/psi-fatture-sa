@@ -35,9 +35,9 @@
   --text-subtle: #6e6a77;     /* 4.8:1 — chrome only: counts, hints, timestamps */
 
   /* Ink: the ONE colour for selection, primary action and focus. */
-  --accent: #3a3e9f;          /* 8.0:1 on canvas */
-  --accent-strong: #2c2f80;   /* pressed / hover of a filled accent surface */
-  --accent-ink: #ffffff;      /* text on a filled accent surface, 8.9:1 */
+  --accent: #3d35b0;          /* 8.1:1 on canvas; the app icon's indigo */
+  --accent-strong: #2e2690;   /* pressed / hover of a filled accent surface */
+  --accent-ink: #ffffff;      /* text on a filled accent surface, 9.0:1 */
 
   /* Status: used for state only, never as decoration. */
   --safe: #2a7550;            /* paid, completed */
@@ -66,7 +66,7 @@
 
   /* The room: two very large, very faint lights so the canvas is not a flat plane. */
   --ambient-warm: rgb(214 170 110 / 0.10);
-  --ambient-cool: rgb(90 96 200 / 0.06);
+  --ambient-cool: rgb(86 74 210 / 0.06);
   --backdrop: rgb(29 27 36 / 0.32);
 
   /* The entire z-index scale. Used as z-(--z-modal); nothing else stacks. */
@@ -96,9 +96,9 @@
   --text-muted: #b3afbf;      /* 8.8:1 */
   --text-subtle: #8b8799;     /* 5.4:1 */
 
-  --accent: #a5a9ff;          /* 8.7:1 */
-  --accent-strong: #c3c6ff;
-  --accent-ink: #15163a;      /* 8.1:1 on accent */
+  --accent: #aaa4ff;          /* 8.5:1 */
+  --accent-strong: #c8c3ff;
+  --accent-ink: #17133f;      /* 7.9:1 on accent */
 
   --safe: #5fc795;
   --warn: #e1a54c;
@@ -119,7 +119,7 @@
   --grain-blend: screen;
 
   --ambient-warm: rgb(214 160 90 / 0.05);
-  --ambient-cool: rgb(120 126 255 / 0.07);
+  --ambient-cool: rgb(126 114 255 / 0.07);
   --backdrop: rgb(4 4 8 / 0.6);
 }
 

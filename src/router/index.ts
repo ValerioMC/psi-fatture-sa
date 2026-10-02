@@ -32,6 +32,7 @@ const router = createRouter({
             { path: 'invoicing', name: 'settings.invoicing', component: () => import('@/views/settings/SettingsInvoicingView.vue') },
             { path: 'email', name: 'settings.email', component: () => import('@/views/settings/SettingsEmailView.vue') },
             { path: 'sts', name: 'settings.sts', component: () => import('@/views/settings/SettingsStsView.vue') },
+            { path: 'data', name: 'settings.data', component: () => import('@/views/settings/SettingsDataView.vue') },
             { path: 'appearance', name: 'settings.appearance', component: () => import('@/views/settings/SettingsAppearanceView.vue') },
             { path: 'legal', name: 'settings.legal', component: () => import('@/views/settings/SettingsLegalView.vue') },
           ],

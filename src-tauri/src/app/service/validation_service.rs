@@ -6,37 +6,42 @@
 
 use chrono::NaiveDate;
 
+use crate::app::common::AppError;
 use crate::app::model::invoice::InvoiceLineInput;
+use crate::app::model::tax::InvoiceLineData;
 
 const MIN_YEAR: i64 = 2000;
 const MAX_YEAR: i64 = 2100;
 
 /// Parses and validates an ISO date string (YYYY-MM-DD).
-pub fn parse_iso_date(value: &str, field: &str) -> Result<NaiveDate, String> {
-    NaiveDate::parse_from_str(value, "%Y-%m-%d")
-        .map_err(|_| format!("{field}: data non valida ({value}), atteso formato YYYY-MM-DD"))
+pub fn parse_iso_date(value: &str, field: &str) -> Result<NaiveDate, AppError> {
+    NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
+        AppError::Invalid(format!(
+            "{field}: data non valida ({value}), atteso formato YYYY-MM-DD"
+        ))
+    })
 }
 
 /// Validates a calendar year within a sane range.
-pub fn validate_year(year: i64) -> Result<(), String> {
+pub fn validate_year(year: i64) -> Result<(), AppError> {
     if (MIN_YEAR..=MAX_YEAR).contains(&year) {
         Ok(())
     } else {
-        Err(format!("Anno non valido: {year}"))
+        Err(AppError::Invalid(format!("Anno non valido: {year}")))
     }
 }
 
 /// Validates a calendar month (1-12).
-pub fn validate_month(month: i64) -> Result<(), String> {
+pub fn validate_month(month: i64) -> Result<(), AppError> {
     if (1..=12).contains(&month) {
         Ok(())
     } else {
-        Err(format!("Mese non valido: {month}"))
+        Err(AppError::Invalid(format!("Mese non valido: {month}")))
     }
 }
 
 /// Validates a time string in HH:MM format.
-pub fn validate_time(value: &str, field: &str) -> Result<(), String> {
+pub fn validate_time(value: &str, field: &str) -> Result<(), AppError> {
     let valid = value.len() == 5
         && value.as_bytes()[2] == b':'
         && value[..2].parse::<u32>().map(|h| h < 24).unwrap_or(false)
@@ -44,18 +49,20 @@ pub fn validate_time(value: &str, field: &str) -> Result<(), String> {
     if valid {
         Ok(())
     } else {
-        Err(format!(
+        Err(AppError::Invalid(format!(
             "{field}: orario non valido ({value}), atteso HH:MM"
-        ))
+        )))
     }
 }
 
 /// Validates that a referenced id is a plausible primary key.
-pub fn validate_id(id: i64, field: &str) -> Result<(), String> {
+pub fn validate_id(id: i64, field: &str) -> Result<(), AppError> {
     if id > 0 {
         Ok(())
     } else {
-        Err(format!("{field}: selezione obbligatoria"))
+        Err(AppError::Invalid(format!(
+            "{field}: selezione obbligatoria"
+        )))
     }
 }
 
@@ -63,49 +70,70 @@ pub fn validate_id(id: i64, field: &str) -> Result<(), String> {
 pub fn validate_invoice_dates(
     issue_date: &str,
     due_date: Option<&str>,
-) -> Result<NaiveDate, String> {
+) -> Result<NaiveDate, AppError> {
     let issue = parse_iso_date(issue_date, "Data emissione")?;
     if let Some(due) = due_date.filter(|d| !d.is_empty()) {
         let due = parse_iso_date(due, "Data scadenza")?;
         if due < issue {
-            return Err("La data di scadenza precede la data di emissione".to_string());
+            return Err(AppError::Invalid(
+                "La data di scadenza precede la data di emissione".to_string(),
+            ));
         }
     }
     Ok(issue)
 }
 
 /// Validates the line items of an invoice.
-pub fn validate_invoice_lines(lines: &[InvoiceLineInput]) -> Result<(), String> {
+pub fn validate_invoice_lines(lines: &[InvoiceLineInput]) -> Result<(), AppError> {
     if lines.is_empty() {
-        return Err("La fattura deve contenere almeno una riga".to_string());
+        return Err(AppError::Invalid(
+            "La fattura deve contenere almeno una riga".to_string(),
+        ));
     }
     for (idx, l) in lines.iter().enumerate() {
         let row = idx + 1;
         if l.description.trim().is_empty() {
-            return Err(format!("Riga {row}: descrizione obbligatoria"));
+            return Err(AppError::Invalid(format!(
+                "Riga {row}: descrizione obbligatoria"
+            )));
         }
         if l.quantity < 1 {
-            return Err(format!("Riga {row}: la quantità deve essere almeno 1"));
+            return Err(AppError::Invalid(format!(
+                "Riga {row}: la quantità deve essere almeno 1"
+            )));
         }
         if !l.unit_price.is_finite() || l.unit_price < 0.0 {
-            return Err(format!("Riga {row}: prezzo unitario non valido"));
+            return Err(AppError::Invalid(format!(
+                "Riga {row}: prezzo unitario non valido"
+            )));
         }
         if !l.vat_rate.is_finite() || !(0.0..=100.0).contains(&l.vat_rate) {
-            return Err(format!("Riga {row}: aliquota IVA non valida (0-100)"));
+            return Err(AppError::Invalid(format!(
+                "Riga {row}: aliquota IVA non valida (0-100)"
+            )));
         }
         if l.amount_override
             .is_some_and(|amount| !amount.is_finite() || amount < 0.0)
         {
-            return Err(format!("Riga {row}: importo non valido"));
+            return Err(AppError::Invalid(format!("Riga {row}: importo non valido")));
         }
+    }
+    let total: f64 = lines
+        .iter()
+        .map(|l| InvoiceLineData::from(l).net_amount())
+        .sum();
+    if total <= 0.0 {
+        return Err(AppError::Invalid(
+            "L'importo della fattura deve essere maggiore di zero".to_string(),
+        ));
     }
     Ok(())
 }
 
 /// Validates that a mandatory text field is not blank.
-pub fn validate_required(value: &str, field: &str) -> Result<(), String> {
+pub fn validate_required(value: &str, field: &str) -> Result<(), AppError> {
     if value.trim().is_empty() {
-        Err(format!("{field}: campo obbligatorio"))
+        Err(AppError::Invalid(format!("{field}: campo obbligatorio")))
     } else {
         Ok(())
     }
@@ -116,7 +144,7 @@ pub fn validate_required(value: &str, field: &str) -> Result<(), String> {
 /// omocodia variants) and the 11-digit format used by legal entities.
 /// Mirrors `validateCodiceFiscale` in `src/utils/validation.ts` so the
 /// frontend and backend reject the same inputs with the same messages.
-pub fn validate_fiscal_code(value: &str) -> Result<(), String> {
+pub fn validate_fiscal_code(value: &str) -> Result<(), AppError> {
     let v = value.trim().to_uppercase();
     if v.is_empty() {
         return Ok(());
@@ -125,30 +153,40 @@ pub fn validate_fiscal_code(value: &str) -> Result<(), String> {
         return validate_vat_number(&v);
     }
     if v.chars().count() != 16 {
-        return Err("Il codice fiscale deve avere 16 caratteri".to_string());
+        return Err(AppError::Invalid(
+            "Il codice fiscale deve avere 16 caratteri".to_string(),
+        ));
     }
     if !v.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err("Il codice fiscale contiene caratteri non validi".to_string());
+        return Err(AppError::Invalid(
+            "Il codice fiscale contiene caratteri non validi".to_string(),
+        ));
     }
     if !cf_shape_is_valid(&cf_de_omocodia(&v)) {
-        return Err("Formato codice fiscale non valido".to_string());
+        return Err(AppError::Invalid(
+            "Formato codice fiscale non valido".to_string(),
+        ));
     }
     let chars: Vec<char> = v.chars().collect();
     if chars[15] != cf_control_char(&chars) {
-        return Err("Codice fiscale non valido (carattere di controllo errato)".to_string());
+        return Err(AppError::Invalid(
+            "Codice fiscale non valido (carattere di controllo errato)".to_string(),
+        ));
     }
     Ok(())
 }
 
 /// Validates an Italian VAT number when provided (11 digits, Luhn checksum).
 /// Mirrors `validatePartitaIva` in `src/utils/validation.ts`.
-pub fn validate_vat_number(value: &str) -> Result<(), String> {
+pub fn validate_vat_number(value: &str) -> Result<(), AppError> {
     let v = value.trim();
     if v.is_empty() {
         return Ok(());
     }
     if v.len() != 11 || !v.chars().all(|c| c.is_ascii_digit()) {
-        return Err("La partita IVA deve essere composta da 11 cifre".to_string());
+        return Err(AppError::Invalid(
+            "La partita IVA deve essere composta da 11 cifre".to_string(),
+        ));
     }
     let sum: u32 = v
         .bytes()
@@ -165,7 +203,9 @@ pub fn validate_vat_number(value: &str) -> Result<(), String> {
         })
         .sum();
     if !sum.is_multiple_of(10) {
-        return Err("Partita IVA non valida (cifra di controllo errata)".to_string());
+        return Err(AppError::Invalid(
+            "Partita IVA non valida (cifra di controllo errata)".to_string(),
+        ));
     }
     Ok(())
 }
@@ -266,7 +306,7 @@ fn cf_odd_value(c: char) -> u32 {
 
 /// Validates an email address when provided: something@domain.tld, no spaces.
 /// Mirrors `validateEmail` in `src/utils/validation.ts`.
-pub fn validate_email(value: &str) -> Result<(), String> {
+pub fn validate_email(value: &str) -> Result<(), AppError> {
     let email = value.trim();
     if email.is_empty() {
         return Ok(());
@@ -281,7 +321,9 @@ pub fn validate_email(value: &str) -> Result<(), String> {
     if valid {
         Ok(())
     } else {
-        Err(format!("Indirizzo email non valido: {email}"))
+        Err(AppError::Invalid(format!(
+            "Indirizzo email non valido: {email}"
+        )))
     }
 }
 

@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::app::app_state::AppState;
+use crate::app::common::AppError;
 use crate::app::model::appointment::{
     Appointment, CreateAppointmentInput, CreateRecurringAppointmentsInput, UpdateAppointmentInput,
 };
@@ -13,13 +14,13 @@ pub async fn list_appointments(
     date_from: Option<String>,
     date_to: Option<String>,
     client_id: Option<i64>,
-) -> Result<Vec<Appointment>, String> {
+) -> Result<Vec<Appointment>, AppError> {
     appointment_service::list(&state.db, date_from, date_to, client_id).await
 }
 
 /// Returns a single appointment by id.
 #[tauri::command]
-pub async fn get_appointment(state: State<'_, AppState>, id: i64) -> Result<Appointment, String> {
+pub async fn get_appointment(state: State<'_, AppState>, id: i64) -> Result<Appointment, AppError> {
     appointment_service::get(&state.db, id).await
 }
 
@@ -28,7 +29,7 @@ pub async fn get_appointment(state: State<'_, AppState>, id: i64) -> Result<Appo
 pub async fn create_appointment(
     state: State<'_, AppState>,
     input: CreateAppointmentInput,
-) -> Result<Appointment, String> {
+) -> Result<Appointment, AppError> {
     appointment_service::create(&state.db, input).await
 }
 
@@ -37,7 +38,7 @@ pub async fn create_appointment(
 pub async fn create_recurring_appointments(
     state: State<'_, AppState>,
     input: CreateRecurringAppointmentsInput,
-) -> Result<Vec<Appointment>, String> {
+) -> Result<Vec<Appointment>, AppError> {
     appointment_service::create_recurring(&state.db, input).await
 }
 
@@ -46,12 +47,12 @@ pub async fn create_recurring_appointments(
 pub async fn update_appointment(
     state: State<'_, AppState>,
     input: UpdateAppointmentInput,
-) -> Result<Appointment, String> {
+) -> Result<Appointment, AppError> {
     appointment_service::update(&state.db, input).await
 }
 
 /// Deletes an appointment by id.
 #[tauri::command]
-pub async fn delete_appointment(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+pub async fn delete_appointment(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
     appointment_service::remove(&state.db, id).await
 }

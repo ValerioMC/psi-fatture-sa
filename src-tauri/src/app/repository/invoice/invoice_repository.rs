@@ -3,7 +3,8 @@ use sea_orm::{
     EntityTrait, FromQueryResult, QueryFilter, QueryOrder, Statement,
 };
 
-use super::InvoiceRow;
+use super::{InvoiceRow, NumberedDate};
+use crate::app::common::AppError;
 use crate::app::entity::{invoice as invoices, invoice_line};
 use crate::app::model::config::TaxRegime;
 use crate::app::model::invoice::{Invoice, InvoiceFilters, InvoiceLine, InvoiceLineInput};
@@ -13,7 +14,7 @@ use crate::app::model::tax::{round_cents, InvoiceLineData, TaxProfile};
 pub async fn find_ids(
     db: &DatabaseConnection,
     filters: &InvoiceFilters,
-) -> Result<Vec<i64>, String> {
+) -> Result<Vec<i64>, AppError> {
     let mut conditions = vec!["1=1".to_string()];
     let mut values: Vec<sea_orm::Value> = Vec::new();
 
@@ -62,14 +63,13 @@ pub async fn find_ids(
         values,
     ))
     .all(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     Ok(rows.into_iter().map(|r| r.id).collect())
 }
 
 /// Loads a full invoice (with client_name and lines) by id.
-pub async fn load_invoice(db: &impl ConnectionTrait, id: i64) -> Result<Invoice, String> {
+pub async fn load_invoice(db: &impl ConnectionTrait, id: i64) -> Result<Invoice, AppError> {
     let row = InvoiceRow::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         "SELECT i.*, c.first_name || ' ' || c.last_name AS client_name
@@ -79,9 +79,8 @@ pub async fn load_invoice(db: &impl ConnectionTrait, id: i64) -> Result<Invoice,
         [id.into()],
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| format!("Invoice {id} not found"))?;
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("Fattura {id} non trovata")))?;
 
     let lines = load_lines(db, id).await?;
     Ok(row.into_invoice(lines))
@@ -89,7 +88,7 @@ pub async fn load_invoice(db: &impl ConnectionTrait, id: i64) -> Result<Invoice,
 
 /// Loads multiple invoices (with client_name and lines) in two queries,
 /// preserving the order of the given ids.
-pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<Invoice>, String> {
+pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<Invoice>, AppError> {
     if ids.is_empty() {
         return Ok(vec![]);
     }
@@ -109,8 +108,7 @@ pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<I
         id_values.clone(),
     ))
     .all(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     let lines_sql =
         format!("SELECT * FROM invoice_lines WHERE invoice_id IN ({placeholders}) ORDER BY id");
@@ -120,8 +118,7 @@ pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<I
         id_values,
     ))
     .all(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     let mut lines_by_invoice: std::collections::HashMap<i64, Vec<InvoiceLine>> =
         std::collections::HashMap::new();
@@ -172,7 +169,7 @@ pub async fn insert_lines(
     db: &impl sea_orm::ConnectionTrait,
     invoice_id: i64,
     lines: &[InvoiceLineInput],
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     for line in lines {
         let amounts = InvoiceLineData::from(line);
 
@@ -188,7 +185,7 @@ pub async fn insert_lines(
             ..Default::default()
         };
 
-        active.insert(db).await.map_err(|e| e.to_string())?;
+        active.insert(db).await?;
     }
     Ok(())
 }
@@ -212,7 +209,7 @@ pub async fn delete_lines(
 pub async fn next_invoice_number(
     db: &impl sea_orm::ConnectionTrait,
     year: i64,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     #[derive(FromQueryResult)]
     struct Row {
         max_num: i64,
@@ -228,8 +225,7 @@ pub async fn next_invoice_number(
         [year.into()],
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     let (max_num, initial) = row.map(|r| (r.max_num, r.initial)).unwrap_or((0, 1));
     let next = std::cmp::max(max_num, initial - 1) + 1;
@@ -244,7 +240,7 @@ pub async fn invoice_number_taken(
     year: i64,
     number: i64,
     exclude_id: i64,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     #[derive(FromQueryResult)]
     struct Row {
         n: i64,
@@ -257,14 +253,13 @@ pub async fn invoice_number_taken(
         [year.into(), number.into(), exclude_id.into()],
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     Ok(row.map(|r| r.n).unwrap_or(0) > 0)
 }
 
 /// The profile's tax settings; a missing profile taxes as forfettario with the bollo in the ENPAP base.
-pub async fn get_tax_profile(db: &impl sea_orm::ConnectionTrait) -> Result<TaxProfile, String> {
+pub async fn get_tax_profile(db: &impl sea_orm::ConnectionTrait) -> Result<TaxProfile, AppError> {
     #[derive(FromQueryResult)]
     struct ProfileRow {
         tax_regime: String,
@@ -276,8 +271,7 @@ pub async fn get_tax_profile(db: &impl sea_orm::ConnectionTrait) -> Result<TaxPr
         "SELECT tax_regime, enpap_excludes_bollo FROM professional_config WHERE id = 1".to_owned(),
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     Ok(match row {
         Some(r) => TaxProfile {
@@ -296,7 +290,7 @@ pub async fn get_tax_profile(db: &impl sea_orm::ConnectionTrait) -> Result<TaxPr
 pub async fn default_hide_quantity(
     db: &impl sea_orm::ConnectionTrait,
     client_id: i64,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     #[derive(FromQueryResult)]
     struct HideRow {
         hide: i32,
@@ -311,8 +305,7 @@ pub async fn default_hide_quantity(
         [client_id.into()],
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     Ok(row.is_some_and(|r| r.hide != 0))
 }
@@ -324,7 +317,7 @@ pub async fn bulk_update_status(
     ids: &[i64],
     status: &str,
     paid_date: &Option<String>,
-) -> Result<u64, String> {
+) -> Result<u64, AppError> {
     if ids.is_empty() {
         return Ok(0);
     }
@@ -348,8 +341,7 @@ pub async fn bulk_update_status(
             &sql,
             values,
         ))
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
 
     Ok(result.rows_affected())
 }
@@ -359,13 +351,12 @@ pub async fn bulk_update_status(
 async fn load_lines(
     db: &impl ConnectionTrait,
     invoice_id: i64,
-) -> Result<Vec<InvoiceLine>, String> {
+) -> Result<Vec<InvoiceLine>, AppError> {
     let models = invoice_line::Entity::find()
         .filter(invoice_line::Column::InvoiceId.eq(invoice_id))
         .order_by_asc(invoice_line::Column::Id)
         .all(db)
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
 
     Ok(models.into_iter().map(into_line).collect())
 }
@@ -390,7 +381,7 @@ pub async fn find_id_by_issue(
     db: &impl ConnectionTrait,
     issue_date: &str,
     number: &str,
-) -> Result<Option<i64>, String> {
+) -> Result<Option<i64>, AppError> {
     #[derive(FromQueryResult)]
     struct IdRow {
         id: i64,
@@ -402,7 +393,37 @@ pub async fn find_id_by_issue(
         [issue_date.into(), number.into()],
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
     Ok(row.map(|r| r.id))
+}
+
+/// The first invoice of the year whose date breaks the numbering order around
+/// `number` dated `issue_date`: a lower number dated later, or a higher one dated earlier.
+pub async fn find_out_of_order(
+    db: &impl ConnectionTrait,
+    year: i64,
+    number: i64,
+    issue_date: &str,
+    exclude_id: i64,
+) -> Result<Option<NumberedDate>, AppError> {
+    let row = NumberedDate::find_by_statement(Statement::from_sql_and_values(
+        sea_orm::DatabaseBackend::Sqlite,
+        "SELECT invoice_number, issue_date FROM invoices
+         WHERE year = ? AND id <> ?
+           AND ((CAST(invoice_number AS INTEGER) < ? AND issue_date > ?)
+             OR (CAST(invoice_number AS INTEGER) > ? AND issue_date < ?))
+         ORDER BY CAST(invoice_number AS INTEGER)
+         LIMIT 1",
+        [
+            year.into(),
+            exclude_id.into(),
+            number.into(),
+            issue_date.into(),
+            number.into(),
+            issue_date.into(),
+        ],
+    ))
+    .one(db)
+    .await?;
+    Ok(row)
 }

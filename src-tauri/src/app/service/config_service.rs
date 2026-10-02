@@ -1,15 +1,14 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection};
 
+use crate::app::common::AppError;
 use crate::app::entity::professional_config::{self, ActiveModel};
 use crate::app::model::config::{Profession, ProfessionalConfig, TaxRegime, UpsertConfigInput};
 use crate::app::repository::config_repository;
 use crate::app::service::validation_service as validate;
 
 /// Returns the professional config, or None if not yet configured.
-pub async fn get(db: &DatabaseConnection) -> Result<Option<ProfessionalConfig>, String> {
-    let model = config_repository::find(db)
-        .await
-        .map_err(|e| e.to_string())?;
+pub async fn get(db: &DatabaseConnection) -> Result<Option<ProfessionalConfig>, AppError> {
+    let model = config_repository::find(db).await?;
     Ok(model.map(into_domain))
 }
 
@@ -17,18 +16,16 @@ pub async fn get(db: &DatabaseConnection) -> Result<Option<ProfessionalConfig>, 
 pub async fn upsert(
     db: &DatabaseConnection,
     input: UpsertConfigInput,
-) -> Result<ProfessionalConfig, String> {
+) -> Result<ProfessionalConfig, AppError> {
     validate_config_input(&input)?;
     let active = build_active_model(&input);
-    let model = config_repository::save(db, active)
-        .await
-        .map_err(|e| e.to_string())?;
+    let model = config_repository::save(db, active).await?;
     Ok(into_domain(model))
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
-fn validate_config_input(input: &UpsertConfigInput) -> Result<(), String> {
+fn validate_config_input(input: &UpsertConfigInput) -> Result<(), AppError> {
     validate::validate_required(&input.first_name, "Nome")?;
     validate::validate_required(&input.last_name, "Cognome")?;
     validate::validate_required(&input.vat_number, "Partita IVA")?;
@@ -40,10 +37,14 @@ fn validate_config_input(input: &UpsertConfigInput) -> Result<(), String> {
     validate::validate_vat_number(&input.vat_number)?;
     validate::validate_fiscal_code(&input.fiscal_code)?;
     if !input.coefficient.is_finite() || !(1.0..=100.0).contains(&input.coefficient) {
-        return Err("Coefficiente non valido (1-100)".to_string());
+        return Err(AppError::Invalid(
+            "Coefficiente non valido (1-100)".to_string(),
+        ));
     }
     if input.initial_invoice_number < 1 {
-        return Err("Il numero iniziale delle fatture deve essere almeno 1".to_string());
+        return Err(AppError::Invalid(
+            "Il numero iniziale delle fatture deve essere almeno 1".to_string(),
+        ));
     }
     Ok(())
 }

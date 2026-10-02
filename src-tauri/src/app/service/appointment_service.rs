@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection, TransactionTrait};
 
+use crate::app::common::AppError;
 use crate::app::entity::appointment as appointments;
 use crate::app::model::appointment::{
     Appointment, CreateAppointmentInput, CreateRecurringAppointmentsInput, UpdateAppointmentInput,
@@ -13,12 +14,12 @@ pub async fn list(
     date_from: Option<String>,
     date_to: Option<String>,
     client_id: Option<i64>,
-) -> Result<Vec<Appointment>, String> {
+) -> Result<Vec<Appointment>, AppError> {
     appointment_repository::find_all(db, date_from, date_to, client_id).await
 }
 
 /// Returns a single appointment by id.
-pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Appointment, String> {
+pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Appointment, AppError> {
     appointment_repository::find_by_id(db, id).await
 }
 
@@ -26,7 +27,7 @@ pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Appointment, String
 pub async fn create(
     db: &DatabaseConnection,
     input: CreateAppointmentInput,
-) -> Result<Appointment, String> {
+) -> Result<Appointment, AppError> {
     validate_appointment_fields(
         input.client_id,
         &input.date,
@@ -45,9 +46,7 @@ pub async fn create(
         input.recurrence_group_id,
     );
 
-    let model = appointment_repository::insert(db, active)
-        .await
-        .map_err(|e| e.to_string())?;
+    let model = appointment_repository::insert(db, active).await?;
     appointment_repository::find_by_id(db, model.id).await
 }
 
@@ -55,19 +54,19 @@ pub async fn create(
 pub async fn create_recurring(
     db: &DatabaseConnection,
     input: CreateRecurringAppointmentsInput,
-) -> Result<Vec<Appointment>, String> {
+) -> Result<Vec<Appointment>, AppError> {
     if input.dates.is_empty() {
-        return Err("Seleziona almeno una data per la ricorrenza".to_string());
+        return Err(AppError::Invalid(
+            "Seleziona almeno una data per la ricorrenza".to_string(),
+        ));
     }
     for date in &input.dates {
         validate_appointment_fields(input.client_id, date, &input.start_time, &input.end_time)?;
     }
 
-    let tx = db.begin().await.map_err(|e| e.to_string())?;
+    let tx = db.begin().await?;
 
-    let group_id = appointment_repository::insert_recurrence_group(&tx, input.client_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let group_id = appointment_repository::insert_recurrence_group(&tx, input.client_id).await?;
 
     let mut ids = Vec::new();
     for date in &input.dates {
@@ -81,13 +80,11 @@ pub async fn create_recurring(
             Some(input.notes.clone()),
             Some(group_id),
         );
-        let model = appointment_repository::insert(&tx, active)
-            .await
-            .map_err(|e| e.to_string())?;
+        let model = appointment_repository::insert(&tx, active).await?;
         ids.push(model.id);
     }
 
-    tx.commit().await.map_err(|e| e.to_string())?;
+    tx.commit().await?;
 
     let mut results = Vec::new();
     for id in ids {
@@ -100,7 +97,7 @@ pub async fn create_recurring(
 pub async fn update(
     db: &DatabaseConnection,
     input: UpdateAppointmentInput,
-) -> Result<Appointment, String> {
+) -> Result<Appointment, AppError> {
     validate::validate_id(input.id, "Appuntamento")?;
     validate_appointment_fields(
         input.client_id,
@@ -124,17 +121,15 @@ pub async fn update(
         ..Default::default()
     };
 
-    appointment_repository::update(db, active)
-        .await
-        .map_err(|e| e.to_string())?;
+    appointment_repository::update(db, active).await?;
     appointment_repository::find_by_id(db, input.id).await
 }
 
 /// Removes an appointment by id.
-pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), String> {
+pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), AppError> {
     appointment_repository::delete(db, id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(AppError::from)
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
@@ -145,13 +140,15 @@ fn validate_appointment_fields(
     date: &str,
     start_time: &str,
     end_time: &str,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     validate::validate_id(client_id, "Cliente")?;
     validate::parse_iso_date(date, "Data")?;
     validate::validate_time(start_time, "Ora inizio")?;
     validate::validate_time(end_time, "Ora fine")?;
     if end_time <= start_time {
-        return Err("L'ora di fine deve essere successiva all'ora di inizio".to_string());
+        return Err(AppError::Invalid(
+            "L'ora di fine deve essere successiva all'ora di inizio".to_string(),
+        ));
     }
     Ok(())
 }

@@ -15,7 +15,7 @@ const EVERY_ENVIRONMENT: &[TsEnvironment] = &[TsEnvironment::Produzione, TsEnvir
 async fn save_anywhere(
     db: &DatabaseConnection,
     input: UpdateTsSettingsInput,
-) -> Result<TsSettings, String> {
+) -> Result<TsSettings, AppError> {
     update_within(db, input, EVERY_ENVIRONMENT).await
 }
 
@@ -64,7 +64,7 @@ async fn production_requires_valid_checksums() {
     )
     .await
     .unwrap_err();
-    assert!(!err.is_empty());
+    assert!(!err.to_string().is_empty());
     assert!(update(
         &db,
         input(TsEnvironment::Produzione, "RSSMRA80A41H501Y", "12345678903")
@@ -83,7 +83,7 @@ async fn a_production_only_build_refuses_the_test_environment() {
     )
     .await
     .unwrap_err();
-    assert!(err.contains("non è disponibile"));
+    assert!(err.to_string().contains("non è disponibile"));
     assert!(ts_settings_repository::find(&db).await.unwrap().is_none());
 }
 

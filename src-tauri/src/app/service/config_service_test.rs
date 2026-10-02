@@ -58,7 +58,10 @@ fn rejects_blank_required_fields() {
         }
         let result = validate_config_input(&input);
         assert!(result.is_err(), "expected error for blank {field}");
-        assert!(result.unwrap_err().contains("campo obbligatorio"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("campo obbligatorio"));
     }
 }
 
@@ -132,7 +135,7 @@ async fn registration_rejects_invalid_fiscal_code_with_clear_message() {
     let mut input = valid_input();
     input.fiscal_code = "RSSMRA80A41H501X".to_string();
     let err = upsert(&db, input).await.unwrap_err();
-    assert!(err.contains("carattere di controllo errato"));
+    assert!(err.to_string().contains("carattere di controllo errato"));
 
     assert!(get(&db).await.unwrap().is_none());
 }

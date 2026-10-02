@@ -121,7 +121,7 @@ async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
     let err = update(&db, update_input_from(&second, Some("001")))
         .await
         .unwrap_err();
-    assert!(err.contains("già utilizzato"));
+    assert!(err.to_string().contains("già utilizzato"));
 
     // Renumbering to a free number works and is zero-padded.
     let renumbered = update(&db, update_input_from(&second, Some("7")))
@@ -129,8 +129,8 @@ async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
         .unwrap();
     assert_eq!(renumbered.invoice_number, "007");
 
-    // The freed number 002 can now be reassigned (gap filling).
-    let third = create(&db, invoice_input("2026-05-01")).await.unwrap();
+    // The freed number 002 can now be reassigned (gap filling), keeping dates in order.
+    let third = create(&db, invoice_input("2026-04-01")).await.unwrap();
     let filled = update(&db, update_input_from(&third, Some("2")))
         .await
         .unwrap();
@@ -259,4 +259,84 @@ async fn update_without_visibility_keeps_the_saved_one() {
     let mut shown = update_input_from(&invoice, None);
     shown.hide_quantity = Some(false);
     assert!(!update(&db, shown).await.unwrap().hide_quantity);
+}
+
+#[tokio::test]
+async fn a_new_invoice_cannot_predate_the_last_one_of_the_year() {
+    let db = test_db().await;
+    create(&db, invoice_input("2026-04-10")).await.unwrap();
+
+    let error = create(&db, invoice_input("2026-04-09")).await.unwrap_err();
+
+    assert!(matches!(error, AppError::Conflict(_)));
+    assert!(create(&db, invoice_input("2026-04-10")).await.is_ok());
+}
+
+#[tokio::test]
+async fn a_zero_total_invoice_is_refused() {
+    let db = test_db().await;
+    let mut input = invoice_input("2026-03-01");
+    input.lines[0].unit_price = 0.0;
+
+    let error = create(&db, input).await.unwrap_err();
+
+    assert!(matches!(error, AppError::Invalid(_)));
+}
+
+async fn completed_session(db: &DatabaseConnection, date: &str, service_id: &str) {
+    db.execute_unprepared(&format!(
+        "INSERT INTO appointments (client_id, service_id, date, start_time, end_time, status)
+         VALUES (1, {service_id}, '{date}', '10:00', '11:00', 'completed')"
+    ))
+    .await
+    .unwrap();
+}
+
+fn monthly_input(issue_date: Option<&str>) -> GenerateMonthlyInput {
+    GenerateMonthlyInput {
+        year: 2026,
+        month: 3,
+        client_ids: vec![1],
+        payment_method: crate::app::model::invoice::PaymentMethod::Bonifico,
+        apply_enpap: true,
+        issue_date: issue_date.map(str::to_string),
+    }
+}
+
+#[tokio::test]
+async fn monthly_invoicing_refuses_sessions_without_a_price() {
+    let db = test_db().await;
+    completed_session(&db, "2026-03-05", "NULL").await;
+
+    let preview = preview_monthly(&db, 2026, 3).await.unwrap();
+    assert!(preview[0].missing_price);
+
+    let error = generate_monthly(&db, monthly_input(None))
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("Luca Bianchi"));
+    assert!(next_number(&db, 2026).await.unwrap() == "001");
+}
+
+#[tokio::test]
+async fn monthly_invoicing_takes_an_explicit_issue_date() {
+    let db = test_db().await;
+    db.execute_unprepared(
+        "INSERT INTO services (name, default_price, vat_rate) VALUES ('Colloquio', 70.0, 0.0)",
+    )
+    .await
+    .unwrap();
+    completed_session(&db, "2026-03-05", "1").await;
+    create(&db, invoice_input("2026-04-02")).await.unwrap();
+
+    let late = generate_monthly(&db, monthly_input(None))
+        .await
+        .unwrap_err();
+    assert!(matches!(late, AppError::Conflict(_)));
+
+    let created = generate_monthly(&db, monthly_input(Some("2026-04-03")))
+        .await
+        .unwrap();
+    assert_eq!(created[0].issue_date, "2026-04-03");
+    assert_eq!(created[0].invoice_number, "002");
 }

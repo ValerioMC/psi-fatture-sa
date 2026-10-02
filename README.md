@@ -242,8 +242,9 @@ e un solo colore d'accento (indaco inchiostro) per selezione, azione primaria e 
 
 ## Calcolo della fattura
 
-Il backend (`src-tauri/src/app/service/tax_service.rs`) calcola i totali salvati;
-`src/utils/tax.ts` ripete la stessa logica per l'anteprima nel modulo e va tenuto allineato.
+Solo il backend (`src-tauri/src/app/service/tax_service.rs`) calcola i totali: il
+riepilogo del modulo li chiede mentre scrivi al comando `preview_invoice_totals`
+(`src/composables/useInvoiceTotals.ts`), lo stesso codice che poi salva la fattura.
 
 - **Base ENPAP 2%**: nel forfettario la marca da bollo addebitata al paziente è compenso
   (Interpello AdE) e concorre alla base; nell'ordinario la base è il solo imponibile.
@@ -253,6 +254,13 @@ Il backend (`src-tauri/src/app/service/tax_service.rs`) calcola i totali salvati
   lo si scrive a mano; da lì l'importo scritto (`invoice_lines.amount_override`) sostituisce
   il prodotto in tutti i calcoli, e in fattura la riga non mostra il prezzo unitario.
   *Ricalcola* torna al prodotto.
+- **Importo minimo**: una fattura con totale zero non si salva. Nella fatturazione
+  mensile le sedute senza prestazione o con prezzo zero sono segnalate e non si
+  possono fatturare finché non si assegna una prestazione in agenda.
+- **Numerazione e date**: i numeri seguono l'ordine delle date nell'anno. Una fattura
+  nuova non può avere una data precedente all'ultima emessa, e una rinumerata deve
+  restare tra le date dei numeri vicini. La fatturazione mensile propone come data
+  l'ultimo giorno del mese, modificabile.
 - **Quantità e prezzo unitario in fattura**: la scelta è salvata sulla fattura
   (`invoices.hide_quantity`). Una fattura nuova parte dall'impostazione del paziente
   (scheda paziente → *Fattura*), se c'è, altrimenti da quella in Impostazioni → Fatturazione.
@@ -309,8 +317,12 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   pagamento) e interrogazione puntuale del singolo documento.
 - **Scadenze**: invio entro il 31 gennaio dell'anno dopo il pagamento, correzioni
   gratuite nei 5 giorni successivi (spostati al lunedì se cadono nel weekend).
-- **Cancellazione fatture**: non si elimina una fattura i cui dati sono sul Sistema TS
-  di produzione; prima va annullato l'invio.
+- **Fatture già registrate**: non si elimina una fattura i cui dati sono sul Sistema TS
+  di produzione; prima va annullato l'invio. Numero, data e stato *pagata* restano
+  quelli inviati (anche dal cambio di stato in blocco). Importi e paziente si possono
+  correggere: ogni invio salva un'impronta SHA-256 dei dati spediti
+  (`ts_submissions.document_fingerprint`) e, se la fattura non coincide più, il
+  pannello chiede di inviare i dati aggiornati (sostituzione).
 
 Test contro l'ambiente di test Sogei (servono rete e l'utenza pubblica del kit):
 
@@ -360,6 +372,18 @@ Per rivedere l'impaginazione dopo una modifica:
 ```bash
 cd src-tauri && cargo test preview_sample_invoice -- --ignored   # scrive target/invoice-preview.pdf
 ```
+
+## Backup
+
+Tutto l'archivio (pazienti, fatture, agenda, impostazioni) è un solo file SQLite,
+`database.db` nella cartella dati dell'app (`~/Library/Application Support/psi-fatture-sa/`
+su macOS). Impostazioni → *Dati e backup* → *Salva un backup…* ne scrive una copia
+coerente dove scegli (`VACUUM INTO`, include le modifiche ancora nel WAL).
+Password del Sistema TS e della casella email restano fuori: sono cifrate per questo
+computer.
+
+Per ripristinare: chiudi l'app, sostituisci `database.db` con la copia (rinominandola)
+e cancella `database.db-wal` e `database.db-shm` se presenti, poi riapri l'app.
 
 ## Condizioni d'uso e licenza
 
@@ -457,6 +481,11 @@ psi-fatture-sa/
   e le struct di riga dichiarate dentro una sola funzione di query.
 - **Sottopackage per dominio** quando un concetto ha più file (`ts/`, `invoice/`,
   `secret/`). I tipi di servizio interni al package sono `pub(super)`.
+- **Errori tipizzati**: controller, service e repository restituiscono
+  `Result<_, AppError>` (`app/common/app_error.rs`): `Invalid` (dato da correggere),
+  `NotFound`, `Conflict` (contrasta con lo stato salvato: numero già usato, fattura
+  trasmessa), `Database`, `External` (Sistema TS, SMTP, file). Al frontend arriva solo
+  il messaggio in italiano, come stringa.
 - **Test separati**: i test di `foo.rs` stanno in `foo_test.rs` accanto, dichiarati
   con `#[cfg(test)] #[path = "foo_test.rs"] mod tests;`. Restano figli del modulo, quindi
   vedono anche le funzioni private. I doppi riusati in più test stanno in `src/test_support/`.

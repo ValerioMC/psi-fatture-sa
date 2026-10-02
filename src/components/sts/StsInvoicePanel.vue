@@ -4,10 +4,10 @@
  * send or correct it, the next action, and a live check of what the
  * Sistema TS actually holds. The history lists every transmission.
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Ban, ChevronDown, RefreshCw, ScanSearch, Send, Undo2 } from 'lucide-vue-next'
-import { queryTsInvoice } from '@/api'
+import { isTsInvoiceOutOfDate, queryTsInvoice } from '@/api'
 import { useStsStore } from '@/stores/sts'
 import { useToastStore } from '@/stores/toast'
 import type { Invoice, TsDispatchSummary, TsQueryResult } from '@/types'
@@ -56,6 +56,24 @@ const history = computed(() =>
   sts.submissions.filter((s) => s.invoice_id === props.invoice.id).sort((a, b) => b.id - a.id),
 )
 const isTest = computed(() => sts.environment === 'test')
+
+/** The invoice changed after the Sistema TS accepted it: a replacement is due. */
+const outOfDate = ref(false)
+watch(
+  () => [props.invoice.id, props.invoice.updated_at, state.value.kind, state.value.live?.id] as const,
+  async ([invoiceId, , kind]) => {
+    if (kind !== 'accepted') {
+      outOfDate.value = false
+      return
+    }
+    try {
+      outOfDate.value = await isTsInvoiceOutOfDate(invoiceId)
+    } catch (error) {
+      toast.notifyError(error, 'Confronto con il Sistema TS non riuscito')
+    }
+  },
+  { immediate: true },
+)
 
 const sentence = computed(() => {
   const current = state.value.current
@@ -211,6 +229,13 @@ const remoteTotal = computed(() => {
     >
       {{ TS_OPERATION_LABEL[state.failedFollowUp.operation] }} scartata: {{ state.failedFollowUp.outcome_message ?? state.failedFollowUp.outcome_code }}. Sul Sistema TS restano i dati precedenti.
     </p>
+    <p
+      v-else-if="outOfDate"
+      class="mt-3 rounded-control bg-warn-soft px-3 py-2 text-xs leading-relaxed text-text-muted ring-1 ring-inset ring-warn-line"
+      role="status"
+    >
+      Hai modificato la fattura dopo la registrazione: sul Sistema TS ci sono ancora i dati precedenti. Invia i dati aggiornati.
+    </p>
     <p v-else-if="state.kind === 'accepted' && state.current?.outcome_message" class="mt-3 text-xs text-text-subtle">
       {{ state.current.outcome_message }}
     </p>
@@ -234,7 +259,7 @@ const remoteTotal = computed(() => {
       <AppButton v-if="actions.send" variant="primary" block :icon="Send" :loading="busy === 'send'" @click="send">
         {{ state.kind === 'none' ? 'Trasmetti al Sistema TS' : 'Trasmetti di nuovo' }}
       </AppButton>
-      <AppButton v-if="actions.replace" block :icon="RefreshCw" :loading="busy === 'replace'" @click="replace">
+      <AppButton v-if="actions.replace" :variant="outOfDate ? 'primary' : undefined" block :icon="RefreshCw" :loading="busy === 'replace'" @click="replace">
         Invia i dati aggiornati
       </AppButton>
       <AppButton v-if="actions.withdraw" block :icon="Undo2" :loading="busy === 'withdraw'" @click="withdraw">

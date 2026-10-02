@@ -1,5 +1,7 @@
+use serde::Serialize;
+
 /// Every amount of an invoice, rounded to the cent as it is stored.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct InvoiceTotals {
     pub total_net: f64,
     pub total_tax: f64,

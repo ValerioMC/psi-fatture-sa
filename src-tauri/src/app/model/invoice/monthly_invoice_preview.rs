@@ -11,4 +11,6 @@ pub struct MonthlyInvoicePreview {
     pub lines: Vec<InvoiceLineInput>,
     pub estimated_net: f64,
     pub estimated_due: f64,
+    /// Some session has no service or a zero price, so it cannot be billed yet.
+    pub missing_price: bool,
 }

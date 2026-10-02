@@ -41,6 +41,7 @@ fn a_session_needs_the_password_and_carries_the_server() {
     let store = InMemorySecretStore::default();
     assert!(session(&store, &account())
         .unwrap_err()
+        .to_string()
         .contains("password"));
     save_password(&store, "segreta").unwrap();
     let session = session(&store, &account()).unwrap();

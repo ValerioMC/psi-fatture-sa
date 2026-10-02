@@ -1,29 +1,30 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection};
 
+use crate::app::common::AppError;
 use crate::app::entity::client::{self, ActiveModel};
 use crate::app::model::client::{Client, ClientType, CreateClientInput, UpdateClientInput};
 use crate::app::repository::client_repository;
 use crate::app::service::validation_service as validate;
 
 /// Lists all clients, optionally filtered by search query.
-pub async fn list(db: &DatabaseConnection, search: Option<String>) -> Result<Vec<Client>, String> {
-    let models = client_repository::find_all(db, search)
-        .await
-        .map_err(|e| e.to_string())?;
+pub async fn list(
+    db: &DatabaseConnection,
+    search: Option<String>,
+) -> Result<Vec<Client>, AppError> {
+    let models = client_repository::find_all(db, search).await?;
     Ok(models.into_iter().map(into_domain).collect())
 }
 
 /// Returns a single client by id.
-pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Client, String> {
+pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Client, AppError> {
     client_repository::find_by_id(db, id)
-        .await
-        .map_err(|e| e.to_string())?
+        .await?
         .map(into_domain)
-        .ok_or_else(|| format!("Client {id} not found"))
+        .ok_or_else(|| AppError::NotFound(format!("Paziente {id} non trovato")))
 }
 
 /// Creates a new client and returns the created record.
-pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result<Client, String> {
+pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result<Client, AppError> {
     validate_client_fields(
         &input.last_name,
         &input.fiscal_code,
@@ -50,14 +51,12 @@ pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result
         ..Default::default()
     };
 
-    let model = client_repository::insert(db, active)
-        .await
-        .map_err(|e| e.to_string())?;
+    let model = client_repository::insert(db, active).await?;
     Ok(into_domain(model))
 }
 
 /// Updates an existing client and returns the updated record.
-pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result<Client, String> {
+pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result<Client, AppError> {
     validate::validate_id(input.id, "Cliente")?;
     validate_client_fields(
         &input.last_name,
@@ -88,23 +87,21 @@ pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result
         ..Default::default()
     };
 
-    let model = client_repository::update(db, active)
-        .await
-        .map_err(|e| e.to_string())?;
+    let model = client_repository::update(db, active).await?;
     Ok(into_domain(model))
 }
 
 /// Removes a client. Fails if the client has associated invoices.
-pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), String> {
-    let has = client_repository::has_invoices(db, id)
-        .await
-        .map_err(|e| e.to_string())?;
+pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), AppError> {
+    let has = client_repository::has_invoices(db, id).await?;
     if has {
-        return Err("Impossibile eliminare: il cliente ha fatture associate".to_string());
+        return Err(AppError::Conflict(
+            "Impossibile eliminare: il cliente ha fatture associate".to_string(),
+        ));
     }
     client_repository::delete(db, id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(AppError::from)
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
@@ -114,7 +111,7 @@ fn validate_client_fields(
     last_name: &str,
     fiscal_code: &str,
     vat_number: Option<&str>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     validate::validate_required(last_name, "Cognome / Ragione sociale")?;
     validate::validate_fiscal_code(fiscal_code)?;
     if let Some(vat) = vat_number {

@@ -1,6 +1,7 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
 use super::{email_account_service, email_credential_service, email_template_service, EmailValues};
+use crate::app::common::AppError;
 use crate::app::entity::invoice_email::{self, ActiveModel};
 use crate::app::model::email::{
     EmailAccount, EmailConnectionCheck, EmailDraft, InvoiceEmail, InvoiceEmailFilters,
@@ -17,7 +18,7 @@ use crate::app::service::validation_service as validate;
 
 /// The email the template proposes for this invoice, addressed to the patient's
 /// address on file when there is one.
-pub async fn prepare(db: &impl ConnectionTrait, invoice_id: i64) -> Result<EmailDraft, String> {
+pub async fn prepare(db: &impl ConnectionTrait, invoice_id: i64) -> Result<EmailDraft, AppError> {
     let document = invoice_pdf_service::load_document(db, invoice_id).await?;
     ensure_sendable(&document)?;
     let template = email_template_service::get(db).await?;
@@ -46,7 +47,7 @@ pub async fn send(
     secrets: &dyn SecretStore,
     gateway: &dyn MailGateway,
     input: SendInvoiceEmailInput,
-) -> Result<InvoiceEmail, String> {
+) -> Result<InvoiceEmail, AppError> {
     let recipient = input.recipient.trim().to_lowercase();
     validate::validate_required(&recipient, "Destinatario")?;
     validate::validate_email(&recipient)?;
@@ -86,7 +87,7 @@ pub async fn send(
     .await?;
     if let Some(error) = error {
         log::warn!(target: "email", invoice_id = input.invoice_id; "invoice email not sent");
-        return Err(error);
+        return Err(AppError::External(error));
     }
     if input.remember_recipient
         && document
@@ -95,9 +96,7 @@ pub async fn send(
             .as_deref()
             .is_none_or(|e| e.trim().is_empty())
     {
-        client_repository::update_email(db, document.client.id, &recipient)
-            .await
-            .map_err(|e| e.to_string())?;
+        client_repository::update_email(db, document.client.id, &recipient).await?;
     }
     Ok(record)
 }
@@ -108,10 +107,12 @@ pub async fn send_prepared(
     secrets: &dyn SecretStore,
     gateway: &dyn MailGateway,
     invoice_id: i64,
-) -> Result<InvoiceEmail, String> {
+) -> Result<InvoiceEmail, AppError> {
     let draft = prepare(db, invoice_id).await?;
     if draft.recipient.is_empty() {
-        return Err("Il paziente non ha un indirizzo email nella sua scheda".to_string());
+        return Err(AppError::Invalid(
+            "Il paziente non ha un indirizzo email nella sua scheda".to_string(),
+        ));
     }
     send(
         db,
@@ -131,7 +132,7 @@ pub async fn send_prepared(
 pub async fn list(
     db: &impl ConnectionTrait,
     filters: InvoiceEmailFilters,
-) -> Result<Vec<InvoiceEmail>, String> {
+) -> Result<Vec<InvoiceEmail>, AppError> {
     invoice_email_repository::find(db, &filters)
         .await?
         .into_iter()
@@ -144,7 +145,7 @@ pub async fn check_connection(
     db: &impl ConnectionTrait,
     secrets: &dyn SecretStore,
     gateway: &dyn MailGateway,
-) -> Result<EmailConnectionCheck, String> {
+) -> Result<EmailConnectionCheck, AppError> {
     let account = email_account_service::saved(db).await?;
     let session = email_credential_service::session(secrets, &account)?;
     Ok(match gateway.check(&session).await {
@@ -163,12 +164,14 @@ pub async fn check_connection(
 }
 
 /// A draft has no fiscal value yet and a cancelled invoice has none any more.
-fn ensure_sendable(document: &InvoiceDocument) -> Result<(), String> {
+fn ensure_sendable(document: &InvoiceDocument) -> Result<(), AppError> {
     match document.invoice.status {
-        InvoiceStatus::Draft => Err("Emetti la fattura prima di inviarla al paziente".to_string()),
-        InvoiceStatus::Cancelled => {
-            Err("Una fattura annullata non si invia al paziente".to_string())
-        }
+        InvoiceStatus::Draft => Err(AppError::Invalid(
+            "Emetti la fattura prima di inviarla al paziente".to_string(),
+        )),
+        InvoiceStatus::Cancelled => Err(AppError::Conflict(
+            "Una fattura annullata non si invia al paziente".to_string(),
+        )),
         InvoiceStatus::Issued | InvoiceStatus::Paid | InvoiceStatus::Overdue => Ok(()),
     }
 }
@@ -186,7 +189,7 @@ async fn record(
     subject: &str,
     attachment_name: &str,
     error: Option<String>,
-) -> Result<InvoiceEmail, String> {
+) -> Result<InvoiceEmail, AppError> {
     let status = if error.is_some() {
         InvoiceEmailStatus::Failed
     } else {
@@ -205,7 +208,7 @@ async fn record(
     into_domain(invoice_email_repository::insert(db, active).await?)
 }
 
-fn into_domain(row: invoice_email::Model) -> Result<InvoiceEmail, String> {
+fn into_domain(row: invoice_email::Model) -> Result<InvoiceEmail, AppError> {
     Ok(InvoiceEmail {
         id: row.id,
         invoice_id: row.invoice_id,

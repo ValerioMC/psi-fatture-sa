@@ -99,6 +99,7 @@ fn rejects_fiscal_code_with_wrong_control_char() {
     let result = validate_fiscal_code("RSSMRA80A01H501X");
     assert!(result
         .unwrap_err()
+        .to_string()
         .contains("carattere di controllo errato"));
 }
 
@@ -120,7 +121,10 @@ fn validates_vat_number_shape() {
 #[test]
 fn rejects_vat_number_with_wrong_check_digit() {
     let result = validate_vat_number("01234567890");
-    assert!(result.unwrap_err().contains("cifra di controllo errata"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("cifra di controllo errata"));
 }
 
 #[test]

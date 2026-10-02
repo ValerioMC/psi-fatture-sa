@@ -8,7 +8,10 @@ const ALL: [TsSubmissionStatus; 6] = [
 #[test]
 fn round_trips_through_storage_string() {
     for status in ALL {
-        assert_eq!(TsSubmissionStatus::parse(status.as_str()), Ok(status));
+        assert_eq!(
+            TsSubmissionStatus::parse(status.as_str()).ok(),
+            Some(status)
+        );
     }
     assert!(TsSubmissionStatus::parse("inviato").is_err());
 }

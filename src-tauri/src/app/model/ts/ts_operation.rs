@@ -1,3 +1,4 @@
+use crate::app::common::AppError;
 use serde::{Deserialize, Serialize};
 
 use super::TsSubmissionStatus;
@@ -21,12 +22,14 @@ impl TsOperation {
         }
     }
 
-    pub fn parse(value: &str) -> Result<Self, String> {
+    pub fn parse(value: &str) -> Result<Self, AppError> {
         match value {
             "invio" => Ok(TsOperation::Invio),
             "sostituzione" => Ok(TsOperation::Sostituzione),
             "annullamento" => Ok(TsOperation::Annullamento),
-            other => Err(format!("Operazione STS sconosciuta: {other}")),
+            other => Err(AppError::Invalid(format!(
+                "Operazione STS sconosciuta: {other}"
+            ))),
         }
     }
 

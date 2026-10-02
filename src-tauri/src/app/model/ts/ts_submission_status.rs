@@ -1,3 +1,4 @@
+use crate::app::common::AppError;
 use serde::{Deserialize, Serialize};
 
 /// Lifecycle of one Sistema TS transmission.
@@ -29,7 +30,7 @@ impl TsSubmissionStatus {
         }
     }
 
-    pub fn parse(value: &str) -> Result<Self, String> {
+    pub fn parse(value: &str) -> Result<Self, AppError> {
         match value {
             "non_inviata" => Ok(TsSubmissionStatus::NonInviata),
             "inviata" => Ok(TsSubmissionStatus::Inviata),
@@ -37,7 +38,9 @@ impl TsSubmissionStatus {
             "scartata" => Ok(TsSubmissionStatus::Scartata),
             "annullata" => Ok(TsSubmissionStatus::Annullata),
             "sostituita" => Ok(TsSubmissionStatus::Sostituita),
-            other => Err(format!("Stato di trasmissione STS sconosciuto: {other}")),
+            other => Err(AppError::Invalid(format!(
+                "Stato di trasmissione STS sconosciuto: {other}"
+            ))),
         }
     }
 

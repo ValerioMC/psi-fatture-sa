@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use sea_orm::DatabaseConnection;
 
+use crate::app::common::AppError;
 use crate::app::model::dashboard::{DashboardData, MonthTotal, MonthlyRevenue};
 use crate::app::model::invoice::Invoice;
 use crate::app::repository::dashboard_repository;
@@ -23,7 +24,7 @@ const MONTH_NAMES: [&str; 12] = [
 ];
 
 /// Returns aggregated dashboard analytics for the given year.
-pub async fn get(db: &DatabaseConnection, year: i64) -> Result<DashboardData, String> {
+pub async fn get(db: &DatabaseConnection, year: i64) -> Result<DashboardData, AppError> {
     let month_totals = dashboard_repository::paid_totals_by_month(db, year).await?;
     Ok(DashboardData {
         year,
@@ -59,7 +60,7 @@ fn monthly_revenue(totals: &[MonthTotal]) -> Vec<MonthlyRevenue> {
 }
 
 /// An invoice that fails to load is left out rather than failing the whole dashboard.
-async fn recent_invoices(db: &DatabaseConnection, year: i64) -> Result<Vec<Invoice>, String> {
+async fn recent_invoices(db: &DatabaseConnection, year: i64) -> Result<Vec<Invoice>, AppError> {
     let mut invoices = Vec::new();
     for id in dashboard_repository::recent_invoice_ids(db, year).await? {
         match invoice_repository::load_invoice(db, id).await {

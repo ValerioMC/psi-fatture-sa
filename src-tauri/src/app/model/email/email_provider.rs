@@ -1,3 +1,4 @@
+use crate::app::common::AppError;
 use serde::{Deserialize, Serialize};
 
 use super::{EmailProviderPreset, EmailSecurity};
@@ -30,11 +31,11 @@ impl EmailProvider {
         }
     }
 
-    pub fn parse(value: &str) -> Result<Self, String> {
+    pub fn parse(value: &str) -> Result<Self, AppError> {
         EmailProvider::ALL
             .into_iter()
             .find(|provider| provider.as_str() == value)
-            .ok_or_else(|| format!("Provider email sconosciuto: {value}"))
+            .ok_or_else(|| AppError::Invalid(format!("Provider email sconosciuto: {value}")))
     }
 
     /// psypec.it is the free PEC the Ordine gives every psychologist, run by Namirial.

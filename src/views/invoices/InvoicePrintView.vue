@@ -398,7 +398,7 @@ async function handlePrint(): Promise<void> {
 
 .company-profession {
   font-size: 7.5pt;
-  color: #34388f;
+  color: #362ea0;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.4px;
@@ -426,7 +426,7 @@ async function handlePrint(): Promise<void> {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: #34388f;
+  color: #362ea0;
   margin-bottom: 4px;
 }
 
@@ -506,7 +506,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #34388f;
+  color: #362ea0;
   font-weight: 700;
   margin-bottom: 8px;
 }
@@ -531,7 +531,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #34388f;
+  color: #362ea0;
   text-transform: uppercase;
   margin-right: 3px;
 }
@@ -582,7 +582,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #34388f;
+  color: #362ea0;
   font-weight: 700;
   margin-bottom: 7px;
 }
@@ -643,7 +643,7 @@ async function handlePrint(): Promise<void> {
   padding: 1px 5px;
   font-size: 7pt;
   font-weight: 600;
-  color: #34388f;
+  color: #362ea0;
 }
 
 /* ══════════════════════════════
@@ -686,7 +686,7 @@ async function handlePrint(): Promise<void> {
 .totals-grand td { border-bottom: none !important; }
 .totals-grand-label {
   padding: 12px 16px !important;
-  color: #34388f;
+  color: #362ea0;
   font-size: 8pt;
   font-weight: 600;
 }
@@ -794,7 +794,7 @@ async function handlePrint(): Promise<void> {
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #34388f;
+  color: #362ea0;
   font-weight: 700;
   margin-bottom: 5px;
 }

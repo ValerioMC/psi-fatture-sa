@@ -79,6 +79,17 @@ export interface Service {
 export type CreateServiceInput = Omit<Service, 'id' | 'created_at' | 'updated_at'>
 export type UpdateServiceInput = Omit<Service, 'created_at' | 'updated_at'>
 
+/** Every amount of an invoice, as the backend computes and stores it. */
+export interface InvoiceTotals {
+  total_net: number
+  total_tax: number
+  contributo_enpap: number
+  ritenuta_acconto: number
+  marca_da_bollo: number
+  total_gross: number
+  total_due: number
+}
+
 export interface InvoiceLineInput {
   service_id?: number
   description: string
@@ -189,6 +200,8 @@ export interface MonthlyInvoicePreview {
   lines: InvoiceLineInput[]
   estimated_net: number
   estimated_due: number
+  /** Some session has no service or a zero price: it cannot be billed yet. */
+  missing_price: boolean
 }
 
 export interface GenerateMonthlyInput {
@@ -197,6 +210,8 @@ export interface GenerateMonthlyInput {
   client_ids: number[]
   payment_method: PaymentMethod
   apply_enpap: boolean
+  /** Defaults to the last day of the month. */
+  issue_date?: string | null
 }
 
 export interface MonthlyRevenue {

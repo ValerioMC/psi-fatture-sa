@@ -1,4 +1,5 @@
 pub mod appointment_controller;
+pub mod backup_controller;
 pub mod client_controller;
 pub mod config_controller;
 pub mod dashboard_controller;

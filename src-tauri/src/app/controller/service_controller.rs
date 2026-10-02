@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::app::app_state::AppState;
+use crate::app::common::AppError;
 use crate::app::model::service::{CreateServiceInput, Service, UpdateServiceInput};
 use crate::app::service::service_service;
 
@@ -9,13 +10,13 @@ use crate::app::service::service_service;
 pub async fn list_services(
     state: State<'_, AppState>,
     active_only: bool,
-) -> Result<Vec<Service>, String> {
+) -> Result<Vec<Service>, AppError> {
     service_service::list(&state.db, active_only).await
 }
 
 /// Returns a single service by id.
 #[tauri::command]
-pub async fn get_service(state: State<'_, AppState>, id: i64) -> Result<Service, String> {
+pub async fn get_service(state: State<'_, AppState>, id: i64) -> Result<Service, AppError> {
     service_service::get(&state.db, id).await
 }
 
@@ -24,7 +25,7 @@ pub async fn get_service(state: State<'_, AppState>, id: i64) -> Result<Service,
 pub async fn create_service(
     state: State<'_, AppState>,
     input: CreateServiceInput,
-) -> Result<Service, String> {
+) -> Result<Service, AppError> {
     service_service::create(&state.db, input).await
 }
 
@@ -33,12 +34,12 @@ pub async fn create_service(
 pub async fn update_service(
     state: State<'_, AppState>,
     input: UpdateServiceInput,
-) -> Result<Service, String> {
+) -> Result<Service, AppError> {
     service_service::update(&state.db, input).await
 }
 
 /// Deletes a service by id.
 #[tauri::command]
-pub async fn delete_service(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+pub async fn delete_service(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
     service_service::remove(&state.db, id).await
 }

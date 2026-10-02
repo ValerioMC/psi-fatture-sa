@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::app::app_state::AppState;
+use crate::app::common::AppError;
 use crate::app::model::terms::{AcceptTermsInput, TermsAcceptance};
 use crate::app::service::terms_service;
 
@@ -9,7 +10,7 @@ use crate::app::service::terms_service;
 pub async fn get_terms_acceptance(
     state: State<'_, AppState>,
     version: String,
-) -> Result<Option<TermsAcceptance>, String> {
+) -> Result<Option<TermsAcceptance>, AppError> {
     terms_service::find(&state.db, &version).await
 }
 
@@ -17,6 +18,6 @@ pub async fn get_terms_acceptance(
 pub async fn accept_terms(
     state: State<'_, AppState>,
     input: AcceptTermsInput,
-) -> Result<TermsAcceptance, String> {
+) -> Result<TermsAcceptance, AppError> {
     terms_service::accept(&state.db, input).await
 }

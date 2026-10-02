@@ -1,3 +1,4 @@
+use crate::app::common::AppError;
 use serde::Serialize;
 
 /// `esitoChiamata` of a document call: 0 accepted, 2 accepted with warnings, 1 rejected.
@@ -10,12 +11,14 @@ pub enum TsEsito {
 }
 
 impl TsEsito {
-    pub fn parse(value: &str) -> Result<Self, String> {
+    pub fn parse(value: &str) -> Result<Self, AppError> {
         match value.trim() {
             "0" => Ok(TsEsito::Accepted),
             "2" => Ok(TsEsito::AcceptedWithWarnings),
             "1" => Ok(TsEsito::Rejected),
-            other => Err(format!("esitoChiamata sconosciuto: {other}")),
+            other => Err(AppError::Invalid(format!(
+                "esitoChiamata sconosciuto: {other}"
+            ))),
         }
     }
 }

@@ -1,6 +1,10 @@
-use sea_orm::{ActiveModelTrait, ConnectionTrait, EntityTrait, FromQueryResult, Statement, Value};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter,
+    QueryOrder, Statement, Value,
+};
 
 use super::TsSubmissionRow;
+use crate::app::common::AppError;
 use crate::app::entity::ts_submission::{self, ActiveModel};
 use crate::app::model::ts::{
     TsDocumentId, TsEnvironment, TsOperation, TsSubmission, TsSubmissionFilters, TsSubmissionStatus,
@@ -22,7 +26,7 @@ const SELECT_SQL: &str = "
 pub async fn find(
     db: &impl ConnectionTrait,
     filters: &TsSubmissionFilters,
-) -> Result<Vec<TsSubmission>, String> {
+) -> Result<Vec<TsSubmission>, AppError> {
     let mut conditions = vec!["1=1"];
     let mut values: Vec<Value> = Vec::new();
 
@@ -47,17 +51,17 @@ pub async fn find(
 }
 
 /// Returns one submission with its invoice details.
-pub async fn load(db: &impl ConnectionTrait, id: i64) -> Result<TsSubmission, String> {
+pub async fn load(db: &impl ConnectionTrait, id: i64) -> Result<TsSubmission, AppError> {
     let sql = format!("{SELECT_SQL} WHERE s.id = ?");
     query(db, &sql, vec![id.into()])
         .await?
         .into_iter()
         .next()
-        .ok_or_else(|| format!("Trasmissione STS {id} non trovata"))
+        .ok_or_else(|| AppError::NotFound(format!("Trasmissione STS {id} non trovata")))
 }
 
 /// Returns queued submissions whose next attempt is due at `now`, oldest first.
-pub async fn find_due(db: &impl ConnectionTrait, now: &str) -> Result<Vec<TsSubmission>, String> {
+pub async fn find_due(db: &impl ConnectionTrait, now: &str) -> Result<Vec<TsSubmission>, AppError> {
     let sql = format!(
         "{SELECT_SQL} WHERE s.status = ? AND s.next_attempt_at <= ?
          ORDER BY s.next_attempt_at, s.id"
@@ -66,12 +70,14 @@ pub async fn find_due(db: &impl ConnectionTrait, now: &str) -> Result<Vec<TsSubm
     query(db, &sql, values).await
 }
 
-pub async fn find_row(db: &impl ConnectionTrait, id: i64) -> Result<ts_submission::Model, String> {
+pub async fn find_row(
+    db: &impl ConnectionTrait,
+    id: i64,
+) -> Result<ts_submission::Model, AppError> {
     ts_submission::Entity::find_by_id(id)
         .one(db)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("Trasmissione STS {id} non trovata"))
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Trasmissione STS {id} non trovata")))
 }
 
 /// Whether the Sistema TS of `environment` holds, or may be about to hold,
@@ -80,7 +86,7 @@ pub async fn invoice_holds_ts_data(
     db: &impl ConnectionTrait,
     invoice_id: i64,
     environment: TsEnvironment,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     let sql = "SELECT COUNT(*) AS count FROM ts_submissions
                WHERE invoice_id = ? AND environment = ?
                  AND (status = ? OR (status = ? AND operation <> ?))";
@@ -101,7 +107,7 @@ pub async fn invoice_has_status(
     invoice_id: i64,
     statuses: &[TsSubmissionStatus],
     environment: Option<TsEnvironment>,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     if statuses.is_empty() {
         return Ok(false);
     }
@@ -125,11 +131,13 @@ pub async fn claim(
     db: &impl ConnectionTrait,
     id: i64,
     document: &TsDocumentId,
+    fingerprint: Option<String>,
     now: &str,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     let sql = "UPDATE ts_submissions
                SET status = ?, document_vat_number = ?, document_issue_date = ?,
-                   document_number = ?, attempt_count = attempt_count + 1,
+                   document_number = ?, document_fingerprint = ?,
+                   attempt_count = attempt_count + 1,
                    last_attempt_at = ?, updated_at = ?
                WHERE id = ? AND status = ?";
     let values: Vec<Value> = vec![
@@ -137,6 +145,7 @@ pub async fn claim(
         document.vat_number.as_str().into(),
         document.issue_date.as_str().into(),
         document.number.as_str().into(),
+        fingerprint.into(),
         now.into(),
         now.into(),
         id.into(),
@@ -148,13 +157,12 @@ pub async fn claim(
             sql,
             values,
         ))
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
     Ok(result.rows_affected() == 1)
 }
 
 /// Puts back in the queue every call left in flight by a previous run.
-pub async fn requeue_in_flight(db: &impl ConnectionTrait, now: &str) -> Result<u64, String> {
+pub async fn requeue_in_flight(db: &impl ConnectionTrait, now: &str) -> Result<u64, AppError> {
     let sql = "UPDATE ts_submissions SET status = ?, next_attempt_at = ?, updated_at = ?
                WHERE status = ?";
     let values: Vec<Value> = vec![
@@ -169,52 +177,50 @@ pub async fn requeue_in_flight(db: &impl ConnectionTrait, now: &str) -> Result<u
             sql,
             values,
         ))
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
     Ok(result.rows_affected())
 }
 
 pub async fn insert(
     db: &impl ConnectionTrait,
     active: ActiveModel,
-) -> Result<ts_submission::Model, String> {
-    active.insert(db).await.map_err(|e| e.to_string())
+) -> Result<ts_submission::Model, AppError> {
+    active.insert(db).await.map_err(AppError::from)
 }
 
 pub async fn update(
     db: &impl ConnectionTrait,
     active: ActiveModel,
-) -> Result<ts_submission::Model, String> {
-    active.update(db).await.map_err(|e| e.to_string())
+) -> Result<ts_submission::Model, AppError> {
+    active.update(db).await.map_err(AppError::from)
 }
 
-pub async fn delete(db: &impl ConnectionTrait, id: i64) -> Result<(), String> {
+pub async fn delete(db: &impl ConnectionTrait, id: i64) -> Result<(), AppError> {
     ts_submission::Entity::delete_by_id(id)
         .exec(db)
         .await
         .map(|_| ())
-        .map_err(|e| e.to_string())
+        .map_err(AppError::from)
 }
 
 async fn query(
     db: &impl ConnectionTrait,
     sql: &str,
     values: Vec<Value>,
-) -> Result<Vec<TsSubmission>, String> {
+) -> Result<Vec<TsSubmission>, AppError> {
     TsSubmissionRow::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         sql,
         values,
     ))
     .all(db)
-    .await
-    .map_err(|e| e.to_string())?
+    .await?
     .into_iter()
     .map(TsSubmissionRow::into_submission)
     .collect()
 }
 
-async fn count(db: &impl ConnectionTrait, sql: &str, values: Vec<Value>) -> Result<i64, String> {
+async fn count(db: &impl ConnectionTrait, sql: &str, values: Vec<Value>) -> Result<i64, AppError> {
     #[derive(FromQueryResult)]
     struct CountRow {
         count: i64,
@@ -226,7 +232,22 @@ async fn count(db: &impl ConnectionTrait, sql: &str, values: Vec<Value>) -> Resu
         values,
     ))
     .one(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
     Ok(row.map_or(0, |r| r.count))
+}
+
+/// The submission whose data the Sistema TS currently holds for the invoice:
+/// the latest accepted first transmission or replacement.
+pub async fn find_latest_accepted_document(
+    db: &impl ConnectionTrait,
+    invoice_id: i64,
+) -> Result<Option<ts_submission::Model>, AppError> {
+    let row = ts_submission::Entity::find()
+        .filter(ts_submission::Column::InvoiceId.eq(invoice_id))
+        .filter(ts_submission::Column::Status.eq(TsSubmissionStatus::Accettata.as_str()))
+        .filter(ts_submission::Column::Operation.ne(TsOperation::Annullamento.as_str()))
+        .order_by_desc(ts_submission::Column::Id)
+        .one(db)
+        .await?;
+    Ok(row)
 }

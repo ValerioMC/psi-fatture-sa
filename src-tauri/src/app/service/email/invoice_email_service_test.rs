@@ -50,10 +50,15 @@ async fn prepares_the_template_for_the_patient_on_file() {
 #[tokio::test]
 async fn drafts_and_cancelled_invoices_are_not_sent() {
     let db = email_database::setup(Some("anna@example.it")).await;
-    assert!(prepare(&db, DRAFT).await.unwrap_err().contains("Emetti"));
+    assert!(prepare(&db, DRAFT)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("Emetti"));
     assert!(prepare(&db, CANCELLED)
         .await
         .unwrap_err()
+        .to_string()
         .contains("annullata"));
     let store = configured(&db, false).await;
     let gateway = FakeMailGateway::default();
@@ -124,11 +129,14 @@ async fn a_refused_send_is_recorded_and_reported() {
     )
     .await
     .unwrap_err();
-    assert!(error.contains("indirizzo e password"));
+    assert!(error.to_string().contains("indirizzo e password"));
     let attempts = list(&db, InvoiceEmailFilters::default()).await.unwrap();
     assert_eq!(attempts.len(), 1);
     assert_eq!(attempts[0].status, InvoiceEmailStatus::Failed);
-    assert_eq!(attempts[0].error.as_deref(), Some(error.as_str()));
+    assert_eq!(
+        attempts[0].error.as_deref(),
+        Some(error.to_string().as_str())
+    );
 }
 
 #[tokio::test]
@@ -144,7 +152,7 @@ async fn nothing_is_sent_without_a_saved_mailbox_or_its_password() {
     )
     .await
     .unwrap_err();
-    assert!(error.contains("Configura la casella"));
+    assert!(error.to_string().contains("Configura la casella"));
     configured(&db, false).await;
     let error = send(
         &db,
@@ -154,7 +162,7 @@ async fn nothing_is_sent_without_a_saved_mailbox_or_its_password() {
     )
     .await
     .unwrap_err();
-    assert!(error.contains("password"));
+    assert!(error.to_string().contains("password"));
     assert!(gateway.sent().is_empty());
     assert!(list(&db, InvoiceEmailFilters::default())
         .await
@@ -216,7 +224,7 @@ async fn a_bulk_send_skips_patients_without_an_address() {
     let error = send_prepared(&db, &store, &gateway, ISSUED)
         .await
         .unwrap_err();
-    assert!(error.contains("indirizzo email"));
+    assert!(error.to_string().contains("indirizzo email"));
     assert!(gateway.sent().is_empty());
 }
 

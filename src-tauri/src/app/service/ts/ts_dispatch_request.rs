@@ -16,4 +16,13 @@ impl TsDispatchRequest {
             TsDispatchRequest::Cancel(id) => id,
         }
     }
+
+    pub(super) fn fingerprint(&self) -> Option<String> {
+        match self {
+            TsDispatchRequest::Insert(document) | TsDispatchRequest::Update(document) => {
+                Some(document.fingerprint())
+            }
+            TsDispatchRequest::Cancel(_) => None,
+        }
+    }
 }

@@ -1,3 +1,4 @@
+use crate::app::common::AppError;
 use serde::{Deserialize, Serialize};
 
 /// Which Sistema TS installation a transmission goes to. Test accepts the
@@ -37,11 +38,13 @@ impl TsEnvironment {
         }
     }
 
-    pub fn parse(value: &str) -> Result<Self, String> {
+    pub fn parse(value: &str) -> Result<Self, AppError> {
         match value {
             "test" => Ok(TsEnvironment::Test),
             "produzione" => Ok(TsEnvironment::Produzione),
-            other => Err(format!("Ambiente Sistema TS sconosciuto: {other}")),
+            other => Err(AppError::Invalid(format!(
+                "Ambiente Sistema TS sconosciuto: {other}"
+            ))),
         }
     }
 

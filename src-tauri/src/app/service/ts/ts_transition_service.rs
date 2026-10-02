@@ -5,6 +5,7 @@
 use chrono::{Duration, NaiveDateTime};
 use sea_orm::{ActiveValue::Set, ConnectionTrait, IntoActiveModel, TransactionTrait};
 
+use crate::app::common::AppError;
 use crate::app::entity::ts_submission;
 use crate::app::model::ts::{
     TsDocumentId, TsOperation, TsOutcome, TsSubmission, TsSubmissionStatus,
@@ -19,7 +20,7 @@ const RETRY_MAX_SECONDS: i64 = 6 * 60 * 60;
 pub async fn due(
     db: &impl ConnectionTrait,
     now: NaiveDateTime,
-) -> Result<Vec<TsSubmission>, String> {
+) -> Result<Vec<TsSubmission>, AppError> {
     ts_submission_repository::find_due(db, &format_timestamp(now)).await
 }
 
@@ -29,9 +30,10 @@ pub async fn claim(
     db: &impl ConnectionTrait,
     id: i64,
     document: &TsDocumentId,
+    fingerprint: Option<String>,
     now: NaiveDateTime,
-) -> Result<bool, String> {
-    ts_submission_repository::claim(db, id, document, &format_timestamp(now)).await
+) -> Result<bool, AppError> {
+    ts_submission_repository::claim(db, id, document, fingerprint, &format_timestamp(now)).await
 }
 
 /// Puts an in-flight submission back in the queue after a failure that never
@@ -41,7 +43,7 @@ pub async fn release_for_retry(
     id: i64,
     error: &str,
     now: NaiveDateTime,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     let row = ts_submission_repository::find_row(db, id).await?;
     transition_guard(&row, TsSubmissionStatus::NonInviata)?;
 
@@ -63,7 +65,7 @@ pub async fn reject_locally(
     id: i64,
     reason: &str,
     now: NaiveDateTime,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     let row = ts_submission_repository::find_row(db, id).await?;
     transition_guard(&row, TsSubmissionStatus::Scartata)?;
 
@@ -85,7 +87,7 @@ pub async fn record_outcome<C>(
     id: i64,
     outcome: &TsOutcome,
     now: NaiveDateTime,
-) -> Result<TsSubmission, String>
+) -> Result<TsSubmission, AppError>
 where
     C: ConnectionTrait + TransactionTrait,
 {
@@ -95,7 +97,7 @@ where
         TsSubmissionStatus::Scartata
     };
     let stamp = format_timestamp(now);
-    let tx = db.begin().await.map_err(|e| e.to_string())?;
+    let tx = db.begin().await?;
 
     let row = ts_submission_repository::find_row(&tx, id).await?;
     transition_guard(&row, next)?;
@@ -128,7 +130,7 @@ where
         ts_submission_repository::update(&tx, target_active).await?;
     }
 
-    tx.commit().await.map_err(|e| e.to_string())?;
+    tx.commit().await?;
     ts_submission_repository::load(db, id).await
 }
 
@@ -136,7 +138,7 @@ where
 pub async fn requeue_interrupted(
     db: &impl ConnectionTrait,
     now: NaiveDateTime,
-) -> Result<u64, String> {
+) -> Result<u64, AppError> {
     ts_submission_repository::requeue_in_flight(db, &format_timestamp(now)).await
 }
 
@@ -151,15 +153,15 @@ pub fn format_timestamp(moment: NaiveDateTime) -> String {
     moment.format(TIMESTAMP_FORMAT).to_string()
 }
 
-fn transition_guard(row: &ts_submission::Model, next: TsSubmissionStatus) -> Result<(), String> {
+fn transition_guard(row: &ts_submission::Model, next: TsSubmissionStatus) -> Result<(), AppError> {
     let current = TsSubmissionStatus::parse(&row.status)?;
     if !current.can_transition_to(next) {
-        return Err(format!(
+        return Err(AppError::Invalid(format!(
             "Trasmissione STS {}: passaggio da {} a {} non consentito",
             row.id,
             current.as_str(),
             next.as_str()
-        ));
+        )));
     }
     Ok(())
 }

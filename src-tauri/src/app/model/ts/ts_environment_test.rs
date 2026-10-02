@@ -3,7 +3,10 @@ use super::*;
 #[test]
 fn round_trips_through_storage_string() {
     for environment in [TsEnvironment::Test, TsEnvironment::Produzione] {
-        assert_eq!(TsEnvironment::parse(environment.as_str()), Ok(environment));
+        assert_eq!(
+            TsEnvironment::parse(environment.as_str()).ok(),
+            Some(environment)
+        );
     }
     assert!(TsEnvironment::parse("prod").is_err());
 }

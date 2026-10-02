@@ -13,6 +13,7 @@ pub struct Model {
     pub document_vat_number: Option<String>,
     pub document_issue_date: Option<String>,
     pub document_number: Option<String>,
+    pub document_fingerprint: Option<String>,
     pub protocol: Option<String>,
     pub outcome_code: Option<String>,
     pub outcome_message: Option<String>,

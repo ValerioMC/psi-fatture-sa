@@ -2,6 +2,7 @@ use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
 use super::email_template_renderer;
 use super::EmailValues;
+use crate::app::common::AppError;
 use crate::app::entity::email_template::ActiveModel;
 use crate::app::model::email::{
     EmailPlaceholder, EmailPlaceholderInfo, EmailPreview, EmailTemplate,
@@ -38,7 +39,7 @@ pub fn placeholders() -> Vec<EmailPlaceholderInfo> {
 }
 
 /// The saved template, or the built-in one while none is saved.
-pub async fn get(db: &impl ConnectionTrait) -> Result<EmailTemplate, String> {
+pub async fn get(db: &impl ConnectionTrait) -> Result<EmailTemplate, AppError> {
     Ok(email_template_repository::find(db)
         .await?
         .map(|row| EmailTemplate {
@@ -51,7 +52,7 @@ pub async fn get(db: &impl ConnectionTrait) -> Result<EmailTemplate, String> {
 pub async fn update(
     db: &impl ConnectionTrait,
     template: EmailTemplate,
-) -> Result<EmailTemplate, String> {
+) -> Result<EmailTemplate, AppError> {
     let template = EmailTemplate {
         subject: template.subject.trim().to_string(),
         body: template.body.trim().to_string(),
@@ -68,7 +69,7 @@ pub async fn update(
 }
 
 /// Back to the built-in template.
-pub async fn reset(db: &impl ConnectionTrait) -> Result<EmailTemplate, String> {
+pub async fn reset(db: &impl ConnectionTrait) -> Result<EmailTemplate, AppError> {
     email_template_repository::delete(db).await?;
     Ok(default_template())
 }
@@ -77,10 +78,8 @@ pub async fn reset(db: &impl ConnectionTrait) -> Result<EmailTemplate, String> {
 pub async fn preview(
     db: &impl ConnectionTrait,
     template: EmailTemplate,
-) -> Result<EmailPreview, String> {
-    let profile = config_repository::find(db)
-        .await
-        .map_err(|e| e.to_string())?;
+) -> Result<EmailPreview, AppError> {
+    let profile = config_repository::find(db).await?;
     let today = chrono::Local::now().date_naive();
     let due = today + chrono::Duration::days(30);
     let professional = profile
@@ -107,21 +106,31 @@ pub fn fill(template: &EmailTemplate, values: &EmailValues) -> EmailPreview {
     }
 }
 
-fn validate_template(template: &EmailTemplate) -> Result<(), String> {
+fn validate_template(template: &EmailTemplate) -> Result<(), AppError> {
     if template.subject.is_empty() {
-        return Err("L'oggetto dell'email non può essere vuoto".to_string());
+        return Err(AppError::Invalid(
+            "L'oggetto dell'email non può essere vuoto".to_string(),
+        ));
     }
     if template.subject.contains('\n') {
-        return Err("L'oggetto dell'email sta su una sola riga".to_string());
+        return Err(AppError::Invalid(
+            "L'oggetto dell'email sta su una sola riga".to_string(),
+        ));
     }
     if template.subject.chars().count() > SUBJECT_MAX_LENGTH {
-        return Err(format!("Oggetto: massimo {SUBJECT_MAX_LENGTH} caratteri"));
+        return Err(AppError::Invalid(format!(
+            "Oggetto: massimo {SUBJECT_MAX_LENGTH} caratteri"
+        )));
     }
     if template.body.is_empty() {
-        return Err("Il testo dell'email non può essere vuoto".to_string());
+        return Err(AppError::Invalid(
+            "Il testo dell'email non può essere vuoto".to_string(),
+        ));
     }
     if template.body.chars().count() > BODY_MAX_LENGTH {
-        return Err(format!("Testo: massimo {BODY_MAX_LENGTH} caratteri"));
+        return Err(AppError::Invalid(format!(
+            "Testo: massimo {BODY_MAX_LENGTH} caratteri"
+        )));
     }
     let mut unknown = email_template_renderer::unknown_placeholders(&template.subject);
     for name in email_template_renderer::unknown_placeholders(&template.body) {
@@ -131,7 +140,10 @@ fn validate_template(template: &EmailTemplate) -> Result<(), String> {
     }
     if !unknown.is_empty() {
         let names: Vec<String> = unknown.iter().map(|name| format!("{{{name}}}")).collect();
-        return Err(format!("Segnaposto sconosciuti: {}", names.join(", ")));
+        return Err(AppError::Invalid(format!(
+            "Segnaposto sconosciuti: {}",
+            names.join(", ")
+        )));
     }
     Ok(())
 }

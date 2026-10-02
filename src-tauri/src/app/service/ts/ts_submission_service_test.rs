@@ -15,10 +15,15 @@ async fn queues_a_paid_invoice_with_its_details() {
 #[tokio::test]
 async fn refuses_unpaid_or_undated_invoices() {
     let db = setup().await;
-    assert!(enqueue_invio(&db, 2).await.unwrap_err().contains("pagate"));
+    assert!(enqueue_invio(&db, 2)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("pagate"));
     assert!(enqueue_invio(&db, 3)
         .await
         .unwrap_err()
+        .to_string()
         .contains("data di pagamento"));
     assert!(enqueue_invio(&db, 99).await.is_err());
 }
@@ -30,12 +35,14 @@ async fn allows_one_in_flight_submission_per_invoice() {
     assert!(enqueue_invio(&db, 1)
         .await
         .unwrap_err()
+        .to_string()
         .contains("in corso"));
 
     force_status(&db, first.id, TsSubmissionStatus::Inviata).await;
     assert!(enqueue_invio(&db, 1)
         .await
         .unwrap_err()
+        .to_string()
         .contains("in corso"));
 }
 
@@ -50,6 +57,7 @@ async fn requeues_after_rejection_but_not_after_acceptance() {
     assert!(enqueue_invio(&db, 1)
         .await
         .unwrap_err()
+        .to_string()
         .contains("sostituzione"));
 }
 
@@ -67,6 +75,7 @@ async fn follow_ups_target_only_accepted_submissions() {
     assert!(enqueue_replacement(&db, original.id)
         .await
         .unwrap_err()
+        .to_string()
         .contains("in corso"));
 }
 
@@ -82,6 +91,7 @@ async fn replacement_requires_the_invoice_to_still_be_paid() {
     assert!(enqueue_replacement(&db, original.id)
         .await
         .unwrap_err()
+        .to_string()
         .contains("pagate"));
     assert!(enqueue_cancellation(&db, original.id).await.is_ok());
 }
@@ -101,6 +111,7 @@ async fn withdraws_only_unsent_submissions() {
     assert!(withdraw(&db, sent.id)
         .await
         .unwrap_err()
+        .to_string()
         .contains("non ancora inviate"));
 }
 
@@ -177,7 +188,7 @@ async fn invoice_deletion_is_refused_while_accepted_and_cascades_after_cancellat
     let original = enqueue_invio(&db, 1).await.unwrap();
     force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
     let err = invoice_service::remove(&db, 1).await.unwrap_err();
-    assert!(err.contains("Sistema TS"));
+    assert!(err.to_string().contains("Sistema TS"));
 
     let cancellation = enqueue_cancellation(&db, original.id).await.unwrap();
     force_status(&db, cancellation.id, TsSubmissionStatus::Accettata).await;
@@ -189,4 +200,53 @@ async fn invoice_deletion_is_refused_while_accepted_and_cascades_after_cancellat
     invoice_service::remove(&db, 1).await.unwrap();
     let left = list(&db, TsSubmissionFilters::default()).await.unwrap();
     assert!(left.is_empty());
+}
+
+async fn accept_as_sent(db: &sea_orm::DatabaseConnection, submission_id: i64) {
+    let settings = ts_settings_service::get(db).await.unwrap();
+    let sent = ts_document_service::build(db, 1, &settings.vat_number, None)
+        .await
+        .unwrap();
+    let claimed = ts_submission_repository::claim(
+        db,
+        submission_id,
+        &sent.id,
+        Some(sent.fingerprint()),
+        "2026-03-20 10:00:00",
+    )
+    .await
+    .unwrap();
+    assert!(claimed);
+    force_status(db, submission_id, TsSubmissionStatus::Accettata).await;
+}
+
+#[tokio::test]
+async fn an_unchanged_invoice_is_in_step_with_the_sistema_ts() {
+    let db = setup().await;
+    let sent = enqueue_invio(&db, 1).await.unwrap();
+    accept_as_sent(&db, sent.id).await;
+
+    assert!(!invoice_out_of_date(&db, 1).await.unwrap());
+}
+
+#[tokio::test]
+async fn an_edited_amount_after_acceptance_asks_for_a_replacement() {
+    let db = setup().await;
+    let sent = enqueue_invio(&db, 1).await.unwrap();
+    accept_as_sent(&db, sent.id).await;
+
+    db.execute_unprepared("UPDATE invoices SET total_gross = 91.64 WHERE id = 1")
+        .await
+        .unwrap();
+
+    assert!(invoice_out_of_date(&db, 1).await.unwrap());
+}
+
+#[tokio::test]
+async fn a_submission_without_fingerprint_never_reports_a_change() {
+    let db = setup().await;
+    let sent = enqueue_invio(&db, 1).await.unwrap();
+    force_status(&db, sent.id, TsSubmissionStatus::Accettata).await;
+
+    assert!(!invoice_out_of_date(&db, 1).await.unwrap());
 }

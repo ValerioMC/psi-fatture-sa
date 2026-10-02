@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 
 use sea_orm::ConnectionTrait;
 
+use crate::app::common::AppError;
 use crate::app::model::client::{Client, ClientType};
 use crate::app::model::config::TaxRegime;
 use crate::app::model::invoice::{Invoice, InvoiceStatus, PaymentMethod};
@@ -25,15 +26,13 @@ pub async fn build(
     invoice_id: i64,
     vat_number: &str,
     id: Option<TsDocumentId>,
-) -> Result<TsExpenseDocument, String> {
+) -> Result<TsExpenseDocument, AppError> {
     let invoice = invoice_repository::load_invoice(db, invoice_id).await?;
     let client = client_repository::find_by_id(db, invoice.client_id)
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("Paziente {} non trovato", invoice.client_id))?;
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Paziente {} non trovato", invoice.client_id)))?;
     let regime = config_repository::find(db)
-        .await
-        .map_err(|e| e.to_string())?
+        .await?
         .map(|c| TaxRegime::from(c.tax_regime))
         .unwrap_or(TaxRegime::Forfettario);
     document_from(
@@ -51,7 +50,7 @@ pub fn document_from(
     regime: &TaxRegime,
     vat_number: &str,
     id: Option<TsDocumentId>,
-) -> Result<TsExpenseDocument, String> {
+) -> Result<TsExpenseDocument, AppError> {
     let payment_date = payment_date_of(invoice)?;
     let citizen_fiscal_code = citizen_of(client)?;
     let id = match id {
@@ -74,59 +73,71 @@ pub fn document_from(
     })
 }
 
-fn payment_date_of(invoice: &Invoice) -> Result<String, String> {
+fn payment_date_of(invoice: &Invoice) -> Result<String, AppError> {
     if invoice.status != InvoiceStatus::Paid {
-        return Err("Solo le fatture pagate possono essere trasmesse al Sistema TS".to_string());
+        return Err(AppError::Conflict(
+            "Solo le fatture pagate possono essere trasmesse al Sistema TS".to_string(),
+        ));
     }
     let date = invoice
         .paid_date
         .as_deref()
         .map(str::trim)
         .filter(|d| !d.is_empty())
-        .ok_or("Indica la data di pagamento prima di trasmettere la fattura")?;
+        .ok_or_else(|| {
+            AppError::Invalid(
+                "Indica la data di pagamento prima di trasmettere la fattura".to_string(),
+            )
+        })?;
     validate::parse_iso_date(date, "Data pagamento")?;
     Ok(date.to_string())
 }
 
 /// The patient's codice fiscale, or None when they opposed the transmission.
-fn citizen_of(client: &Client) -> Result<Option<String>, String> {
+fn citizen_of(client: &Client) -> Result<Option<String>, AppError> {
     if client.client_type != ClientType::PersonaFisica {
-        return Err("Al Sistema TS vanno solo le spese di persone fisiche".to_string());
+        return Err(AppError::Invalid(
+            "Al Sistema TS vanno solo le spese di persone fisiche".to_string(),
+        ));
     }
     if !client.sts_authorization {
         return Ok(None);
     }
     let code = client.fiscal_code.trim().to_uppercase();
     if code.chars().count() != 16 {
-        return Err(format!(
+        return Err(AppError::Invalid(format!(
             "Serve il codice fiscale di {} {} (16 caratteri) per trasmettere la spesa",
             client.first_name, client.last_name
-        ));
+        )));
     }
     validate::validate_fiscal_code(&code)?;
     Ok(Some(code))
 }
 
-fn document_number_of(invoice: &Invoice) -> Result<String, String> {
+fn document_number_of(invoice: &Invoice) -> Result<String, AppError> {
     let number = invoice.invoice_number.trim();
     let allowed = |c: char| c.is_ascii_alphanumeric() || "_./\\-".contains(c);
     if number.is_empty() || number.chars().count() > 20 || !number.chars().all(allowed) {
-        return Err(format!(
+        return Err(AppError::Conflict(format!(
             "Numero fattura «{number}» non accettato dal Sistema TS (max 20 tra lettere, cifre e _ . / - )"
-        ));
+        )));
     }
     Ok(number.to_string())
 }
 
 /// One item per VAT rate. ENPAP follows each group's share of the net, and
 /// the last group absorbs rounding so the items add up to `total_gross`.
-fn items_of(invoice: &Invoice, regime: &TaxRegime) -> Result<Vec<TsExpenseItem>, String> {
+fn items_of(invoice: &Invoice, regime: &TaxRegime) -> Result<Vec<TsExpenseItem>, AppError> {
     let total = round2(invoice.total_gross);
     if total <= 0.0 {
-        return Err("La fattura ha importo nullo: niente da trasmettere".to_string());
+        return Err(AppError::Invalid(
+            "La fattura ha importo nullo: niente da trasmettere".to_string(),
+        ));
     }
     if total > MAX_AMOUNT {
-        return Err("Importo oltre il massimo accettato dal Sistema TS (99.999,99 €)".to_string());
+        return Err(AppError::Invalid(
+            "Importo oltre il massimo accettato dal Sistema TS (99.999,99 €)".to_string(),
+        ));
     }
 
     let mut net_by_rate: BTreeMap<i64, f64> = BTreeMap::new();

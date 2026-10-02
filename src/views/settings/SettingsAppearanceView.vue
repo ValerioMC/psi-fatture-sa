@@ -61,16 +61,16 @@ const THEMES: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
 [data-swatch='light'] .theme-swatch-side { background: #fbfaf7; box-shadow: inset -1px 0 0 #e4e0d7; }
 [data-swatch='light'] .theme-swatch-main { background: #f5f3ee; }
 [data-swatch='light'] .theme-swatch-main > span { background: #cfc9bc; }
-[data-swatch='light'] .theme-swatch-main > span:first-child { background: #3a3e9f; }
+[data-swatch='light'] .theme-swatch-main > span:first-child { background: #3d35b0; }
 
 [data-swatch='dark'] .theme-swatch-side { background: #17161d; box-shadow: inset -1px 0 0 #2a2834; }
 [data-swatch='dark'] .theme-swatch-main { background: #121117; }
 [data-swatch='dark'] .theme-swatch-main > span { background: #3b3947; }
-[data-swatch='dark'] .theme-swatch-main > span:first-child { background: #a5a9ff; }
+[data-swatch='dark'] .theme-swatch-main > span:first-child { background: #aaa4ff; }
 
 /* "Come il sistema" is literally half of each. */
 [data-swatch='system'] { background: linear-gradient(135deg, #f5f3ee 50%, #121117 50%); }
 [data-swatch='system'] .theme-swatch-side { background: linear-gradient(135deg, #fbfaf7 50%, #17161d 50%); }
 [data-swatch='system'] .theme-swatch-main > span { background: #8b8799; }
-[data-swatch='system'] .theme-swatch-main > span:first-child { background: #6e72d0; }
+[data-swatch='system'] .theme-swatch-main > span:first-child { background: #736bd8; }
 </style>

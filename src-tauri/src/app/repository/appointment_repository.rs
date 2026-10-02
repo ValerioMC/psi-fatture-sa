@@ -2,6 +2,7 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait, FromQueryResult, Statement,
 };
 
+use crate::app::common::AppError;
 use crate::app::entity::{appointment as appointments, recurrence_group as recurrence_groups};
 use crate::app::model::appointment::{Appointment, AppointmentStatus};
 
@@ -11,7 +12,7 @@ pub async fn find_all(
     date_from: Option<String>,
     date_to: Option<String>,
     client_id: Option<i64>,
-) -> Result<Vec<Appointment>, String> {
+) -> Result<Vec<Appointment>, AppError> {
     let mut conditions = vec!["1=1".to_string()];
     let mut values: Vec<sea_orm::Value> = Vec::new();
     if let Some(d) = date_from {
@@ -44,7 +45,7 @@ pub async fn find_all(
 }
 
 /// Returns a single appointment by id.
-pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Appointment, String> {
+pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Appointment, AppError> {
     let sql = "SELECT a.id, a.client_id, a.service_id, a.date, a.start_time, a.end_time,
                 a.status, a.notes, a.recurrence_group_id, a.invoice_id,
                 a.created_at, a.updated_at,
@@ -58,7 +59,7 @@ pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Appointment,
     let mut results = load_appointments_by_sql(db, sql, vec![id.into()]).await?;
     results
         .pop()
-        .ok_or_else(|| format!("Appointment {id} not found"))
+        .ok_or_else(|| AppError::NotFound(format!("Appuntamento {id} non trovato")))
 }
 
 /// Inserts a new appointment record.
@@ -101,7 +102,7 @@ pub async fn find_unbilled_for_month(
     db: &DatabaseConnection,
     year: i64,
     month: i64,
-) -> Result<Vec<Appointment>, String> {
+) -> Result<Vec<Appointment>, AppError> {
     let date_from = format!("{year:04}-{month:02}-01");
     let date_to = if month == 12 {
         format!("{:04}-01-01", year + 1)
@@ -131,7 +132,7 @@ pub async fn mark_as_invoiced(
     db: &impl sea_orm::ConnectionTrait,
     appointment_ids: &[i64],
     invoice_id: i64,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     if appointment_ids.is_empty() {
         return Ok(());
     }
@@ -146,8 +147,7 @@ pub async fn mark_as_invoiced(
         &sql,
         values,
     ))
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
     Ok(())
 }
 
@@ -157,7 +157,7 @@ async fn load_appointments_by_sql(
     db: &DatabaseConnection,
     sql: &str,
     values: Vec<sea_orm::Value>,
-) -> Result<Vec<Appointment>, String> {
+) -> Result<Vec<Appointment>, AppError> {
     #[derive(FromQueryResult)]
     struct Row {
         id: i64,
@@ -182,8 +182,7 @@ async fn load_appointments_by_sql(
         values,
     ))
     .all(db)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     Ok(rows
         .into_iter()

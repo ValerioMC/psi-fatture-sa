@@ -10,6 +10,7 @@ mod m20240701_add_invoice_amount_options;
 mod m20240801_add_terms_acceptances;
 mod m20240901_add_whatsapp;
 mod m20241001_drop_whatsapp;
+mod m20241101_add_ts_document_fingerprint;
 
 pub struct Migrator;
 
@@ -27,6 +28,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20240801_add_terms_acceptances::Migration),
             Box::new(m20240901_add_whatsapp::Migration),
             Box::new(m20241001_drop_whatsapp::Migration),
+            Box::new(m20241101_add_ts_document_fingerprint::Migration),
         ]
     }
 }

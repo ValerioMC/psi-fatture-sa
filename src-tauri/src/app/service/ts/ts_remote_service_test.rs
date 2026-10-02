@@ -116,7 +116,7 @@ async fn monthly_report_surfaces_refusals_and_bad_periods() {
     let err = monthly_report(&db, &store(), &gateway, 2026, 3, TsReportBasis::Pagamento)
         .await
         .unwrap_err();
-    assert!(err.contains("WS46"));
+    assert!(err.to_string().contains("WS46"));
     assert!(
         monthly_report(&db, &store(), &gateway, 2026, 13, TsReportBasis::Invio)
             .await

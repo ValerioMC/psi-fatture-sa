@@ -1,3 +1,4 @@
+use crate::app::common::AppError;
 use serde::{Deserialize, Serialize};
 
 /// How the SMTP connection is protected: `Tls` from the first byte (port 465),
@@ -17,11 +18,13 @@ impl EmailSecurity {
         }
     }
 
-    pub fn parse(value: &str) -> Result<Self, String> {
+    pub fn parse(value: &str) -> Result<Self, AppError> {
         match value {
             "tls" => Ok(EmailSecurity::Tls),
             "starttls" => Ok(EmailSecurity::Starttls),
-            other => Err(format!("Sicurezza della connessione sconosciuta: {other}")),
+            other => Err(AppError::Invalid(format!(
+                "Sicurezza della connessione sconosciuta: {other}"
+            ))),
         }
     }
 }

@@ -67,7 +67,10 @@ fn delete_is_idempotent() {
 #[test]
 fn surfaces_store_failures() {
     let store = UnavailableSecretStore;
-    assert!(status(&store).unwrap_err().contains("Archivio credenziali"));
+    assert!(status(&store)
+        .unwrap_err()
+        .to_string()
+        .contains("Archivio credenziali"));
     assert!(save_pincode(&store, "1234").is_err());
     assert!(delete_password(&store).is_err());
 }
@@ -79,6 +82,7 @@ fn unreadable_secrets_read_as_missing_but_block_the_session() {
     assert!(!status.password_configured && !status.pincode_configured);
     assert!(session(&store, &settings())
         .unwrap_err()
+        .to_string()
         .contains("inseriscila di nuovo"));
 }
 
@@ -96,16 +100,21 @@ fn session_names_the_first_missing_piece() {
     let store = InMemorySecretStore::default();
     assert!(session(&store, &settings())
         .unwrap_err()
+        .to_string()
         .contains("password"));
     save_password(&store, "Salve123").unwrap();
     assert!(session(&store, &settings())
         .unwrap_err()
+        .to_string()
         .contains("PINCODE"));
     save_pincode(&store, "3489543096").unwrap();
 
     let mut blank = settings();
     blank.vat_number.clear();
-    assert!(session(&store, &blank).unwrap_err().contains("partita IVA"));
+    assert!(session(&store, &blank)
+        .unwrap_err()
+        .to_string()
+        .contains("partita IVA"));
 
     let ready = session(&store, &settings()).unwrap();
     assert_eq!(ready.username, "MTOMRA66A41G224M");

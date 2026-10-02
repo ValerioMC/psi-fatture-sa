@@ -1,3 +1,4 @@
+use crate::app::common::AppError;
 use serde::{Deserialize, Serialize};
 
 /// The outcome of one attempt to email an invoice. Only `Sent` counts as delivered to
@@ -17,11 +18,13 @@ impl InvoiceEmailStatus {
         }
     }
 
-    pub fn parse(value: &str) -> Result<Self, String> {
+    pub fn parse(value: &str) -> Result<Self, AppError> {
         match value {
             "sent" => Ok(InvoiceEmailStatus::Sent),
             "failed" => Ok(InvoiceEmailStatus::Failed),
-            other => Err(format!("Esito di invio sconosciuto: {other}")),
+            other => Err(AppError::Invalid(format!(
+                "Esito di invio sconosciuto: {other}"
+            ))),
         }
     }
 }

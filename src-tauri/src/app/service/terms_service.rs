@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
+use crate::app::common::AppError;
 use crate::app::entity::terms_acceptance::{self, ActiveModel};
 use crate::app::model::terms::{AcceptTermsInput, TermsAcceptance};
 use crate::app::repository::terms_acceptance_repository;
@@ -10,7 +11,7 @@ const VERSION_MAX_LENGTH: usize = 40;
 pub async fn find(
     db: &impl ConnectionTrait,
     version: &str,
-) -> Result<Option<TermsAcceptance>, String> {
+) -> Result<Option<TermsAcceptance>, AppError> {
     let version = validate_version(version)?;
     Ok(terms_acceptance_repository::find_by_version(db, version)
         .await?
@@ -21,15 +22,17 @@ pub async fn find(
 pub async fn accept(
     db: &impl ConnectionTrait,
     input: AcceptTermsInput,
-) -> Result<TermsAcceptance, String> {
+) -> Result<TermsAcceptance, AppError> {
     let version = validate_version(&input.version)?;
     if !input.terms_accepted {
-        return Err("Per usare l'app accetta le condizioni d'uso".to_string());
+        return Err(AppError::Invalid(
+            "Per usare l'app accetta le condizioni d'uso".to_string(),
+        ));
     }
     if !input.clauses_approved {
-        return Err(
+        return Err(AppError::Invalid(
             "Per usare l'app approva le clausole indicate (artt. 1341 e 1342 c.c.)".to_string(),
-        );
+        ));
     }
     if let Some(existing) = terms_acceptance_repository::find_by_version(db, version).await? {
         return Ok(into_domain(existing));
@@ -45,10 +48,12 @@ pub async fn accept(
     ))
 }
 
-fn validate_version(version: &str) -> Result<&str, String> {
+fn validate_version(version: &str) -> Result<&str, AppError> {
     let version = version.trim();
     if version.is_empty() || version.chars().count() > VERSION_MAX_LENGTH {
-        return Err("Versione delle condizioni d'uso non valida".to_string());
+        return Err(AppError::Invalid(
+            "Versione delle condizioni d'uso non valida".to_string(),
+        ));
     }
     Ok(version)
 }

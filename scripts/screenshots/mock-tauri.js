@@ -340,6 +340,10 @@
     update_invoice: ({ input }) => { const i = invoices.findIndex((x) => x.id === input.id); invoices[i] = { ...invoices[i], ...input, lines: input.lines.map((l) => ({ ...l, line_total: l.quantity * l.unit_price })), ...totals(input.lines, input.apply_enpap) }; return invoices[i] },
     create_invoice: ({ input }) => { const inv = { hide_quantity: false, ...input, id: nextId++, invoice_number: String(++counters[TY]), year: TY, client_name: clientName(clients.find((c) => c.id === input.client_id)), lines: input.lines.map((l) => ({ ...l, line_total: l.quantity * l.unit_price })), ...totals(input.lines, input.apply_enpap) }; invoices.push(inv); return inv },
     delete_invoice: ({ id }) => { invoices.splice(invoices.findIndex((i) => i.id === id), 1) },
+    preview_invoice_totals: ({ lines, applyEnpap }) => { const t = totals(lines, applyEnpap); return { ...t, marca_da_bollo: t.marca_da_bollo ? 2 : 0 } },
+    is_ts_invoice_out_of_date: () => false,
+    get_backup_file_name: () => `PSI-Fatture-backup-${todayIso}.db`,
+    export_backup: () => null,
     get_next_invoice_number: () => String((counters[TY] ?? 0) + 1),
     bulk_update_invoice_status: ({ input }) => { for (const i of invoices) if (input.ids.includes(i.id)) { i.status = input.status; i.paid_date = input.paid_date } return input.ids.length },
     preview_monthly_invoices: ({ year, month }) => {
@@ -350,7 +354,7 @@
         const svc = services.find((s) => s.id === list[0].service_id)
         const lines = [{ service_id: svc.id, description: `${svc.name} — ${MONTHS[month - 1].toLowerCase()} ${year}`, quantity: list.length, unit_price: svc.default_price, vat_rate: 0 }]
         const t = totals(lines, true)
-        return { client_id: Number(cid), client_name: list[0].client_name, appointment_count: list.length, lines, estimated_net: t.total_net, estimated_due: t.total_due }
+        return { client_id: Number(cid), client_name: list[0].client_name, appointment_count: list.length, lines, estimated_net: t.total_net, estimated_due: t.total_due, missing_price: false }
       }).sort((a, b) => a.client_name.localeCompare(b.client_name))
     },
     generate_monthly_invoices: ({ input }) => input.client_ids.map((id) => ({ id })),

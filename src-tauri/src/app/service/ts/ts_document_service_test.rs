@@ -71,7 +71,7 @@ fn build(
     invoice: &Invoice,
     client: &Client,
     regime: TaxRegime,
-) -> Result<TsExpenseDocument, String> {
+) -> Result<TsExpenseDocument, AppError> {
     document_from(invoice, client, &regime, "12345678903", None)
 }
 
@@ -167,24 +167,28 @@ fn refuses_what_the_sistema_ts_cannot_take() {
     unpaid.status = InvoiceStatus::Issued;
     assert!(build(&unpaid, &client(), TaxRegime::Forfettario)
         .unwrap_err()
+        .to_string()
         .contains("pagate"));
 
     let mut undated = invoice();
     undated.paid_date = None;
     assert!(build(&undated, &client(), TaxRegime::Forfettario)
         .unwrap_err()
+        .to_string()
         .contains("data di pagamento"));
 
     let mut company = client();
     company.client_type = ClientType::Azienda;
     assert!(build(&invoice(), &company, TaxRegime::Forfettario)
         .unwrap_err()
+        .to_string()
         .contains("persone fisiche"));
 
     let mut no_code = client();
     no_code.fiscal_code.clear();
     assert!(build(&invoice(), &no_code, TaxRegime::Forfettario)
         .unwrap_err()
+        .to_string()
         .contains("codice fiscale"));
 
     let mut odd_number = invoice();
@@ -195,6 +199,7 @@ fn refuses_what_the_sistema_ts_cannot_take() {
     empty.total_gross = 0.0;
     assert!(build(&empty, &client(), TaxRegime::Forfettario)
         .unwrap_err()
+        .to_string()
         .contains("nullo"));
 }
 

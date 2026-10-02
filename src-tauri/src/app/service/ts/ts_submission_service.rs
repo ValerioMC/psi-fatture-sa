@@ -4,6 +4,7 @@
 
 use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
+use crate::app::common::AppError;
 use crate::app::entity::ts_submission::ActiveModel;
 use crate::app::model::ts::{
     TsDocumentId, TsEnvironment, TsOperation, TsSubmission, TsSubmissionFilters, TsSubmissionStatus,
@@ -18,7 +19,7 @@ const IN_FLIGHT: [TsSubmissionStatus; 2] =
 pub async fn list(
     db: &DatabaseConnection,
     filters: TsSubmissionFilters,
-) -> Result<Vec<TsSubmission>, String> {
+) -> Result<Vec<TsSubmission>, AppError> {
     ts_submission_repository::find(db, &filters).await
 }
 
@@ -27,13 +28,15 @@ pub async fn list(
 pub async fn enqueue_invio(
     db: &DatabaseConnection,
     invoice_id: i64,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     validate::validate_id(invoice_id, "Fattura")?;
-    let tx = db.begin().await.map_err(|e| e.to_string())?;
+    let tx = db.begin().await?;
 
     let settings = ts_settings_service::get(&tx).await?;
     if settings.vat_number.trim().is_empty() {
-        return Err("Indica la partita IVA del Sistema TS nelle Impostazioni".to_string());
+        return Err(AppError::Invalid(
+            "Indica la partita IVA del Sistema TS nelle Impostazioni".to_string(),
+        ));
     }
     ts_document_service::build(&tx, invoice_id, &settings.vat_number, None).await?;
     ensure_nothing_in_flight(&tx, invoice_id).await?;
@@ -45,9 +48,9 @@ pub async fn enqueue_invio(
     )
     .await?
     {
-        return Err(
+        return Err(AppError::Conflict(
             "Fattura già accettata dal Sistema TS: per correggerla usa la sostituzione".to_string(),
-        );
+        ));
     }
 
     let created = ts_submission_repository::insert(
@@ -55,7 +58,7 @@ pub async fn enqueue_invio(
         new_submission(invoice_id, TsOperation::Invio, None, settings.environment),
     )
     .await?;
-    tx.commit().await.map_err(|e| e.to_string())?;
+    tx.commit().await?;
     ts_submission_repository::load(db, created.id).await
 }
 
@@ -63,7 +66,7 @@ pub async fn enqueue_invio(
 pub async fn enqueue_replacement(
     db: &DatabaseConnection,
     target_submission_id: i64,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     enqueue_follow_up(db, target_submission_id, TsOperation::Sostituzione).await
 }
 
@@ -71,19 +74,19 @@ pub async fn enqueue_replacement(
 pub async fn enqueue_cancellation(
     db: &DatabaseConnection,
     target_submission_id: i64,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     enqueue_follow_up(db, target_submission_id, TsOperation::Annullamento).await
 }
 
 /// Removes a submission that is still waiting in the queue.
-pub async fn withdraw(db: &DatabaseConnection, submission_id: i64) -> Result<(), String> {
+pub async fn withdraw(db: &DatabaseConnection, submission_id: i64) -> Result<(), AppError> {
     validate::validate_id(submission_id, "Trasmissione STS")?;
     let row = ts_submission_repository::find_row(db, submission_id).await?;
     if TsSubmissionStatus::parse(&row.status)? != TsSubmissionStatus::NonInviata {
-        return Err(
+        return Err(AppError::Invalid(
             "Solo le trasmissioni non ancora inviate possono essere ritirate dalla coda"
                 .to_string(),
-        );
+        ));
     }
     ts_submission_repository::delete(db, submission_id).await
 }
@@ -92,8 +95,30 @@ pub async fn withdraw(db: &DatabaseConnection, submission_id: i64) -> Result<(),
 pub async fn blocks_invoice_deletion(
     db: &DatabaseConnection,
     invoice_id: i64,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     ts_submission_repository::invoice_holds_ts_data(db, invoice_id, TsEnvironment::Produzione).await
+}
+
+/// Whether the invoice changed since the Sistema TS accepted its data, so a
+/// replacement is due. Submissions sent before fingerprints existed never report it.
+pub async fn invoice_out_of_date(
+    db: &DatabaseConnection,
+    invoice_id: i64,
+) -> Result<bool, AppError> {
+    validate::validate_id(invoice_id, "Fattura")?;
+    let Some(row) = ts_submission_repository::find_latest_accepted_document(db, invoice_id).await?
+    else {
+        return Ok(false);
+    };
+    let (Some(sent), Some(id)) = (row.document_fingerprint.clone(), document_id_of(&row)) else {
+        return Ok(false);
+    };
+    let vat_number = id.vat_number.clone();
+    match ts_document_service::build(db, invoice_id, &vat_number, Some(id)).await {
+        Ok(current) => Ok(current.fingerprint() != sent),
+        Err(AppError::Invalid(_) | AppError::Conflict(_)) => Ok(true),
+        Err(error) => Err(error),
+    }
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
@@ -102,16 +127,16 @@ async fn enqueue_follow_up(
     db: &DatabaseConnection,
     target_submission_id: i64,
     operation: TsOperation,
-) -> Result<TsSubmission, String> {
+) -> Result<TsSubmission, AppError> {
     validate::validate_id(target_submission_id, "Trasmissione STS")?;
-    let tx = db.begin().await.map_err(|e| e.to_string())?;
+    let tx = db.begin().await?;
 
     let target = ts_submission_repository::find_row(&tx, target_submission_id).await?;
     if TsSubmissionStatus::parse(&target.status)? != TsSubmissionStatus::Accettata {
-        return Err(format!(
+        return Err(AppError::Conflict(format!(
             "Si può chiedere {} solo di una trasmissione accettata",
             follow_up_label(operation)
-        ));
+        )));
     }
     let environment = TsEnvironment::parse(&target.environment)?;
     if operation == TsOperation::Sostituzione {
@@ -129,7 +154,7 @@ async fn enqueue_follow_up(
         new_submission(target.invoice_id, operation, Some(target.id), environment),
     )
     .await?;
-    tx.commit().await.map_err(|e| e.to_string())?;
+    tx.commit().await?;
     ts_submission_repository::load(db, created.id).await
 }
 
@@ -154,11 +179,11 @@ pub(crate) fn document_id_of(
 async fn ensure_nothing_in_flight(
     db: &impl ConnectionTrait,
     invoice_id: i64,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     if ts_submission_repository::invoice_has_status(db, invoice_id, &IN_FLIGHT, None).await? {
-        return Err(
+        return Err(AppError::Conflict(
             "C'è già una trasmissione in corso per questa fattura: attendi l'esito".to_string(),
-        );
+        ));
     }
     Ok(())
 }

@@ -21,7 +21,7 @@ fn verdict(accepted: bool) -> TsOutcome {
 }
 
 async fn claimed(db: &sea_orm::DatabaseConnection, id: i64, now: NaiveDateTime) {
-    assert!(claim(db, id, &document(), now).await.unwrap());
+    assert!(claim(db, id, &document(), None, now).await.unwrap());
 }
 
 #[test]
@@ -41,8 +41,8 @@ async fn claim_is_won_once_and_records_the_document_id() {
     let queued = queue::enqueue_invio(&db, 1).await.unwrap();
     let now = at("2099-01-01 10:00:00");
 
-    assert!(claim(&db, queued.id, &document(), now).await.unwrap());
-    assert!(!claim(&db, queued.id, &document(), now).await.unwrap());
+    assert!(claim(&db, queued.id, &document(), None, now).await.unwrap());
+    assert!(!claim(&db, queued.id, &document(), None, now).await.unwrap());
 
     let row = ts_submission_repository::load(&db, queued.id)
         .await
@@ -135,7 +135,7 @@ async fn refuses_transitions_out_of_order() {
     assert!(release_for_retry(&db, queued.id, "x", now).await.is_err());
 
     force_status(&db, queued.id, TsSubmissionStatus::Accettata).await;
-    assert!(!claim(&db, queued.id, &document(), now).await.unwrap());
+    assert!(!claim(&db, queued.id, &document(), None, now).await.unwrap());
     assert!(reject_locally(&db, queued.id, "x", now).await.is_err());
 }
 

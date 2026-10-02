@@ -28,7 +28,11 @@ async fn proposes_the_profile_pec_on_psypec_before_the_first_save() {
         (account.smtp_port, account.security),
         (465, EmailSecurity::Tls)
     );
-    assert!(saved(&db).await.unwrap_err().contains("Impostazioni"));
+    assert!(saved(&db)
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("Impostazioni"));
 }
 
 #[tokio::test]

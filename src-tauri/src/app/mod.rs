@@ -1,4 +1,5 @@
 pub mod app_state;
+pub mod common;
 pub mod controller;
 pub mod db;
 pub mod entity;

@@ -4,6 +4,7 @@
 
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
+use crate::app::common::AppError;
 use crate::app::model::ts::{
     TsConnectionCheck, TsDocumentId, TsOperation, TsQueryResult, TsReportBasis, TsReportRow,
     TsSettings, TsSubmissionFilters, TsSubmissionStatus,
@@ -25,7 +26,7 @@ pub async fn query_invoice(
     store: &dyn SecretStore,
     gateway: &dyn SistemaTsGateway,
     invoice_id: i64,
-) -> Result<TsQueryResult, String> {
+) -> Result<TsQueryResult, AppError> {
     validate::validate_id(invoice_id, "Fattura")?;
     let settings = ts_settings_service::get(db).await?;
     let session = ts_credential_service::session(store, &settings)?;
@@ -33,10 +34,7 @@ pub async fn query_invoice(
         Some(id) => id,
         None => own_id(db, invoice_id, &settings).await?,
     };
-    gateway
-        .query(&session, &id)
-        .await
-        .map_err(|e| e.to_string())
+    gateway.query(&session, &id).await.map_err(AppError::from)
 }
 
 /// The documents the Sistema TS holds for a month, by send or payment date,
@@ -48,16 +46,13 @@ pub async fn monthly_report(
     year: i32,
     month: u32,
     basis: TsReportBasis,
-) -> Result<Vec<TsReportRow>, String> {
+) -> Result<Vec<TsReportRow>, AppError> {
     validate::validate_year(i64::from(year))?;
     validate::validate_month(i64::from(month))?;
     let settings = ts_settings_service::get(db).await?;
     let session = ts_credential_service::session(store, &settings)?;
 
-    let outcome = gateway
-        .monthly_report(&session, year, month, basis)
-        .await
-        .map_err(|e| e.to_string())?;
+    let outcome = gateway.monthly_report(&session, year, month, basis).await?;
     let mut rows = match outcome {
         ReportOutcome::Rows(rows) => rows,
         ReportOutcome::Refused(messages) => {
@@ -66,7 +61,10 @@ pub async fn monthly_report(
                 .filter(|m| m.is_error())
                 .map(|m| format!("{} {}", m.code, m.description))
                 .collect();
-            return Err(format!("Report non disponibile: {}", reasons.join(" · ")));
+            return Err(AppError::Invalid(format!(
+                "Report non disponibile: {}",
+                reasons.join(" · ")
+            )));
         }
     };
     for row in &mut rows {
@@ -82,11 +80,11 @@ pub async fn check_connection(
     db: &DatabaseConnection,
     store: &dyn SecretStore,
     gateway: &dyn SistemaTsGateway,
-) -> Result<TsConnectionCheck, String> {
+) -> Result<TsConnectionCheck, AppError> {
     let settings = ts_settings_service::get(db).await?;
     let session = match ts_credential_service::session(store, &settings) {
         Ok(session) => session,
-        Err(reason) => return Ok(failed(reason)),
+        Err(reason) => return Ok(failed(reason.to_string())),
     };
     let probe = TsDocumentId {
         vat_number: settings.vat_number.clone(),
@@ -122,7 +120,7 @@ async fn last_sent_id(
     db: &impl ConnectionTrait,
     invoice_id: i64,
     settings: &TsSettings,
-) -> Result<Option<TsDocumentId>, String> {
+) -> Result<Option<TsDocumentId>, AppError> {
     let filters = TsSubmissionFilters {
         invoice_id: Some(invoice_id),
         ..Default::default()
@@ -147,7 +145,7 @@ async fn own_id(
     db: &impl ConnectionTrait,
     invoice_id: i64,
     settings: &TsSettings,
-) -> Result<TsDocumentId, String> {
+) -> Result<TsDocumentId, AppError> {
     let invoice = invoice_repository::load_invoice(db, invoice_id).await?;
     Ok(TsDocumentId {
         vat_number: settings.vat_number.clone(),

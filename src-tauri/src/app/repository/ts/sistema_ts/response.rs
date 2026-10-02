@@ -118,7 +118,7 @@ fn esito_of(root: &XmlNode) -> Result<TsEsito, String> {
     let node = root
         .find("esitoChiamata")
         .ok_or("Risposta del Sistema TS senza esitoChiamata")?;
-    TsEsito::parse(&node.text)
+    TsEsito::parse(&node.text).map_err(|e| e.to_string())
 }
 
 fn messages_of(response: &XmlNode) -> Vec<TsMessage> {

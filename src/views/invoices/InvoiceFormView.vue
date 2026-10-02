@@ -12,6 +12,7 @@ import { useInvoicesStore } from '@/stores/invoices'
 import { useClientsStore } from '@/stores/clients'
 import { useServicesStore } from '@/stores/services'
 import { useConfigStore } from '@/stores/config'
+import { useStsStore } from '@/stores/sts'
 import { errorMessage, useToastStore } from '@/stores/toast'
 import { getInvoice } from '@/api'
 import type { CreateInvoiceInput, InvoiceLineInput, InvoiceStatus, PaymentMethod, UpdateInvoiceInput } from '@/types'
@@ -26,7 +27,8 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { ComboOption, SegmentOption } from '@/components/ui/types'
 import { formatCurrency, todayIso } from '@/utils/format'
-import { calculateInvoiceTotals, enpapIncludesBollo, hasAmountOverride, lineNetAmount } from '@/utils/tax'
+import { enpapIncludesBollo, hasAmountOverride, lineNetAmount } from '@/utils/tax'
+import { useInvoiceTotals } from '@/composables/useInvoiceTotals'
 import { clientDisplayName } from '@/utils/client'
 import { INVOICE_STATUS, INVOICE_STATUS_ORDER, PAYMENT_METHOD_LABEL, PAYMENT_METHOD_ORDER } from '@/utils/labels'
 
@@ -36,6 +38,7 @@ const invoicesStore = useInvoicesStore()
 const clientsStore = useClientsStore()
 const servicesStore = useServicesStore()
 const configStore = useConfigStore()
+const sts = useStsStore()
 const toast = useToastStore()
 
 const editId = route.params.id ? Number(route.params.id) : null
@@ -89,12 +92,19 @@ const taxProfile = computed(() => ({
   tax_regime: taxRegime.value,
   enpap_excludes_bollo: configStore.config?.enpap_excludes_bollo ?? false,
 }))
-const totals = computed(() => calculateInvoiceTotals(form.lines, taxProfile.value, form.apply_enpap))
+const totals = useInvoiceTotals(() => form.lines, () => form.apply_enpap)
 const enpapDescription = computed(() =>
   enpapIncludesBollo(taxProfile.value)
     ? 'Addebitato al paziente su imponibile e marca da bollo, che nel forfettario è compenso.'
     : 'Addebitato al paziente sul solo imponibile, senza la marca da bollo.',
 )
+
+/** The production Sistema TS holds this invoice: its number, date and paid status are fixed. */
+const heldBySts = computed(() => {
+  if (editId === null || sts.environment !== 'produzione') return false
+  const kind = sts.stateOf(editId).kind
+  return kind === 'accepted' || kind === 'sending'
+})
 
 const selectedClient = computed(() => clientsStore.clients.find((client) => client.id === form.client_id))
 const patientHideQuantity = computed(() => selectedClient.value?.hide_quantity_in_invoice ?? null)
@@ -148,6 +158,7 @@ onMounted(async () => {
       clientsStore.fetchClients(),
       servicesStore.fetchServices(false),
       configStore.isConfigured ? Promise.resolve() : configStore.loadConfig(),
+      isEdit && !sts.loaded ? sts.load() : Promise.resolve(),
     ])
     const presetClient = Number(route.query.client)
     if (!isEdit && Number.isInteger(presetClient) && presetClient > 0) form.client_id = presetClient
@@ -283,8 +294,11 @@ async function onSubmit(): Promise<void> {
                 />
               </FormField>
 
+              <p v-if="heldBySts" class="col-span-2 rounded-control bg-accent-soft px-3 py-2 text-xs leading-relaxed text-text-muted ring-1 ring-inset ring-accent-line" role="note">
+                Registrata al Sistema TS: numero, data e stato pagato restano quelli inviati. Se cambi importi o paziente, dopo il salvataggio invia i dati aggiornati.
+              </p>
               <FormField v-slot="{ id, invalid, describedBy }" label="Data di emissione" required :error="errors.issue_date">
-                <input :id="id" v-model="form.issue_date" type="date" class="field" :aria-invalid="invalid" :aria-describedby="describedBy" />
+                <input :id="id" v-model="form.issue_date" type="date" class="field" :disabled="heldBySts" :aria-invalid="invalid" :aria-describedby="describedBy" />
               </FormField>
               <FormField v-slot="{ id, invalid, describedBy }" label="Scadenza" optional :error="errors.due_date">
                 <input :id="id" v-model="form.due_date" type="date" class="field" :aria-invalid="invalid" :aria-describedby="describedBy" />
@@ -302,7 +316,7 @@ async function onSubmit(): Promise<void> {
                 hint="Cambialo solo per correggere la numerazione: deve restare unico nell'anno."
                 :error="errors.invoice_number"
               >
-                <input :id="id" v-model="form.invoice_number" type="text" inputmode="numeric" class="field tabular" :aria-invalid="invalid" :aria-describedby="describedBy" />
+                <input :id="id" v-model="form.invoice_number" type="text" inputmode="numeric" class="field tabular" :disabled="heldBySts" :aria-invalid="invalid" :aria-describedby="describedBy" />
               </FormField>
               <div v-else class="self-end pb-2 text-sm text-text-subtle">
                 <template v-if="nextNumber">Riceverà il numero <span class="tabular font-medium text-text-muted">{{ nextNumber }}</span> al salvataggio.</template>

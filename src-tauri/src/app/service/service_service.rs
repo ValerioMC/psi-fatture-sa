@@ -1,28 +1,29 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection};
 
+use crate::app::common::AppError;
 use crate::app::entity::service::{self, ActiveModel};
 use crate::app::model::service::{CreateServiceInput, Service, UpdateServiceInput};
 use crate::app::repository::service_repository;
 
 /// Lists all services, optionally filtered to active-only.
-pub async fn list(db: &DatabaseConnection, active_only: bool) -> Result<Vec<Service>, String> {
-    let models = service_repository::find_all(db, active_only)
-        .await
-        .map_err(|e| e.to_string())?;
+pub async fn list(db: &DatabaseConnection, active_only: bool) -> Result<Vec<Service>, AppError> {
+    let models = service_repository::find_all(db, active_only).await?;
     Ok(models.into_iter().map(into_domain).collect())
 }
 
 /// Returns a single service by id.
-pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Service, String> {
+pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Service, AppError> {
     service_repository::find_by_id(db, id)
-        .await
-        .map_err(|e| e.to_string())?
+        .await?
         .map(into_domain)
-        .ok_or_else(|| format!("Service {id} not found"))
+        .ok_or_else(|| AppError::NotFound(format!("Prestazione {id} non trovata")))
 }
 
 /// Creates a new service and returns the created record.
-pub async fn create(db: &DatabaseConnection, input: CreateServiceInput) -> Result<Service, String> {
+pub async fn create(
+    db: &DatabaseConnection,
+    input: CreateServiceInput,
+) -> Result<Service, AppError> {
     let active = ActiveModel {
         name: Set(input.name),
         description: Set(input.description),
@@ -32,14 +33,15 @@ pub async fn create(db: &DatabaseConnection, input: CreateServiceInput) -> Resul
         ..Default::default()
     };
 
-    let model = service_repository::insert(db, active)
-        .await
-        .map_err(|e| e.to_string())?;
+    let model = service_repository::insert(db, active).await?;
     Ok(into_domain(model))
 }
 
 /// Updates an existing service and returns the updated record.
-pub async fn update(db: &DatabaseConnection, input: UpdateServiceInput) -> Result<Service, String> {
+pub async fn update(
+    db: &DatabaseConnection,
+    input: UpdateServiceInput,
+) -> Result<Service, AppError> {
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let active = ActiveModel {
         id: Set(input.id),
@@ -52,17 +54,15 @@ pub async fn update(db: &DatabaseConnection, input: UpdateServiceInput) -> Resul
         ..Default::default()
     };
 
-    let model = service_repository::update(db, active)
-        .await
-        .map_err(|e| e.to_string())?;
+    let model = service_repository::update(db, active).await?;
     Ok(into_domain(model))
 }
 
 /// Removes a service by id.
-pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), String> {
+pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), AppError> {
     service_repository::delete(db, id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(AppError::from)
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────

@@ -23,6 +23,8 @@ import type {
   Invoice,
   InvoiceEmail,
   InvoiceFilters,
+  InvoiceLineInput,
+  InvoiceTotals,
   MonthlyInvoicePreview,
   ProfessionalConfig,
   SendInvoiceEmailInput,
@@ -86,12 +88,19 @@ export const updateInvoice = (input: UpdateInvoiceInput) =>
 export const deleteInvoice = (id: number) => invoke<void>('delete_invoice', { id })
 export const getNextInvoiceNumber = (year: number) =>
   invoke<string>('get_next_invoice_number', { year })
+export const previewInvoiceTotals = (lines: InvoiceLineInput[], applyEnpap: boolean) =>
+  invoke<InvoiceTotals>('preview_invoice_totals', { lines, applyEnpap })
 export const previewMonthlyInvoices = (year: number, month: number) =>
   invoke<MonthlyInvoicePreview[]>('preview_monthly_invoices', { year, month })
 export const generateMonthlyInvoices = (input: GenerateMonthlyInput) =>
   invoke<Invoice[]>('generate_monthly_invoices', { input })
 export const bulkUpdateInvoiceStatus = (input: BulkUpdateStatusInput) =>
   invoke<number>('bulk_update_invoice_status', { input })
+
+// ─── Backup ──────────────────────────────────────────────────────────────────
+
+export const exportBackup = (path: string) => invoke<void>('export_backup', { path })
+export const getBackupFileName = () => invoke<string>('get_backup_file_name')
 
 /** Renders the invoice PDF and opens it in the system viewer. */
 export const openInvoicePdf = (invoiceId: number) => invoke<void>('open_invoice_pdf', { invoiceId })
@@ -147,6 +156,8 @@ export const listTsSubmissions = (filters: TsSubmissionFilters = {}) =>
   invoke<TsSubmission[]>('list_ts_submissions', { filters })
 export const enqueueTsSubmission = (invoiceId: number) =>
   invoke<TsSubmission>('enqueue_ts_submission', { invoiceId })
+export const isTsInvoiceOutOfDate = (invoiceId: number) =>
+  invoke<boolean>('is_ts_invoice_out_of_date', { invoiceId })
 export const enqueueTsReplacement = (submissionId: number) =>
   invoke<TsSubmission>('enqueue_ts_replacement', { submissionId })
 export const enqueueTsCancellation = (submissionId: number) =>

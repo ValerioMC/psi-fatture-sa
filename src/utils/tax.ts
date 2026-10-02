@@ -1,10 +1,9 @@
 /**
- * Tax calculation utilities for Italian psychologist invoices.
- *
- * The invoice totals logic mirrors the Rust implementation in
- * `src-tauri/src/app/service/tax_service.rs`: any change here must be
- * replicated there, or the live preview will differ from the saved invoice.
+ * Tax helpers for Italian psychologist invoices. Invoice totals are computed
+ * only by the backend (`preview_invoice_totals`); here live the per-line
+ * display helpers and the annual tax estimates.
  */
+import type { InvoiceLineInput } from '@/types'
 
 export interface LineData {
   quantity: number
@@ -18,21 +17,6 @@ export interface TaxProfile {
   tax_regime: string
   enpap_excludes_bollo: boolean
 }
-
-export interface InvoiceTotals {
-  total_net: number
-  total_tax: number
-  contributo_enpap: number
-  ritenuta_acconto: number
-  marca_da_bollo: number
-  total_gross: number
-  total_due: number
-}
-
-const ENPAP_RATE = 0.02
-const RITENUTA_RATE = 0.2
-const MARCA_DA_BOLLO_AMOUNT = 2.0
-const MARCA_DA_BOLLO_THRESHOLD = 77.47
 
 /** The line's taxable amount: the hand-typed one when set, otherwise quantity × unit price. */
 export function lineNetAmount(line: LineData): number {
@@ -55,48 +39,17 @@ export function enpapIncludesBollo(profile: TaxProfile): boolean {
 }
 
 /**
- * Calculates all invoice totals including ENPAP, ritenuta d'acconto, and marca da bollo.
- *
- * For "forfettario" regime: no ritenuta d'acconto applies.
- * Marca da bollo (€2) applies when the invoice is VAT-exempt and total_net > €77.47.
+ * A form line as the backend reads it: emptied number fields become zero, and an
+ * emptied hand-typed amount falls back to quantity × price.
  */
-export function calculateInvoiceTotals(
-  lines: LineData[],
-  profile: TaxProfile,
-  applyEnpap: boolean,
-): InvoiceTotals {
-  let total_net = 0
-  let total_tax = 0
-  for (const line of lines) {
-    const lineNet = lineNetAmount(line)
-    const lineVat = round2(lineNet * sanitize(line.vat_rate) / 100)
-    total_net += lineNet
-    total_tax += lineVat
-  }
-
-  const hasVat = total_tax > 0
-  const appliesMarcaDaBollo =
-    !hasVat && total_net > MARCA_DA_BOLLO_THRESHOLD
-  const marca_da_bollo = appliesMarcaDaBollo ? MARCA_DA_BOLLO_AMOUNT : 0
-
-  const enpapBase = enpapIncludesBollo(profile) ? total_net + marca_da_bollo : total_net
-  const contributo_enpap = applyEnpap ? round2(enpapBase * ENPAP_RATE) : 0
-  const total_gross = total_net + total_tax + contributo_enpap
-
-  const ritenuta_base = total_net + contributo_enpap
-  const ritenuta_acconto =
-    profile.tax_regime === 'ordinario' ? round2(ritenuta_base * RITENUTA_RATE) : 0
-
-  const total_due = total_gross - ritenuta_acconto + marca_da_bollo
-
+export function toLineInput(line: LineData & { service_id?: number; description?: string }): InvoiceLineInput {
   return {
-    total_net: round2(total_net),
-    total_tax: round2(total_tax),
-    contributo_enpap,
-    ritenuta_acconto,
-    marca_da_bollo,
-    total_gross: round2(total_gross),
-    total_due: round2(total_due),
+    service_id: line.service_id,
+    description: line.description ?? '',
+    quantity: Math.trunc(sanitize(line.quantity)),
+    unit_price: sanitize(line.unit_price),
+    vat_rate: sanitize(line.vat_rate),
+    amount_override: hasAmountOverride(line) && Number.isFinite(line.amount_override) ? line.amount_override : null,
   }
 }
 

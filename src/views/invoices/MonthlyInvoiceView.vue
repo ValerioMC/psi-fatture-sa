@@ -3,10 +3,11 @@
  * End-of-month invoicing: every session held and not yet invoiced becomes one
  * invoice per patient. Pick the month, untick who should wait, generate. The
  * preview loads as soon as the month changes; there is no "load" step.
+ * Sessions without a priced service cannot be billed until fixed in the agenda.
  */
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { CalendarCheck, FileText, Sparkles } from 'lucide-vue-next'
+import { RouterLink, useRoute } from 'vue-router'
+import { CalendarCheck, FileText, Sparkles, TriangleAlert } from 'lucide-vue-next'
 import { generateMonthlyInvoices, previewMonthlyInvoices } from '@/api'
 import type { MonthlyInvoicePreview, PaymentMethod } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -37,6 +38,7 @@ const month = ref(Number.isInteger(queryMonth) && queryMonth >= 1 && queryMonth 
 
 const paymentMethod = ref<PaymentMethod>('bonifico')
 const applyEnpap = ref(true)
+const issueDate = ref(lastDayOfMonth(year.value, month.value))
 const previews = ref<MonthlyInvoicePreview[]>([])
 const selected = ref<Set<number>>(new Set())
 const loading = ref(false)
@@ -46,6 +48,11 @@ const generated = ref<number | null>(null)
 
 const label = computed(() => formatMonthYear(year.value, month.value))
 const isFutureMonth = computed(() => year.value > now.getFullYear() || (year.value === now.getFullYear() && month.value > now.getMonth() + 1))
+
+function lastDayOfMonth(forYear: number, forMonth: number): string {
+  const day = new Date(forYear, forMonth, 0).getDate()
+  return `${forYear}-${String(forMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
 
 function shift(delta: number): void {
   let nextMonth = month.value + delta
@@ -61,7 +68,7 @@ async function loadPreview(): Promise<void> {
   generated.value = null
   try {
     previews.value = await previewMonthlyInvoices(year.value, month.value)
-    selected.value = new Set(previews.value.map((preview) => preview.client_id))
+    selected.value = new Set(billable.value.map((preview) => preview.client_id))
   } catch (error) {
     previews.value = []
     toast.notifyError(error, 'Anteprima non disponibile')
@@ -70,15 +77,20 @@ async function loadPreview(): Promise<void> {
   }
 }
 
-watch([year, month], loadPreview)
+watch([year, month], () => {
+  issueDate.value = lastDayOfMonth(year.value, month.value)
+  void loadPreview()
+})
 onMounted(loadPreview)
 
+const billable = computed(() => previews.value.filter((preview) => !preview.missing_price))
+const unpriced = computed(() => previews.value.length - billable.value.length)
 const chosen = computed(() => previews.value.filter((preview) => selected.value.has(preview.client_id)))
 const totals = computed(() => ({
   sessions: chosen.value.reduce((sum, preview) => sum + preview.appointment_count, 0),
   due: chosen.value.reduce((sum, preview) => sum + preview.estimated_due, 0),
 }))
-const allSelected = computed(() => previews.value.length > 0 && selected.value.size === previews.value.length)
+const allSelected = computed(() => billable.value.length > 0 && selected.value.size === billable.value.length)
 
 function toggle(clientId: number): void {
   const next = new Set(selected.value)
@@ -88,7 +100,7 @@ function toggle(clientId: number): void {
 }
 
 function toggleAll(): void {
-  selected.value = allSelected.value ? new Set() : new Set(previews.value.map((preview) => preview.client_id))
+  selected.value = allSelected.value ? new Set() : new Set(billable.value.map((preview) => preview.client_id))
 }
 
 async function generate(): Promise<void> {
@@ -100,6 +112,7 @@ async function generate(): Promise<void> {
       client_ids: [...selected.value],
       payment_method: paymentMethod.value,
       apply_enpap: applyEnpap.value,
+      issue_date: issueDate.value,
     })
     confirmOpen.value = false
     generated.value = result.length
@@ -161,13 +174,21 @@ async function generate(): Promise<void> {
             <AppButton to="/agenda">Apri l'agenda</AppButton>
           </EmptyState>
 
-          <ul v-else class="border-t border-border">
+          <p v-if="!loading && unpriced > 0" class="mx-5 mb-3 flex items-start gap-2 rounded-control bg-warn-soft px-3 py-2 text-xs leading-relaxed text-text-muted ring-1 ring-inset ring-warn-line" role="status">
+            <TriangleAlert :size="14" class="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
+            <span>
+              {{ plural(unpriced, 'paziente ha', 'pazienti hanno') }} sedute senza prestazione o con prezzo zero: assegna una prestazione in
+              <RouterLink to="/agenda" class="rounded-sm font-medium text-accent hover:underline focus-ring">agenda</RouterLink> per fatturarle.
+            </span>
+          </p>
+
+          <ul v-if="!loading && previews.length > 0" class="border-t border-border">
             <li v-for="preview in previews" :key="preview.client_id" class="border-b border-border last:border-b-0">
               <label
                 class="flex cursor-pointer items-start gap-3.5 px-5 py-3.5 transition-colors"
                 :class="selected.has(preview.client_id) ? 'hover:bg-surface-hover' : 'bg-surface text-text-subtle'"
               >
-                <input type="checkbox" class="mt-2" :checked="selected.has(preview.client_id)" @change="toggle(preview.client_id)" />
+                <input type="checkbox" class="mt-2" :checked="selected.has(preview.client_id)" :disabled="preview.missing_price" @change="toggle(preview.client_id)" />
                 <PatientMonogram :name="preview.client_name" size="md" />
                 <span class="min-w-0 flex-1">
                   <span class="block text-base font-medium" :class="selected.has(preview.client_id) ? 'text-text' : 'text-text-muted'">{{ preview.client_name }}</span>
@@ -177,7 +198,8 @@ async function generate(): Promise<void> {
                 </span>
                 <span class="text-right">
                   <span class="tabular block text-base font-medium" :class="selected.has(preview.client_id) ? 'text-text' : 'text-text-subtle line-through'">{{ formatCurrency(preview.estimated_due) }}</span>
-                  <span class="block text-xs text-text-subtle">{{ plural(preview.appointment_count, 'seduta', 'sedute') }}</span>
+                  <span v-if="preview.missing_price" class="block text-xs text-warn">Prezzo mancante</span>
+                  <span v-else class="block text-xs text-text-subtle">{{ plural(preview.appointment_count, 'seduta', 'sedute') }}</span>
                 </span>
               </label>
             </li>
@@ -186,6 +208,9 @@ async function generate(): Promise<void> {
 
         <aside class="settle lg:sticky lg:top-30" style="--settle: 1">
           <AppCard class="space-y-5">
+            <FormField v-slot="{ id, describedBy }" label="Data di emissione" hint="Non può precedere l’ultima fattura dell’anno.">
+              <input :id="id" v-model="issueDate" type="date" class="field" :aria-describedby="describedBy" />
+            </FormField>
             <FormField v-slot="{ id }" label="Metodo di pagamento">
               <select :id="id" v-model="paymentMethod" class="field">
                 <option v-for="method in PAYMENT_METHOD_ORDER" :key="method" :value="method">{{ PAYMENT_METHOD_LABEL[method] }}</option>

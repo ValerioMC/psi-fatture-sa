@@ -51,11 +51,14 @@ async fn refuses_without_both_boxes_and_records_nothing() {
     let terms = accept(&db, input("2026-10-01", false, true))
         .await
         .unwrap_err();
-    assert_eq!(terms, "Per usare l'app accetta le condizioni d'uso");
+    assert_eq!(
+        terms.to_string(),
+        "Per usare l'app accetta le condizioni d'uso"
+    );
     let clauses = accept(&db, input("2026-10-01", true, false))
         .await
         .unwrap_err();
-    assert!(clauses.contains("1341"));
+    assert!(clauses.to_string().contains("1341"));
     assert_eq!(find(&db, "2026-10-01").await.unwrap(), None);
 }
 
