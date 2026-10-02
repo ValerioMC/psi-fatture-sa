@@ -366,7 +366,7 @@ input[type='checkbox'] {
 ::-webkit-scrollbar-thumb:hover { background-color: var(--text-subtle); }
 
 /* With the macOS overlay title bar the traffic lights sit on the sidebar: make room. */
-[data-titlebar='overlay'] .sidebar-top { padding-top: 3.25rem; }
+[data-titlebar='overlay'] .sidebar-top { padding-top: 2.75rem; }
 
 @layer components {
 /*

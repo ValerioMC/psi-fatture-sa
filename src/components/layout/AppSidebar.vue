@@ -170,11 +170,11 @@ const CEILING_FILL = {
 
 <template>
   <aside class="sidebar relative flex h-full w-sidebar shrink-0 flex-col">
-    <div class="sidebar-top flex items-center gap-2.5 px-5 pt-6 pb-5" data-tauri-drag-region>
-      <BrandMark :size="30" />
+    <div class="sidebar-top flex items-center gap-2.5 px-5 pt-5 pb-4" data-tauri-drag-region>
+      <BrandMark :size="26" />
       <div class="min-w-0" data-tauri-drag-region>
-        <span class="display block text-[1.1875rem] leading-none text-text" data-tauri-drag-region>PSI Fatture</span>
-        <span class="mt-1 block text-2xs leading-none text-text-subtle" data-tauri-drag-region>Studio di psicologia</span>
+        <span class="display block text-lg leading-none text-text" data-tauri-drag-region>PSI Fatture</span>
+        <span class="mt-0.5 block text-2xs leading-none text-text-subtle" data-tauri-drag-region>Studio di psicologia</span>
       </div>
     </div>
 
