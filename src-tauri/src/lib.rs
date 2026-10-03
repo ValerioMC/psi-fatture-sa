@@ -15,7 +15,9 @@ use app::controller::{
     update_controller::*,
 };
 use app::repository::email::{LettreMailGateway, MailGateway};
-use app::repository::release::{GithubReleaseGateway, ReleaseGateway};
+use app::repository::release::{
+    BundleInstaller, DiskImageInstaller, GithubReleaseGateway, ReleaseGateway,
+};
 use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
 use app::repository::ts::sistema_ts::{HttpSistemaTsGateway, SistemaTsGateway};
 use app::service::rotating_backup_service::RotatingBackups;
@@ -42,6 +44,7 @@ pub fn run() {
         GithubReleaseGateway::new(env!("CARGO_PKG_VERSION"))
             .expect("Failed to build the release check client"),
     );
+    let bundle_installer: Arc<dyn BundleInstaller> = Arc::new(DiskImageInstaller);
 
     tauri::Builder::default()
         .manage(AppState {
@@ -51,6 +54,7 @@ pub fn run() {
             mail_gateway,
             backups,
             release_gateway,
+            bundle_installer,
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -104,6 +108,7 @@ pub fn run() {
             reveal_backups_folder,
             get_app_version,
             check_for_update,
+            install_update,
             preview_invoice_totals,
             is_ts_invoice_out_of_date,
             enqueue_ts_cancellation,

@@ -1,6 +1,8 @@
 //! Reads the newest published release of the app from the GitHub API, the same
 //! source the showcase site's download buttons resolve against.
 
+use std::io::Write;
+use std::path::Path;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -13,6 +15,8 @@ use crate::app::model::update::{LatestRelease, ReleaseAsset};
 const LATEST_RELEASE_URL: &str =
     "https://api.github.com/repos/ValerioMC/psi-fatture-sa/releases/latest";
 const TIMEOUT: Duration = Duration::from_secs(10);
+/// A bundle is about 15 MB: generous for a slow line, still bounded.
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
 
 pub struct GithubReleaseGateway {
     client: reqwest::Client,
@@ -49,6 +53,31 @@ impl ReleaseGateway for GithubReleaseGateway {
             .await
             .map_err(|e| unreachable_error(&e.to_string()))?;
         parse_latest(&body)
+    }
+
+    async fn download(&self, url: &str, target: &Path) -> Result<(), AppError> {
+        let mut response = self
+            .client
+            .get(url)
+            .timeout(DOWNLOAD_TIMEOUT)
+            .send()
+            .await
+            .map_err(|e| download_error(&e.to_string()))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(download_error(&format!("risposta HTTP {status}")));
+        }
+        let mut file = std::fs::File::create(target)
+            .map_err(|e| download_error(&format!("{}: {e}", target.display())))?;
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| download_error(&e.to_string()))?
+        {
+            file.write_all(&chunk)
+                .map_err(|e| download_error(&e.to_string()))?;
+        }
+        file.flush().map_err(|e| download_error(&e.to_string()))
     }
 }
 
@@ -88,6 +117,12 @@ pub fn parse_latest(body: &str) -> Result<LatestRelease, AppError> {
 fn unreachable_error(cause: &str) -> AppError {
     AppError::External(format!(
         "Impossibile verificare gli aggiornamenti ({cause})"
+    ))
+}
+
+fn download_error(cause: &str) -> AppError {
+    AppError::External(format!(
+        "Download della nuova versione non riuscito ({cause})"
     ))
 }
 

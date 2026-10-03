@@ -2,7 +2,6 @@
 /** This build's version, and a check by hand against the newest release, with its download. */
 import { computed, onMounted, ref } from 'vue'
 import { BadgeInfo, Download, RefreshCw } from 'lucide-vue-next'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { useUpdateStore } from '@/stores/update'
 import { errorMessage, useToastStore } from '@/stores/toast'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -25,9 +24,9 @@ async function checkNow(): Promise<void> {
   }
 }
 
-async function download(url: string): Promise<void> {
+async function apply(): Promise<void> {
   try {
-    await openUrl(url)
+    await update.apply()
   } catch (error) {
     toast.notifyError(error, 'Impossibile aprire il download')
   }
@@ -47,12 +46,17 @@ onMounted(() => {
       <p>All’avvio l’app controlla se è uscita una versione più recente e, se c’è, ti propone il file da scaricare.</p>
 
       <p v-if="failure" class="text-danger" role="alert">{{ failure }}</p>
+      <p v-if="update.installFailure" class="text-danger" role="alert">
+        Installazione non riuscita: {{ update.installFailure }}. Il pulsante ora apre il download nel browser.
+      </p>
 
       <div v-else-if="update.latest && update.latest.update_available" class="flex items-center gap-3 rounded-control bg-accent-soft px-3.5 py-3 ring-1 ring-inset ring-accent-line">
         <span class="min-w-0 flex-1 text-text">
           È disponibile la versione <strong class="font-semibold">{{ update.latest.latest_version }}</strong> per {{ update.latest.platform_label }}.
         </span>
-        <AppButton variant="primary" size="sm" :icon="Download" @click="download(update.latest.download_url)">Scarica</AppButton>
+        <AppButton variant="primary" size="sm" :icon="Download" :loading="update.installing" @click="apply">
+          {{ update.installing ? 'Installazione…' : 'Scarica' }}
+        </AppButton>
       </div>
 
       <p v-else-if="update.latest" class="flex items-center gap-2">

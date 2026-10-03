@@ -3,7 +3,7 @@ use std::sync::Arc;
 use sea_orm::DatabaseConnection;
 
 use crate::app::repository::email::MailGateway;
-use crate::app::repository::release::ReleaseGateway;
+use crate::app::repository::release::{BundleInstaller, ReleaseGateway};
 use crate::app::repository::secret::SecretStore;
 use crate::app::repository::ts::sistema_ts::SistemaTsGateway;
 use crate::app::service::rotating_backup_service::RotatingBackups;
@@ -16,4 +16,5 @@ pub struct AppState {
     pub mail_gateway: Arc<dyn MailGateway>,
     pub backups: Arc<RotatingBackups>,
     pub release_gateway: Arc<dyn ReleaseGateway>,
+    pub bundle_installer: Arc<dyn BundleInstaller>,
 }

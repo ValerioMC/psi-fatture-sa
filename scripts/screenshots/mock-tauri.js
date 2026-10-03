@@ -367,6 +367,7 @@
     },
     reveal_backups_folder: () => null,
     get_app_version: () => '0.9.7',
+    install_update: () => new Promise(() => {}),
     check_for_update: () => ({ current_version: '0.9.7', latest_version: '0.9.8', update_available: true, download_url: 'https://github.com/ValerioMC/psi-fatture-sa/releases/latest/download/PSI-Fatture-macOS-arm64.dmg', platform: 'mac_os_arm64', platform_label: 'Mac con chip Apple' }),
     get_next_invoice_number: () => String((counters[TY] ?? 0) + 1),
     bulk_update_invoice_status: ({ input }) => { for (const i of invoices) if (input.ids.includes(i.id)) { i.status = input.status; i.paid_date = input.paid_date } return input.ids.length },

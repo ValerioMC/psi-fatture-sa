@@ -406,10 +406,29 @@ e cancella `database.db-wal` e `database.db-shm` se presenti, poi riapri l'app.
 
 All'avvio l'app chiede a `https://api.github.com/repos/ValerioMC/psi-fatture-sa/releases/latest`
 l'ultima release pubblicata e la confronta con la propria versione (quella del tag, vedi
-*Build per Windows*). Se è più recente apre un popup con il link al bundle del sistema in
-uso: `.dmg` arm64 o x64 su macOS, `-setup.exe` su Windows, la pagina della release
-altrimenti. Senza rete il controllo fallisce in silenzio e riprova al prossimo avvio.
+*Build per Windows*). Se è più recente apre un popup con un solo pulsante, *Scarica*.
+Senza rete il controllo fallisce in silenzio e riprova al prossimo avvio.
 Impostazioni → *Versione* mostra la versione installata e permette di controllare a mano.
+
+- **Mac**: `update_install_service` scarica il `.dmg` per l'architettura in uso
+  (solo da `github.com/ValerioMC/psi-fatture-sa/releases/download/`), lo monta con
+  `hdiutil`, copia `PSI Fatture.app` con `ditto` accanto a quella in uso, scambia i nomi
+  (la vecchia resta da parte finché la nuova è al suo posto, e torna indietro se lo scambio
+  fallisce) e riavvia l'app. Il file è scaricato dall'app e non dal browser, quindi non
+  riceve l'attributo `com.apple.quarantine`: la nuova versione si apre senza
+  `xattr -dr com.apple.quarantine`. Se l'installazione fallisce (per esempio l'app gira
+  dall'immagine disco o la cartella non è scrivibile) il pulsante apre il download nel
+  browser.
+- **Windows** e altri sistemi: il pulsante apre nel browser l'installer per il sistema in
+  uso (`-setup.exe` su Windows, la pagina della release altrimenti).
+- **Prima installazione su Mac**: l'app non è firmata con un Developer ID, quindi il `.dmg`
+  scaricato dal sito è in quarantena e la prima apertura richiede ancora una volta
+  `xattr -dr com.apple.quarantine "/Applications/PSI Fatture.app"`. Nessun codice dell'app
+  può farlo, perché è la quarantena a impedirne l'avvio: solo la firma con notarizzazione
+  (vedi *Build firmata*) la elimina.
+
+Test reale dell'installazione (rete, solo Mac, installa in una cartella temporanea):
+`cd src-tauri && cargo test live_the_published -- --ignored`.
 
 In `npm run tauri dev` il controllo all'avvio è disattivato: la versione committata è un
 segnaposto (`0.1.0`) e risulterebbe sempre superata. Una build locale (`make build`) porta

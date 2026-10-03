@@ -10,6 +10,10 @@ impl ReleaseGateway for FixedRelease {
     async fn latest(&self) -> Result<LatestRelease, AppError> {
         self.0.clone().map_err(AppError::External)
     }
+
+    async fn download(&self, _url: &str, _target: &std::path::Path) -> Result<(), AppError> {
+        unreachable!("the check never downloads")
+    }
 }
 
 fn published(tag: &str) -> FixedRelease {

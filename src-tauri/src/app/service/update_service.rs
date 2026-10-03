@@ -10,8 +10,17 @@ pub async fn check(
     current_version: &str,
     platform: Platform,
 ) -> Result<UpdateCheck, AppError> {
-    let current = ReleaseVersion::parse(current_version)?;
     let release = gateway.latest().await?;
+    evaluate(&release, current_version, platform)
+}
+
+/// Compares `release` with this build; a tag that is not a version is the server's fault.
+pub fn evaluate(
+    release: &LatestRelease,
+    current_version: &str,
+    platform: Platform,
+) -> Result<UpdateCheck, AppError> {
+    let current = ReleaseVersion::parse(current_version)?;
     let latest = ReleaseVersion::parse(&release.tag).map_err(|_| {
         AppError::External(format!(
             "L'ultima versione pubblicata ha un numero non valido: '{}'",
@@ -22,19 +31,18 @@ pub async fn check(
         current_version: current.to_string(),
         latest_version: latest.to_string(),
         update_available: latest > current,
-        download_url: download_url(&release, platform),
+        download_url: bundle_url(release, platform).unwrap_or_else(|| release.page_url.clone()),
         platform,
         platform_label: platform.label().to_string(),
     })
 }
 
-/// The bundle published for `platform`, or the release page when there is none.
-fn download_url(release: &LatestRelease, platform: Platform) -> String {
+/// The bundle published for `platform`, if the release has one.
+pub fn bundle_url(release: &LatestRelease, platform: Platform) -> Option<String> {
     platform
         .asset_name()
         .and_then(|wanted| release.assets.iter().find(|asset| asset.name == wanted))
         .map(|asset| asset.download_url.clone())
-        .unwrap_or_else(|| release.page_url.clone())
 }
 
 #[cfg(test)]

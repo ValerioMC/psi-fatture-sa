@@ -13,5 +13,6 @@ pub mod service_service;
 pub mod tax_service;
 pub mod terms_service;
 pub mod ts;
+pub mod update_install_service;
 pub mod update_service;
 pub mod validation_service;

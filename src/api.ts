@@ -112,6 +112,8 @@ export const revealBackupsFolder = () => invoke<void>('reveal_backups_folder')
 
 export const getAppVersion = () => invoke<string>('get_app_version')
 export const checkForUpdate = () => invoke<UpdateCheck>('check_for_update')
+/** Mac only: installs the newest release over this app and restarts, so on success it never resolves. */
+export const installUpdate = () => invoke<void>('install_update')
 
 /** Renders the invoice PDF and opens it in the system viewer. */
 export const openInvoicePdf = (invoiceId: number) => invoke<void>('open_invoice_pdf', { invoiceId })
