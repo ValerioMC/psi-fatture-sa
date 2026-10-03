@@ -436,8 +436,11 @@ la stessa versione segnaposto, quindi all'avvio propone sempre l'ultima release.
 
 ## Condizioni d'uso e licenza
 
-Il codice è distribuito con licenza MIT (`LICENSE`), che esclude ogni garanzia. Le condizioni
-d'uso stanno in `src/legal/terms.ts` e si accettano prima di qualsiasi altra schermata.
+Il codice è pubblicato solo per essere consultato, con licenza **PolyForm Strict 1.0.0**
+(`LICENSE`): nessuno può copiarlo, modificarlo, ridistribuirlo o rivenderlo, e la licenza
+copre solo usi non commerciali. L'uso dell'app per la propria attività professionale è
+concesso agli utenti dalle condizioni d'uso, che stanno in `src/legal/terms.ts` (clausola 1)
+e si accettano prima di qualsiasi altra schermata.
 
 - **Accettazione**: `TermsView.vue` mostra il testo con due caselle separate, una per le
   condizioni e una per l'approvazione specifica delle clausole di limitazione (artt. 1341 e
@@ -515,7 +518,7 @@ psi-fatture-sa/
 │   │   └── test_support/   # Test double e fixture condivisi (solo in `cargo test`)
 │   ├── tauri.conf.json     # Configurazione Tauri
 │   └── Cargo.toml          # Dipendenze Rust
-├── LICENSE                 # Licenza MIT
+├── LICENSE                 # Licenza PolyForm Strict 1.0.0
 └── package.json            # Dipendenze frontend
 ```
 

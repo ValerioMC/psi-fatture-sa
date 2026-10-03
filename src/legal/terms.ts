@@ -4,7 +4,7 @@
  * each version accepted.
  */
 
-export const TERMS_VERSION = '2026-10-01'
+export const TERMS_VERSION = '2026-10-03'
 
 export interface TermsClause {
   readonly number: number
@@ -17,7 +17,8 @@ export const TERMS_CLAUSES: readonly TermsClause[] = [
     number: 1,
     title: 'Oggetto',
     paragraphs: [
-      "PSI Fatture è un'app desktop gratuita per la fatturazione di psicologi e psicoterapeuti. Il codice è pubblicato con licenza MIT. Queste condizioni regolano l'uso dell'app da parte tua.",
+      "PSI Fatture è un'app desktop gratuita per la fatturazione di psicologi e psicoterapeuti. Queste condizioni regolano l'uso dell'app da parte tua.",
+      "Il codice sorgente è pubblicato solo per essere consultato, con licenza PolyForm Strict 1.0.0: non puoi copiarlo, modificarlo, ridistribuirlo o rivenderlo. L'autore ti concede il diritto di installare e usare l'app, anche per la tua attività professionale, ma non di cederla ad altri.",
     ],
   },
   {
