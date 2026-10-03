@@ -5,11 +5,12 @@
  * current month sits in a faint band, the best month carries its value in full
  * ink, and months still ahead are empty slots: no data is not zero.
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import type { MonthlyRevenue } from '@/types'
 import type { MonthPending } from '@/utils/monthlyPending'
 import { formatCurrency, formatCurrencyCompact } from '@/utils/format'
 import { plural } from '@/utils/labels'
+import { placeTooltip, visibleTopOf, type TooltipPlacement } from '@/utils/tooltipPlacement'
 
 const props = defineProps<{
   months: readonly MonthlyRevenue[]
@@ -20,6 +21,8 @@ const props = defineProps<{
 }>()
 
 const hovered = ref<number | null>(null)
+/** Per month, so a tooltip fading out keeps its place while the next one opens. */
+const placements = ref<Record<number, TooltipPlacement>>({})
 
 interface Column {
   month: number
@@ -79,13 +82,63 @@ function share(value: number): number {
 }
 
 /** A non-zero column never collapses below a sliver, so a small month is still visible. */
+function heightShare(column: Column): number {
+  return column.total > 0 ? Math.max(share(column.total), 1.5) : 0
+}
+
 function heightOf(column: Column): string {
-  if (column.total <= 0) return '0%'
-  return `${Math.max(share(column.total), 1.5)}%`
+  return `${heightShare(column)}%`
+}
+
+/** The column's height in the plot area, which excludes the 1.5rem month label row. */
+function plotHeightOf(column: Column): string {
+  return `(100% - 1.5rem) * ${heightShare(column) / 100}`
 }
 
 function pendingShare(column: Column): string {
   return column.total > 0 ? `${(column.pending / column.total) * 100}%` : '0%'
+}
+
+/** Room between a column and the tooltip above it, clear of the value label on the column. */
+const TOOLTIP_GAP_REM = 1.5
+const TOOLTIP_MARGIN_PX = 8
+
+function remToPixels(rem: number): number {
+  return rem * Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+}
+
+/** Renders the tooltip above, then measures it before paint and moves it beside the column if the page header would cover it. */
+async function showTooltip(column: Column, event: MouseEvent): Promise<void> {
+  const columnElement = event.currentTarget
+  if (!(columnElement instanceof HTMLElement)) return
+  hovered.value = column.month
+  placements.value = { ...placements.value, [column.month]: { kind: 'above' } }
+  await nextTick()
+  if (hovered.value !== column.month) return
+  const tooltip = columnElement.querySelector<HTMLElement>('[data-tooltip]')
+  const bar = columnElement.querySelector<HTMLElement>('[data-bar]')
+  if (tooltip === null || bar === null) return
+  const barRect = bar.getBoundingClientRect()
+  placements.value = {
+    ...placements.value,
+    [column.month]: placeTooltip({
+      anchorTop: barRect.top,
+      containerTop: columnElement.getBoundingClientRect().top,
+      baseline: barRect.bottom,
+      visibleTop: visibleTopOf(columnElement),
+      tooltipHeight: tooltip.offsetHeight,
+      gap: remToPixels(TOOLTIP_GAP_REM),
+      margin: TOOLTIP_MARGIN_PX,
+      preferredSide: column.month <= 6 ? 'right' : 'left',
+    }),
+  }
+}
+
+function tooltipStyle(column: Column): Record<string, string> {
+  const placement = placements.value[column.month] ?? { kind: 'above' }
+  if (placement.kind === 'above') return { bottom: `calc(1.5rem + ${plotHeightOf(column)} + ${TOOLTIP_GAP_REM}rem)` }
+  const offset = 'calc(100% + 0.25rem)'
+  return placement.side === 'right' ? { top: `${placement.top}px`, left: offset } : { top: `${placement.top}px`, right: offset }
 }
 
 const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']
@@ -111,7 +164,7 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
             :key="column.month"
             :data-month="column.month"
             class="relative flex flex-1 flex-col items-center"
-            @mouseenter="hovered = column.month"
+            @mouseenter="showTooltip(column, $event)"
             @mouseleave="hovered = null"
           >
             <!-- "Now": a faint band the full height of the column, so the current month is found even when still empty. -->
@@ -133,6 +186,7 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
               />
               <div
                 v-else
+                data-bar
                 class="relative flex w-[min(30px,60%)] flex-col transition-[height] duration-500 ease-out-expo"
                 :style="{ height: heightOf(column) }"
                 aria-hidden="true"
@@ -165,12 +219,13 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
               aria-hidden="true"
             >{{ MONTH_ABBR[column.month - 1] }}</span>
 
-            <!-- Tooltip: the month's total, then what is in and what is still out. -->
+            <!-- Tooltip: the month's total, then what is in and what is still out. Above the column, or beside it when the header is in the way. -->
             <Transition name="popover">
               <div
                 v-if="hovered === column.month && !isFuture(column.month)"
                 class="pointer-events-none absolute z-(--z-overlay) min-w-44 whitespace-nowrap rounded-control border border-border bg-surface-raised px-3 py-2.5 shadow-modal"
-                :style="{ bottom: `calc(${heightOf(column)} + 2.25rem)` }"
+                :style="tooltipStyle(column)"
+                data-tooltip
                 role="presentation"
               >
                 <p class="text-2xs capitalize text-text-subtle">{{ column.name }}</p>

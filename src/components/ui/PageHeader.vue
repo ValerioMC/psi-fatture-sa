@@ -17,7 +17,7 @@ defineProps<{
 </script>
 
 <template>
-  <header class="page-header glass sticky top-0 z-(--z-sticky)" data-tauri-drag-region>
+  <header class="page-header glass sticky top-0 z-(--z-sticky)" data-tauri-drag-region data-sticky-header>
     <div class="page flex items-end justify-between gap-6 pt-4 pb-3.5" data-tauri-drag-region>
       <div class="flex min-w-0 items-end gap-3" data-tauri-drag-region>
         <span v-if="icon && !back" class="page-icon hidden sm:grid" aria-hidden="true">
