@@ -383,13 +383,37 @@ cd src-tauri && cargo test preview_sample_invoice -- --ignored   # scrive target
 
 Tutto l'archivio (pazienti, fatture, agenda, impostazioni) è un solo file SQLite,
 `database.db` nella cartella dati dell'app (`~/Library/Application Support/psi-fatture-sa/`
-su macOS). Impostazioni → *Dati e backup* → *Salva un backup…* ne scrive una copia
-coerente dove scegli (`VACUUM INTO`, include le modifiche ancora nel WAL).
+su macOS). Ogni copia è coerente (`VACUUM INTO`, include le modifiche ancora nel WAL).
 Password del Sistema TS e della casella email restano fuori: sono cifrate per questo
 computer.
 
+- **Backup automatici**: `RotatingBackups` (`src-tauri/src/app/service/rotating_backup_service.rs`)
+  scrive le copie in `backups/` accanto a `database.db`, con nomi
+  `psi-fatture-AAAAMMGG-HHMMSS[-N]-(auto|manual).db`. Il worker `scheduler/backup_worker.rs`
+  controlla 5 secondi dopo l'avvio e poi ogni ora: se nessuna copia porta la data di oggi ne
+  scrive una. *Backup ora* aggiunge una copia manuale. Si tengono le **10** più recenti,
+  automatiche e manuali insieme; le altre vengono eliminate. I file con altri nomi nella
+  cartella vengono ignorati. Un errore resta visibile nella pagina finché una copia riesce.
+- **Copia altrove**: Impostazioni → *Dati e backup* → *Salva un backup…* scrive una copia
+  dove scegli, per esempio su un disco esterno.
+- La pagina *Dati e backup* mostra il percorso dell'archivio, la cartella dei backup (*Apri*
+  la mostra nel Finder o in Esplora file) e l'elenco delle copie.
+
 Per ripristinare: chiudi l'app, sostituisci `database.db` con la copia (rinominandola)
 e cancella `database.db-wal` e `database.db-shm` se presenti, poi riapri l'app.
+
+## Aggiornamenti
+
+All'avvio l'app chiede a `https://api.github.com/repos/ValerioMC/psi-fatture-sa/releases/latest`
+l'ultima release pubblicata e la confronta con la propria versione (quella del tag, vedi
+*Build per Windows*). Se è più recente apre un popup con il link al bundle del sistema in
+uso: `.dmg` arm64 o x64 su macOS, `-setup.exe` su Windows, la pagina della release
+altrimenti. Senza rete il controllo fallisce in silenzio e riprova al prossimo avvio.
+Impostazioni → *Versione* mostra la versione installata e permette di controllare a mano.
+
+In `npm run tauri dev` il controllo all'avvio è disattivato: la versione committata è un
+segnaposto (`0.1.0`) e risulterebbe sempre superata. Una build locale (`make build`) porta
+la stessa versione segnaposto, quindi all'avvio propone sempre l'ultima release.
 
 ## Condizioni d'uso e licenza
 
@@ -464,7 +488,7 @@ psi-fatture-sa/
 │   │   │   │   ├── secret/     # Archivio cifrato delle credenziali
 │   │   │   │   ├── email/      # Casella, modello, registro invii e gateway SMTP (lettre)
 │   │   │   │   └── ts/         # Coda STS; sistema_ts/ è il client SOAP
-│   │   │   ├── scheduler/  # Worker in background (invio coda STS)
+│   │   │   ├── scheduler/  # Worker in background (invio coda STS, backup giornaliero)
 │   │   │   ├── entity/     # Entità database (una tabella per file)
 │   │   │   ├── model/      # DTO e tipi condivisi, un sottopackage per dominio
 │   │   │   └── db/         # Connessione e percorsi dei file dati
@@ -505,7 +529,8 @@ npm test
 
 # Backend (cargo): calcolo totali fattura, validazione input, Sistema TS (buste SOAP,
 # risposte reali catturate, coda, invio con gateway finto), PDF della fattura, email
-# (casella, modello, invio con gateway SMTP finto). I test usano un archivio
+# (casella, modello, invio con gateway SMTP finto), rotazione dei backup, confronto
+# delle versioni e scelta del download. I test usano un archivio
 # credenziali in memoria o in un file temporaneo
 cd src-tauri && cargo test
 

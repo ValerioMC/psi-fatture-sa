@@ -19,6 +19,11 @@ pub fn db_path() -> PathBuf {
     data_dir().join("database.db")
 }
 
+/// The folder of the rotating automatic backups, beside the database.
+pub fn backups_dir() -> PathBuf {
+    data_dir().join("backups")
+}
+
 /// Returns the path to the encrypted Sistema TS credentials, beside the database.
 pub fn secrets_path() -> PathBuf {
     data_dir().join("secrets.json")

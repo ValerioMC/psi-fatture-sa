@@ -35,6 +35,7 @@ const router = createRouter({
             { path: 'data', name: 'settings.data', component: () => import('@/views/settings/SettingsDataView.vue') },
             { path: 'appearance', name: 'settings.appearance', component: () => import('@/views/settings/SettingsAppearanceView.vue') },
             { path: 'legal', name: 'settings.legal', component: () => import('@/views/settings/SettingsLegalView.vue') },
+            { path: 'version', name: 'settings.version', component: () => import('@/views/settings/SettingsVersionView.vue') },
           ],
         },
       ],

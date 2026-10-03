@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core'
 import type {
   AcceptTermsInput,
   Appointment,
+  BackupFile,
+  BackupOverview,
   BulkUpdateStatusInput,
   Client,
   CreateAppointmentInput,
@@ -44,6 +46,7 @@ import type {
   UpdateClientInput,
   UpdateEmailAccountInput,
   UpdateInvoiceInput,
+  UpdateCheck,
   UpdateServiceInput,
   UpsertConfigInput,
 } from './types'
@@ -101,6 +104,14 @@ export const bulkUpdateInvoiceStatus = (input: BulkUpdateStatusInput) =>
 
 export const exportBackup = (path: string) => invoke<void>('export_backup', { path })
 export const getBackupFileName = () => invoke<string>('get_backup_file_name')
+export const getBackupOverview = () => invoke<BackupOverview>('get_backup_overview')
+export const createBackup = () => invoke<BackupFile>('create_backup')
+export const revealBackupsFolder = () => invoke<void>('reveal_backups_folder')
+
+// ─── Updates ─────────────────────────────────────────────────────────────────
+
+export const getAppVersion = () => invoke<string>('get_app_version')
+export const checkForUpdate = () => invoke<UpdateCheck>('check_for_update')
 
 /** Renders the invoice PDF and opens it in the system viewer. */
 export const openInvoicePdf = (invoiceId: number) => invoke<void>('open_invoice_pdf', { invoiceId })

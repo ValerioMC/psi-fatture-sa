@@ -5,10 +5,11 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { DatabaseBackup, IdCard, KeyRound, Mail, Palette, ReceiptText, Scale, Settings } from 'lucide-vue-next'
+import { BadgeInfo, DatabaseBackup, IdCard, KeyRound, Mail, Palette, ReceiptText, Scale, Settings } from 'lucide-vue-next'
 import { useEmailStore } from '@/stores/email'
 import { useStsStore } from '@/stores/sts'
 import { useToastStore } from '@/stores/toast'
+import { useUpdateStore } from '@/stores/update'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
@@ -35,6 +36,7 @@ watch(
 const toast = useToastStore()
 const email = useEmailStore()
 const sts = useStsStore()
+const update = useUpdateStore()
 const profile = provideSettingsProfile()
 
 onMounted(async () => {
@@ -42,6 +44,7 @@ onMounted(async () => {
   // The status dots are a courtesy: without them the pages still work.
   email.load().catch(() => undefined)
   if (!sts.loaded) sts.load().catch(() => undefined)
+  update.loadVersion().catch(() => undefined)
 })
 
 const items = computed<SettingsNavItem[]>(() => [
@@ -61,9 +64,16 @@ const items = computed<SettingsNavItem[]>(() => [
     icon: KeyRound,
     status: sts.loaded && !sts.connected ? { tone: 'warn', label: 'Credenziali mancanti' } : undefined,
   },
-  { to: '/settings/data', label: 'Dati e backup', hint: 'Una copia dell’archivio', icon: DatabaseBackup },
+  { to: '/settings/data', label: 'Dati e backup', hint: 'Archivio e copie automatiche', icon: DatabaseBackup },
   { to: '/settings/appearance', label: 'Aspetto', hint: 'Tema chiaro o scuro', icon: Palette },
   { to: '/settings/legal', label: 'Condizioni d’uso', hint: 'Il testo che hai accettato', icon: Scale },
+  {
+    to: '/settings/version',
+    label: 'Versione',
+    hint: update.version ? `PSI Fatture ${update.version}` : 'Aggiornamenti',
+    icon: BadgeInfo,
+    status: update.latest?.update_available ? { tone: 'accent', label: `Disponibile la ${update.latest.latest_version}` } : undefined,
+  },
 ])
 
 async function save(): Promise<void> {
@@ -94,7 +104,7 @@ function discardAndLeave(): void {
 
 <template>
   <div class="flex flex-col @min-[48rem]/pane:h-screen">
-    <PageHeader title="Impostazioni" subtitle="Il tuo profilo, come fatturi, la casella email, il Sistema TS e l'aspetto dell'app." :icon="Settings" />
+    <PageHeader title="Impostazioni" subtitle="Il tuo profilo, come fatturi, la casella email, il Sistema TS, l'aspetto e la versione dell'app." :icon="Settings" />
 
     <!-- Side by side, the frame fills the window and only the section pane scrolls: the nav sits outside it, so no section can move it. -->
     <div class="page grid min-h-0 flex-1 grid-cols-1 gap-6 @min-[48rem]/pane:grid-cols-[14rem_minmax(0,1fr)]">

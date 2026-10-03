@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatBytes,
   formatCurrency,
   formatCurrencyCompact,
   formatDateShort,
+  formatLocalTimestamp,
   formatMonthYear,
   minutesBetween,
   parseIsoDate,
@@ -40,5 +42,24 @@ describe('dates', () => {
   it('measures a session in minutes, zero when inverted', () => {
     expect(minutesBetween('09:30', '10:20')).toBe(50)
     expect(minutesBetween('10:00', '09:00')).toBe(0)
+  })
+})
+
+describe('file sizes', () => {
+  it('keeps bytes whole and gives larger sizes one decimal', () => {
+    expect(formatBytes(512)).toBe('512 B')
+    expect(formatBytes(1_534_000)).toBe('1,5 MB')
+    expect(formatBytes(48_000)).toBe('48 KB')
+    expect(formatBytes(2_100_000_000)).toBe('2,1 GB')
+  })
+})
+
+describe('local timestamps', () => {
+  it('reads the backend stamp as local time, with the year', () => {
+    expect(formatLocalTimestamp('2026-10-03 09:15:00')).toBe('3 ott 2026, 09:15')
+  })
+
+  it('leaves an unreadable stamp as it is', () => {
+    expect(formatLocalTimestamp('ieri')).toBe('ieri')
   })
 })

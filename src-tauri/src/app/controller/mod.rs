@@ -10,3 +10,4 @@ pub mod print_controller;
 pub mod service_controller;
 pub mod terms_controller;
 pub mod ts;
+pub mod update_controller;

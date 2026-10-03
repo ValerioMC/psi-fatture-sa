@@ -6,6 +6,7 @@ pub mod dashboard_repository;
 pub mod document_file_repository;
 pub mod email;
 pub mod invoice;
+pub mod release;
 pub mod secret;
 pub mod service_repository;
 pub mod terms_acceptance_repository;

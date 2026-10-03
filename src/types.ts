@@ -461,3 +461,39 @@ export interface AcceptTermsInput {
   terms_accepted: boolean
   clauses_approved: boolean
 }
+
+// ─── Backup ──────────────────────────────────────────────────────────────────
+
+export type BackupReason = 'auto' | 'manual'
+
+export interface BackupFile {
+  name: string
+  path: string
+  size_bytes: number
+  /** Local time, "YYYY-MM-DD HH:MM:SS". */
+  created_at: string
+  reason: BackupReason
+}
+
+export interface BackupOverview {
+  database_path: string
+  backups_folder: string
+  keep: number
+  /** Newest first. */
+  backups: BackupFile[]
+  last_failure: string | null
+}
+
+// ─── Updates ─────────────────────────────────────────────────────────────────
+
+export type Platform = 'mac_os_arm64' | 'mac_os_x64' | 'windows_x64' | 'other'
+
+export interface UpdateCheck {
+  current_version: string
+  latest_version: string
+  update_available: boolean
+  /** The bundle for this system, or the release page when none is published for it. */
+  download_url: string
+  platform: Platform
+  platform_label: string
+}

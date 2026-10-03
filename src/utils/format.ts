@@ -136,3 +136,31 @@ export function formatUtcTimestamp(timestamp: string): string {
   if (Number.isNaN(moment.getTime())) return timestamp
   return moment.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
+
+/**
+ * Formats a local timestamp ("YYYY-MM-DD HH:MM:SS") as day, month, year and time.
+ * @example formatLocalTimestamp("2026-10-03 09:15:00") → "3 ott 2026, 09:15"
+ */
+export function formatLocalTimestamp(timestamp: string): string {
+  const moment = new Date(timestamp.replace(' ', 'T'))
+  if (Number.isNaN(moment.getTime())) return timestamp
+  return moment.toLocaleString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+const BYTE_UNITS = ['KB', 'MB', 'GB'] as const
+
+/**
+ * Formats a file size in decimal units, one decimal past the kilobyte.
+ * @example formatBytes(1_534_000) → "1,5 MB"
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1000) return `${bytes} B`
+  let value = bytes
+  let unit: (typeof BYTE_UNITS)[number] = 'KB'
+  for (const next of BYTE_UNITS) {
+    value /= 1000
+    unit = next
+    if (value < 1000) break
+  }
+  return `${compactFormatter.format(value)} ${unit}`
+}

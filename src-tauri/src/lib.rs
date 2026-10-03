@@ -12,10 +12,13 @@ use app::controller::{
     appointment_controller::*, backup_controller::*, client_controller::*, config_controller::*,
     dashboard_controller::*, email_controller::*, invoice_controller::*, invoice_pdf_controller::*,
     print_controller::*, service_controller::*, terms_controller::*, ts::ts_controller::*,
+    update_controller::*,
 };
 use app::repository::email::{LettreMailGateway, MailGateway};
+use app::repository::release::{GithubReleaseGateway, ReleaseGateway};
 use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
 use app::repository::ts::sistema_ts::{HttpSistemaTsGateway, SistemaTsGateway};
+use app::service::rotating_backup_service::RotatingBackups;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,6 +33,15 @@ pub fn run() {
         Arc::new(HttpSistemaTsGateway::new().expect("Failed to load the Sistema TS certificates"));
     app::scheduler::ts_worker::spawn(db.clone(), secrets.clone(), ts_gateway.clone());
     let mail_gateway: Arc<dyn MailGateway> = Arc::new(LettreMailGateway);
+    let backups = Arc::new(RotatingBackups::new(
+        app::db::connection::db_path(),
+        app::db::connection::backups_dir(),
+    ));
+    app::scheduler::backup_worker::spawn(db.clone(), backups.clone());
+    let release_gateway: Arc<dyn ReleaseGateway> = Arc::new(
+        GithubReleaseGateway::new(env!("CARGO_PKG_VERSION"))
+            .expect("Failed to build the release check client"),
+    );
 
     tauri::Builder::default()
         .manage(AppState {
@@ -37,6 +49,8 @@ pub fn run() {
             secrets,
             ts_gateway,
             mail_gateway,
+            backups,
+            release_gateway,
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -85,6 +99,11 @@ pub fn run() {
             enqueue_ts_replacement,
             export_backup,
             get_backup_file_name,
+            get_backup_overview,
+            create_backup,
+            reveal_backups_folder,
+            get_app_version,
+            check_for_update,
             preview_invoice_totals,
             is_ts_invoice_out_of_date,
             enqueue_ts_cancellation,

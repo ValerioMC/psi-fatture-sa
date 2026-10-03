@@ -1,4 +1,5 @@
 pub mod appointment;
+pub mod backup;
 pub mod client;
 pub mod config;
 pub mod dashboard;
@@ -8,3 +9,4 @@ pub mod service;
 pub mod tax;
 pub mod terms;
 pub mod ts;
+pub mod update;

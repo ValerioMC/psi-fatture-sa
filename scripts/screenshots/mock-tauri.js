@@ -36,6 +36,18 @@
       notes: '', sts_authorization: rand() < 0.8, hide_quantity_in_invoice: null, created_at: '2025-01-10T09:00:00', updated_at: '2025-01-10T09:00:00',
     })
   }
+  const DATA_DIR = '/Users/demo/Library/Application Support/psi-fatture-sa'
+  const backupOverview = {
+    database_path: `${DATA_DIR}/database.db`,
+    backups_folder: `${DATA_DIR}/backups`,
+    keep: 10,
+    last_failure: null,
+    backups: Array.from({ length: 7 }, (_, n) => {
+      const day = addDays(todayIso, -n)
+      const name = `psi-fatture-${day.replace(/-/g, '')}-091${n}05-auto.db`
+      return { name, path: `${DATA_DIR}/backups/${name}`, size_bytes: 1_900_000 - n * 21_000, created_at: `${day} 09:1${n}:05`, reason: 'auto' }
+    }),
+  }
   const clientName = (c) => c.client_type === 'azienda' ? c.last_name : `${c.last_name} ${c.first_name}`
 
   const services = [
@@ -344,6 +356,18 @@
     is_ts_invoice_out_of_date: () => false,
     get_backup_file_name: () => `PSI-Fatture-backup-${todayIso}.db`,
     export_backup: () => null,
+    get_backup_overview: () => backupOverview,
+    create_backup: () => {
+      const stamp = new Date()
+      const created = `${iso(stamp.getFullYear(), stamp.getMonth() + 1, stamp.getDate())} ${pad(stamp.getHours())}:${pad(stamp.getMinutes())}:${pad(stamp.getSeconds())}`
+      const name = `psi-fatture-${created.replace(/[-:]/g, '').replace(' ', '-')}-manual.db`
+      const file = { name, path: `${backupOverview.backups_folder}/${name}`, size_bytes: 1_912_320, created_at: created, reason: 'manual' }
+      backupOverview.backups = [file, ...backupOverview.backups].slice(0, backupOverview.keep)
+      return file
+    },
+    reveal_backups_folder: () => null,
+    get_app_version: () => '0.9.7',
+    check_for_update: () => ({ current_version: '0.9.7', latest_version: '0.9.8', update_available: true, download_url: 'https://github.com/ValerioMC/psi-fatture-sa/releases/latest/download/PSI-Fatture-macOS-arm64.dmg', platform: 'mac_os_arm64', platform_label: 'Mac con chip Apple' }),
     get_next_invoice_number: () => String((counters[TY] ?? 0) + 1),
     bulk_update_invoice_status: ({ input }) => { for (const i of invoices) if (input.ids.includes(i.id)) { i.status = input.status; i.paid_date = input.paid_date } return input.ids.length },
     preview_monthly_invoices: ({ year, month }) => {

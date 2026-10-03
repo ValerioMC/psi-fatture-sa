@@ -3,8 +3,10 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import CommandPalette from './CommandPalette.vue'
+import UpdateDialog from '@/components/update/UpdateDialog.vue'
 import { useSmoothScroll } from '@/composables/useSmoothScroll'
 import { hasPrimaryModifier } from '@/utils/platform'
+import { useUpdateStore } from '@/stores/update'
 
 const paletteOpen = ref(false)
 const scrollWrapperRef = ref<HTMLElement | null>(null)
@@ -33,7 +35,12 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
+const update = useUpdateStore()
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  void update.checkAtStartup()
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
@@ -50,5 +57,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </div>
     </main>
     <CommandPalette :open="paletteOpen" @close="paletteOpen = false" />
+    <UpdateDialog />
   </div>
 </template>
