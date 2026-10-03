@@ -1,0 +1,6 @@
+# Single source of truth for the Rust version: local builds and both CI workflows read it.
+# Bump it on purpose, with `make lint` clean, instead of letting `stable` change under CI.
+[toolchain]
+channel = "1.99.0"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

@@ -81,8 +81,7 @@ impl RotatingBackups {
                     Some((name, file))
                 })
                 .collect();
-        parsed
-            .sort_by(|(a, _), (b, _)| (b.created_at, b.sequence).cmp(&(a.created_at, a.sequence)));
+        parsed.sort_by_key(|(name, _)| std::cmp::Reverse((name.created_at, name.sequence)));
         Ok(parsed.into_iter().map(|(_, file)| file).collect())
     }
 

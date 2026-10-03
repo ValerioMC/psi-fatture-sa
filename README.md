@@ -7,7 +7,7 @@ Gestionale fatture per psicologi — applicazione desktop per macOS e Windows co
 | Strumento | Versione minima | Installazione |
 |-----------|----------------|---------------|
 | **Node.js** | 18+ | [nodejs.org](https://nodejs.org/) oppure `brew install node` |
-| **Rust** | 1.77+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| **Rust** | 1.99 (fissato in `rust-toolchain.toml`, `rustup` lo scarica da solo) | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
 | **Xcode Command Line Tools** | — | `xcode-select --install` |
 
 > Xcode CLT è necessario perché Tauri usa il toolchain nativo Apple per compilare il binario macOS.
@@ -564,6 +564,8 @@ Il progetto integra **Rustfmt** (formatter) e **Clippy** (linter), entrambi stru
 
 Il workflow `.github/workflows/lint.yml` esegue entrambi i check automaticamente ad ogni push e pull request su `main`. Un warning Clippy non risolto blocca il check CI.
 
+La versione di Rust è fissata in `rust-toolchain.toml` (radice del repo) e letta sia da `rustup` in locale sia dai workflow `lint.yml` e `release.yml`: CI e macchina locale usano lo stesso compilatore, quindi un nuovo lint di Clippy non può rompere la CI a sorpresa. Per aggiornarla, cambia `channel`, esegui `make fmt lint test-backend`, correggi i nuovi warning e committa tutto insieme. Prima di ogni push basta `make fmt lint`, gli stessi comandi della CI.
+
 ### Rustfmt — formattazione
 
 ```bash
@@ -591,7 +593,7 @@ La configurazione si trova in `src-tauri/rustfmt.toml`:
 cd src-tauri
 
 # Analisi con tutti i warning (stessa modalità del CI)
-cargo clippy -- -D warnings
+cargo clippy --all-targets -- -D warnings
 
 # Analisi permissiva (solo output, non blocca)
 cargo clippy

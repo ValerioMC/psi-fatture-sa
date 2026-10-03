@@ -13,10 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Install Rust (version pinned in rust-toolchain.toml)
+        run: rustup toolchain install
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -28,5 +26,5 @@ jobs:
         working-directory: src-tauri
 
       - name: Clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
         working-directory: src-tauri
