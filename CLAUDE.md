@@ -30,6 +30,8 @@ Layering, one-type-per-file, typed errors and test placement are described in
   when the entity needs collaborators. In a package only `<entity>_service` is `pub`; the other
   files (rules, value types) are private modules with `pub(super)` items, re-exported by `mod.rs`.
   Example: `service/invoice/` (`invoice_service`, `invoice_guard`, `ClientSessions`, `InvoiceContent`).
+- **`service/support/` is not a service.** Pure, stateless helpers shared by several services
+  (`validation`, `tax_calculator`, `italian_format`). No database, no gateway, no `_service` name.
 - **Controllers forward.** A Tauri command validates nothing and maps nothing beyond calling one
   service function with `&state.db` and the gateways it needs.
 - **Repositories return data, not presentation.** Numbers as numbers, dates as stored; formatting

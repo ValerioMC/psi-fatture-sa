@@ -7,7 +7,7 @@ use crate::app::model::email::{
 };
 use crate::app::repository::config_repository;
 use crate::app::repository::email::email_account_repository;
-use crate::app::service::validation_service as validate;
+use crate::app::service::support::validation as validate;
 
 const NAME_MAX_LENGTH: usize = 100;
 

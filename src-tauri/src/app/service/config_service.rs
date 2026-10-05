@@ -4,7 +4,7 @@ use crate::app::common::AppError;
 use crate::app::entity::professional_config::{self, ActiveModel};
 use crate::app::model::config::{Profession, ProfessionalConfig, TaxRegime, UpsertConfigInput};
 use crate::app::repository::config_repository;
-use crate::app::service::validation_service as validate;
+use crate::app::service::support::validation as validate;
 
 /// Returns the professional config, or None if not yet configured.
 pub async fn get(db: &DatabaseConnection) -> Result<Option<ProfessionalConfig>, AppError> {

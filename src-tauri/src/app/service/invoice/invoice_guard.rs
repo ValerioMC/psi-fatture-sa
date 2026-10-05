@@ -8,7 +8,7 @@ use crate::app::model::invoice::{Invoice, InvoiceStatus};
 use crate::app::model::ts::TsEnvironment;
 use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::ts::ts_submission_repository;
-use crate::app::service::italian_format::date_long;
+use crate::app::service::support::italian_format::date_long;
 
 /// A number is used once per year: "007" and "7" count as the same number.
 pub(super) async fn ensure_number_free(

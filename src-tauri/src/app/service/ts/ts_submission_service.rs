@@ -10,8 +10,8 @@ use crate::app::model::ts::{
     TsDocumentId, TsEnvironment, TsOperation, TsSubmission, TsSubmissionFilters, TsSubmissionStatus,
 };
 use crate::app::repository::ts::ts_submission_repository;
+use crate::app::service::support::validation as validate;
 use crate::app::service::ts::{ts_document_service, ts_settings_service};
-use crate::app::service::validation_service as validate;
 
 const IN_FLIGHT: [TsSubmissionStatus; 2] =
     [TsSubmissionStatus::NonInviata, TsSubmissionStatus::Inviata];

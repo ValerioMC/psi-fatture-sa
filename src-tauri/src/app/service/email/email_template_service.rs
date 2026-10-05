@@ -9,7 +9,7 @@ use crate::app::model::email::{
 };
 use crate::app::repository::config_repository;
 use crate::app::repository::email::email_template_repository;
-use crate::app::service::italian_format;
+use crate::app::service::support::italian_format;
 
 const SUBJECT_MAX_LENGTH: usize = 200;
 const BODY_MAX_LENGTH: usize = 10_000;

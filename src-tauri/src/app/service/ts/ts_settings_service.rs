@@ -5,7 +5,7 @@ use crate::app::entity::ts_setting::ActiveModel;
 use crate::app::model::ts::{TsEnvironment, TsSettings, UpdateTsSettingsInput};
 use crate::app::repository::config_repository;
 use crate::app::repository::ts::ts_settings_repository;
-use crate::app::service::validation_service as validate;
+use crate::app::service::support::validation as validate;
 
 /// The Sistema TS settings. Until saved, or when saved for an environment
 /// this build does not have, they point at production with the codice fiscale

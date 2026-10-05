@@ -4,7 +4,7 @@ use crate::app::common::AppError;
 use crate::app::entity::client::{self, ActiveModel};
 use crate::app::model::client::{Client, ClientType, CreateClientInput, UpdateClientInput};
 use crate::app::repository::client_repository;
-use crate::app::service::validation_service as validate;
+use crate::app::service::support::validation as validate;
 
 /// Lists all clients, optionally filtered by search query.
 pub async fn list(

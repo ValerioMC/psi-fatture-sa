@@ -13,7 +13,7 @@ use crate::app::model::invoice::{Invoice, InvoiceStatus, PaymentMethod};
 use crate::app::model::ts::{TsDocumentId, TsExpenseDocument, TsExpenseItem, TsVatTreatment};
 use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::{client_repository, config_repository};
-use crate::app::service::{client_service, validation_service as validate};
+use crate::app::service::{client_service, support::validation as validate};
 
 const FORFETTARIO_NATURA: &str = "N2.2";
 const EXEMPT_NATURA: &str = "N4";

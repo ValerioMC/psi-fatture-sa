@@ -248,7 +248,7 @@ e un solo colore d'accento (indaco inchiostro) per selezione, azione primaria e 
 
 ## Calcolo della fattura
 
-Solo il backend (`src-tauri/src/app/service/tax_service.rs`) calcola i totali: il
+Solo il backend (`src-tauri/src/app/service/support/tax_calculator.rs`) calcola i totali: il
 riepilogo del modulo li chiede mentre scrivi al comando `preview_invoice_totals`
 (`src/composables/useInvoiceTotals.ts`), lo stesso codice che poi salva la fattura.
 
@@ -510,7 +510,8 @@ psi-fatture-sa/
 │   │   │   │   ├── update/     # Controllo della release (update_service) e installazione su Mac
 │   │   │   │   ├── ts/         # Sistema TS: coda, invio, credenziali, impostazioni
 │   │   │   │   ├── email/      # Invio fatture e modello dell'email
-│   │   │   │   └── pdf/        # PDF della fattura
+│   │   │   │   ├── pdf/        # PDF della fattura
+│   │   │   │   └── support/    # Funzioni pure condivise: validazione, calcolo fiscale, formati italiani
 │   │   │   ├── repository/ # Accesso dati (SeaORM, SQL) e servizi esterni
 │   │   │   │   ├── invoice/    # Fatture e proiezione delle righe lette
 │   │   │   │   ├── secret/     # Archivio cifrato delle credenziali

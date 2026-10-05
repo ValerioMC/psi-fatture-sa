@@ -14,7 +14,7 @@ use crate::app::repository::email::{
 };
 use crate::app::repository::secret::SecretStore;
 use crate::app::service::pdf::{invoice_pdf_service, InvoiceDocument};
-use crate::app::service::validation_service as validate;
+use crate::app::service::support::validation as validate;
 
 /// The email the template proposes for this invoice, addressed to the patient's
 /// address on file when there is one.

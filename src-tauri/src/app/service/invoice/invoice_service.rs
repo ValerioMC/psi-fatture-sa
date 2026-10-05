@@ -13,9 +13,9 @@ use crate::app::model::invoice::{
 use crate::app::model::tax::{InvoiceLineData, InvoiceTotals, TaxRules};
 use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::{appointment_repository, service_repository};
-use crate::app::service::tax_service::{calculate_invoice_totals, rules_for};
+use crate::app::service::support::tax_calculator::{calculate_invoice_totals, rules_for};
+use crate::app::service::support::validation as validate;
 use crate::app::service::ts::ts_submission_service;
-use crate::app::service::validation_service as validate;
 
 /// The id a numbering check excludes for an invoice not saved yet: none.
 const NEW_INVOICE_ID: i64 = 0;

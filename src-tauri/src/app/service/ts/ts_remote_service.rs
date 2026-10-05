@@ -13,8 +13,8 @@ use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::secret::SecretStore;
 use crate::app::repository::ts::sistema_ts::{ReportOutcome, SistemaTsGateway, TsGatewayError};
 use crate::app::repository::ts::ts_submission_repository;
+use crate::app::service::support::validation as validate;
 use crate::app::service::ts::{ts_credential_service, ts_settings_service};
-use crate::app::service::validation_service as validate;
 
 /// Number used by the connection check; no real invoice carries it.
 const PROBE_DOCUMENT_NUMBER: &str = "PSIFATTURE-CHECK";

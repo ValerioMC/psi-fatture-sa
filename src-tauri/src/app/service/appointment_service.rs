@@ -6,7 +6,7 @@ use crate::app::model::appointment::{
     Appointment, CreateAppointmentInput, CreateRecurringAppointmentsInput, UpdateAppointmentInput,
 };
 use crate::app::repository::appointment_repository;
-use crate::app::service::validation_service as validate;
+use crate::app::service::support::validation as validate;
 
 /// Lists appointments with optional date range and client filters.
 pub async fn list(

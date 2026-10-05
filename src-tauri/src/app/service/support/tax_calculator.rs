@@ -74,5 +74,5 @@ pub fn calculate_invoice_totals(lines: &[InvoiceLineData], rules: &TaxRules) -> 
 }
 
 #[cfg(test)]
-#[path = "tax_service_test.rs"]
+#[path = "tax_calculator_test.rs"]
 mod tests;

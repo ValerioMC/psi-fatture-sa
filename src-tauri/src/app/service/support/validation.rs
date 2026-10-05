@@ -328,5 +328,5 @@ pub fn validate_email(value: &str) -> Result<(), AppError> {
 }
 
 #[cfg(test)]
-#[path = "validation_service_test.rs"]
+#[path = "validation_test.rs"]
 mod tests;

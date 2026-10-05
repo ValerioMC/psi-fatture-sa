@@ -1,7 +1,7 @@
 use crate::app::model::client::ClientType;
 use crate::app::model::email::EmailPlaceholder;
-use crate::app::service::italian_format::{currency, date_long};
 use crate::app::service::pdf::InvoiceDocument;
+use crate::app::service::support::italian_format::{currency, date_long};
 
 /// The text each placeholder stands for, for one invoice.
 #[derive(Debug, Clone, PartialEq, Eq)]

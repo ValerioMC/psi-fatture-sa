@@ -5,7 +5,7 @@
 use crate::app::model::client::ClientType;
 use crate::app::model::config::Profession;
 use crate::app::model::invoice::{InvoiceLine, PaymentMethod};
-use crate::app::service::italian_format::{currency, date_long};
+use crate::app::service::support::italian_format::{currency, date_long};
 
 use super::block::baseline;
 use super::page_flow::{CONTENT_WIDTH, MARGIN_BOTTOM, MARGIN_SIDE, PAGE_HEIGHT};
