@@ -510,7 +510,7 @@ psi-fatture-sa/
 │   │   │   │   ├── update/     # Controllo della release (update_service) e installazione su Mac
 │   │   │   │   ├── ts/         # Sistema TS: coda, invio, credenziali, impostazioni
 │   │   │   │   ├── email/      # Invio fatture e modello dell'email
-│   │   │   │   ├── pdf/        # PDF della fattura
+│   │   │   │   ├── pdf/        # PDF della fattura; layout/ disegna la pagina, un modulo per sezione
 │   │   │   │   └── support/    # Funzioni pure condivise: validazione, calcolo fiscale, formati italiani
 │   │   │   ├── repository/ # Accesso dati (SeaORM, SQL) e servizi esterni
 │   │   │   │   ├── appointment/ # Appuntamenti e riga letta con paziente e prestazione

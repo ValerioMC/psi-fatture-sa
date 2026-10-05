@@ -1,4 +1,4 @@
-use super::super::{invoice_layout, invoice_legal_notes, DrawOp, Face};
+use super::super::{invoice_legal_notes, layout, DrawOp, Face};
 use super::*;
 use crate::app::model::client::{Client, ClientType};
 use crate::app::model::config::{Profession, ProfessionalConfig, TaxRegime};
@@ -124,7 +124,7 @@ fn renders_a_one_page_pdf_named_after_the_invoice() {
 #[test]
 fn prints_the_figures_the_print_view_prints() {
     let fonts = PdfFonts::shared().unwrap();
-    let pages = invoice_layout::layout(&document(vec![line("Colloquio psicologico", 80.0)]), fonts);
+    let pages = layout::layout(&document(vec![line("Colloquio psicologico", 80.0)]), fonts);
     assert_eq!(pages.len(), 1);
     let texts = texts(&pages);
     for expected in [
@@ -151,7 +151,7 @@ fn long_invoices_continue_on_a_new_page_with_the_table_head_again() {
     let lines = (1..=45)
         .map(|n| line(&format!("Seduta del {n} marzo"), 80.0))
         .collect();
-    let pages = invoice_layout::layout(&document(lines), fonts);
+    let pages = layout::layout(&document(lines), fonts);
     assert!(pages.len() >= 2);
     let heads = texts(&pages).iter().filter(|t| *t == "DESCRIZIONE").count();
     assert!(heads >= 2, "the head repeats on the next page");
@@ -173,7 +173,7 @@ fn hides_quantity_columns_when_the_invoice_asks() {
     let fonts = PdfFonts::shared().unwrap();
     let mut doc = document(vec![line("Colloquio", 80.0)]);
     doc.invoice.hide_quantity = true;
-    let texts = texts(&invoice_layout::layout(&doc, fonts));
+    let texts = texts(&layout::layout(&doc, fonts));
     assert!(!texts.iter().any(|t| t == "QTÀ" || t == "PREZZO UNIT."));
 }
 
@@ -184,10 +184,35 @@ fn hand_typed_amount_prints_without_a_unit_price() {
     package.quantity = 4;
     package.unit_price = 70.0;
     package.amount_override = Some(250.0);
-    let texts = texts(&invoice_layout::layout(&document(vec![package]), fonts));
+    let texts = texts(&layout::layout(&document(vec![package]), fonts));
     assert!(texts.iter().any(|t| t == "QTÀ"));
     assert!(!texts.iter().any(|t| t.contains("70,00")));
     assert!(texts.iter().any(|t| t.contains("250,00")));
+}
+
+#[test]
+fn totals_list_only_the_amounts_that_apply() {
+    let fonts = PdfFonts::shared().unwrap();
+    let mut doc = document(vec![line("Supervisione", 300.0)]);
+    doc.invoice.apply_enpap = false;
+    doc.invoice.marca_da_bollo = false;
+    doc.invoice.ritenuta_acconto = 60.0;
+    let texts = texts(&layout::layout(&doc, fonts));
+    assert!(texts.iter().any(|t| t == "Ritenuta d'acconto 20%"));
+    assert!(texts.iter().any(|t| t == "− 60,00 €"));
+    assert!(!texts
+        .iter()
+        .any(|t| t == "Marca da bollo" || t == "Contributo ENPAP 2%"));
+}
+
+#[test]
+fn letterhead_leaves_out_a_blank_half_of_the_albo_line() {
+    let fonts = PdfFonts::shared().unwrap();
+    let mut doc = document(vec![line("Colloquio", 80.0)]);
+    doc.config.albo_region = "  ".into();
+    let texts = texts(&layout::layout(&doc, fonts));
+    assert!(texts.iter().any(|t| t == "Iscriz. Albo n. "));
+    assert!(!texts.iter().any(|t| t == "Regione " || t == " — "));
 }
 
 #[test]

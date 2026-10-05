@@ -7,7 +7,7 @@ use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::{client_repository, config_repository};
 use crate::app::service::{client_service, config_service};
 
-use super::{invoice_layout, pdf_painter, InvoiceDocument, PdfFonts};
+use super::{layout, pdf_painter, InvoiceDocument, PdfFonts};
 
 /// The invoice as a PDF, built from what is saved now.
 pub async fn render(db: &impl ConnectionTrait, invoice_id: i64) -> Result<InvoicePdf, AppError> {
@@ -37,7 +37,7 @@ pub async fn load_document(
 
 pub fn render_document(document: &InvoiceDocument) -> Result<InvoicePdf, AppError> {
     let fonts = PdfFonts::shared().map_err(AppError::External)?;
-    let pages = invoice_layout::layout(document, fonts);
+    let pages = layout::layout(document, fonts);
     let bytes =
         pdf_painter::paint(&pages, fonts, metadata(document)).map_err(AppError::External)?;
     Ok(InvoicePdf {
