@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
  * Twelve stacked columns by month of issue: paid in solid ink, still to collect
- * hatched on top, the same "not yet" hatching as the threshold meter. The
- * current month sits in a faint band, the best month carries its value in full
- * ink, and months still ahead are empty slots: no data is not zero.
+ * hatched above it (the same "not yet" hatching as the threshold meter), and
+ * drafts not yet issued as a dotted, dashed-edge sketch on top. The current
+ * month sits in a faint band, the best month carries its value in full ink.
+ * Months ahead show what is already booked in them; with nothing booked they
+ * stay empty slots: no data is not zero.
  */
 import { computed, nextTick, ref } from 'vue'
 import type { MonthlyRevenue } from '@/types'
@@ -16,6 +18,8 @@ const props = defineProps<{
   months: readonly MonthlyRevenue[]
   /** Index 0 is January; issued or overdue invoices not yet paid. */
   pending: readonly MonthPending[]
+  /** Index 0 is January; draft invoices, not yet issued. */
+  drafts: readonly MonthPending[]
   /** 1-12 when the year shown is the current one, else null. */
   currentMonth: number | null
 }>()
@@ -31,12 +35,18 @@ interface Column {
   paidCount: number
   pending: number
   pendingCount: number
+  draft: number
+  draftCount: number
+  /** Paid, pending and draft together: the height of the column. */
   total: number
+  /** Paid and pending only: what is really invoiced, the basis for the average and the best month. */
+  issued: number
 }
 
 const columns = computed<Column[]>(() =>
   props.months.map((month) => {
     const pending = props.pending[month.month - 1] ?? { amount: 0, count: 0 }
+    const draft = props.drafts[month.month - 1] ?? { amount: 0, count: 0 }
     return {
       month: month.month,
       name: month.month_name,
@@ -44,7 +54,10 @@ const columns = computed<Column[]>(() =>
       paidCount: month.invoice_count,
       pending: pending.amount,
       pendingCount: pending.count,
-      total: month.revenue + pending.amount,
+      draft: draft.amount,
+      draftCount: draft.count,
+      total: month.revenue + pending.amount + draft.amount,
+      issued: month.revenue + pending.amount,
     }
   }),
 )
@@ -60,21 +73,27 @@ function niceCeiling(value: number): number {
 const axisMax = computed(() => niceCeiling(Math.max(...columns.value.map((column) => column.total), 0)))
 const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map((share) => axisMax.value * share))
 
-const lived = computed(() => columns.value.filter((column) => !isFuture(column.month) && column.total > 0))
+const lived = computed(() => columns.value.filter((column) => !isFuture(column.month) && column.issued > 0))
 
 /** Average invoiced over the months already lived that had any: the line the columns are read against. */
 const average = computed(() => {
   if (lived.value.length < 2) return null
-  return lived.value.reduce((sum, column) => sum + column.total, 0) / lived.value.length
+  return lived.value.reduce((sum, column) => sum + column.issued, 0) / lived.value.length
 })
 
-const bestMonth = computed(() => lived.value.reduce<Column | null>((best, column) => (best === null || column.total > best.total ? column : best), null)?.month ?? null)
+const bestMonth = computed(() => lived.value.reduce<Column | null>((best, column) => (best === null || column.issued > best.issued ? column : best), null)?.month ?? null)
 
 const paidTotal = computed(() => columns.value.reduce((sum, column) => sum + column.paid, 0))
 const pendingTotal = computed(() => columns.value.reduce((sum, column) => sum + column.pending, 0))
+const draftTotal = computed(() => columns.value.reduce((sum, column) => sum + column.draft, 0))
 
 function isFuture(month: number): boolean {
   return props.currentMonth !== null && month > props.currentMonth
+}
+
+/** A month ahead with nothing booked is an empty slot; with invoices in it, it is a column like any other. */
+function isEmptySlot(column: Column): boolean {
+  return isFuture(column.month) && column.total === 0
 }
 
 function share(value: number): number {
@@ -95,8 +114,8 @@ function plotHeightOf(column: Column): string {
   return `(100% - 1.5rem) * ${heightShare(column) / 100}`
 }
 
-function pendingShare(column: Column): string {
-  return column.total > 0 ? `${(column.pending / column.total) * 100}%` : '0%'
+function segmentShare(column: Column, amount: number): string {
+  return column.total > 0 ? `${(amount / column.total) * 100}%` : '0%'
 }
 
 /** Room between a column and the tooltip above it, clear of the value label on the column. */
@@ -180,7 +199,7 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
                 aria-hidden="true"
               />
               <div
-                v-if="isFuture(column.month)"
+                v-if="isEmptySlot(column)"
                 class="relative h-1 w-[min(30px,60%)] rounded-full bg-surface-sunken"
                 aria-hidden="true"
               />
@@ -198,16 +217,22 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
                   :class="column.month === bestMonth ? 'font-semibold text-text' : 'text-text-subtle'"
                 >{{ formatCurrencyCompact(column.total) }}</span>
                 <div
+                  v-if="column.draft > 0"
+                  class="draft shrink-0 rounded-t-[5px] text-text-muted"
+                  :class="column.paid + column.pending > 0 ? '' : 'rounded-b-[2px]'"
+                  :style="{ height: segmentShare(column, column.draft) }"
+                />
+                <div
                   v-if="column.pending > 0"
-                  class="pending shrink-0 rounded-t-[5px] text-warn"
-                  :class="column.paid > 0 ? '' : 'rounded-b-[2px]'"
-                  :style="{ height: pendingShare(column) }"
+                  class="pending shrink-0 text-warn"
+                  :class="[column.draft > 0 ? '' : 'rounded-t-[5px]', column.paid > 0 ? '' : 'rounded-b-[2px]']"
+                  :style="{ height: segmentShare(column, column.pending) }"
                 />
                 <div
                   v-if="column.paid > 0"
                   class="bar flex-1"
                   :class="[
-                    column.pending > 0 ? '' : 'rounded-t-[5px]',
+                    column.pending > 0 || column.draft > 0 ? '' : 'rounded-t-[5px]',
                     column.month === currentMonth ? 'bar-current' : hovered === column.month ? 'bar-hover' : '',
                   ]"
                 />
@@ -222,13 +247,16 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
             <!-- Tooltip: the month's total, then what is in and what is still out. Above the column, or beside it when the header is in the way. -->
             <Transition name="popover">
               <div
-                v-if="hovered === column.month && !isFuture(column.month)"
+                v-if="hovered === column.month && !isEmptySlot(column)"
                 class="pointer-events-none absolute z-(--z-overlay) min-w-44 whitespace-nowrap rounded-control border border-border bg-surface-raised px-3 py-2.5 shadow-modal"
                 :style="tooltipStyle(column)"
                 data-tooltip
                 role="presentation"
               >
-                <p class="text-2xs capitalize text-text-subtle">{{ column.name }}</p>
+                <p class="flex items-center gap-1.5 text-2xs capitalize text-text-subtle">
+                  {{ column.name }}
+                  <span v-if="isFuture(column.month)" class="rounded-full bg-surface-sunken px-1.5 py-px normal-case">in programma</span>
+                </p>
                 <p class="tabular text-base font-semibold text-text">{{ formatCurrency(column.total) }}</p>
                 <dl class="mt-2 space-y-1 border-t border-border pt-2 text-2xs">
                   <div class="flex items-center gap-2">
@@ -241,9 +269,14 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
                     <dt class="text-text-muted">Da incassare</dt>
                     <dd class="tabular ml-auto pl-4 text-text">{{ formatCurrency(column.pending) }}</dd>
                   </div>
+                  <div v-if="column.draft > 0" class="flex items-center gap-2">
+                    <span class="draft size-2 rounded-[2px] text-text-muted" aria-hidden="true" />
+                    <dt class="text-text-muted">In bozza</dt>
+                    <dd class="tabular ml-auto pl-4 text-text">{{ formatCurrency(column.draft) }}</dd>
+                  </div>
                 </dl>
                 <p class="mt-1.5 text-2xs text-text-subtle">
-                  {{ plural(column.paidCount + column.pendingCount, 'fattura', 'fatture') }}<template v-if="column.pendingCount > 0">, {{ column.pendingCount }} in attesa</template>
+                  {{ plural(column.paidCount + column.pendingCount + column.draftCount, 'fattura', 'fatture') }}<template v-if="column.pendingCount > 0">, {{ column.pendingCount }} in attesa</template><template v-if="column.draftCount > 0">, {{ plural(column.draftCount, 'bozza', 'bozze') }}</template>
                 </p>
               </div>
             </Transition>
@@ -272,6 +305,11 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
         <dt class="text-text-muted">Da incassare</dt>
         <dd class="tabular font-semibold text-text">{{ formatCurrencyCompact(pendingTotal) }}</dd>
       </div>
+      <div v-if="draftTotal > 0" class="flex items-center gap-2">
+        <span class="draft size-2.5 rounded-[3px] text-text-muted" aria-hidden="true" />
+        <dt class="text-text-muted">In bozza</dt>
+        <dd class="tabular font-semibold text-text">{{ formatCurrencyCompact(draftTotal) }}</dd>
+      </div>
       <div v-if="average !== null" class="flex items-center gap-2">
         <span class="w-3.5 border-t border-dashed border-accent" aria-hidden="true" />
         <dt class="text-text-muted">Media mensile</dt>
@@ -283,13 +321,14 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
     <table class="sr-only">
       <caption>Fatturato per mese</caption>
       <thead>
-        <tr><th scope="col">Mese</th><th scope="col">Incassato</th><th scope="col">Da incassare</th></tr>
+        <tr><th scope="col">Mese</th><th scope="col">Incassato</th><th scope="col">Da incassare</th><th scope="col">In bozza</th></tr>
       </thead>
       <tbody>
         <tr v-for="column in columns" :key="column.month">
           <th scope="row">{{ column.name }}</th>
           <td>{{ formatCurrency(column.paid) }}</td>
           <td>{{ formatCurrency(column.pending) }}</td>
+          <td>{{ formatCurrency(column.draft) }}</td>
         </tr>
       </tbody>
     </table>
@@ -319,6 +358,14 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
     transparent 1.5px 4.5px
   );
   box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+/* A draft is a sketch, not an invoice: neutral ink, a dot grid instead of a fill, and a dashed edge no issued mark has. */
+.draft {
+  background-color: color-mix(in srgb, currentColor 6%, transparent);
+  background-image: radial-gradient(color-mix(in srgb, currentColor 60%, transparent) 0.75px, transparent 1px);
+  background-size: 4px 4px;
+  border: 1px dashed color-mix(in srgb, currentColor 55%, transparent);
 }
 
 .now-band {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pendingByMonth, type InvoiceForPending } from './monthlyPending'
+import { draftByMonth, pendingByMonth, type InvoiceForPending } from './monthlyPending'
 
 const invoice = (status: InvoiceForPending['status'], issue_date: string, total_due: number): InvoiceForPending => ({ status, issue_date, total_due })
 
@@ -31,5 +31,18 @@ describe('pendingByMonth', () => {
 
   it('skips an invoice with a malformed date instead of throwing', () => {
     expect(() => pendingByMonth([invoice('issued', 'bad', 10)])).not.toThrow()
+  })
+})
+
+describe('draftByMonth', () => {
+  it('sums only draft invoices by month of issue, future months included', () => {
+    const months = draftByMonth([
+      invoice('draft', '2026-12-15', 80),
+      invoice('draft', '2026-12-20', 40.5),
+      invoice('issued', '2026-12-01', 99),
+      invoice('paid', '2026-03-10', 80),
+    ])
+    expect(months[11]).toEqual({ amount: 120.5, count: 2 })
+    expect(months[2]).toEqual({ amount: 0, count: 0 })
   })
 })
