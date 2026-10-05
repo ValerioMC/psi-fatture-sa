@@ -101,33 +101,10 @@ where
 
     let row = ts_submission_repository::find_row(&tx, id).await?;
     transition_guard(&row, next)?;
-    let operation = TsOperation::parse(&row.operation)?;
-    let target_id = row.target_submission_id;
-
-    let mut active = row.into_active_model();
-    active.status = Set(next.as_str().to_owned());
-    active.protocol = Set(outcome.protocol.clone());
-    active.outcome_code = Set(outcome.code.clone());
-    active.outcome_message = Set(outcome.message.clone());
-    active.last_error = Set(None);
-    active.resolved_at = Set(Some(stamp.clone()));
-    if outcome.accepted {
-        active.sent_at = Set(Some(stamp.clone()));
-    }
-    active.updated_at = Set(stamp.clone());
-    ts_submission_repository::update(&tx, active).await?;
-
-    if let (true, Some(target_id), Some(retired)) = (
-        outcome.accepted,
-        target_id,
-        operation.target_status_on_acceptance(),
-    ) {
-        let target = ts_submission_repository::find_row(&tx, target_id).await?;
-        transition_guard(&target, retired)?;
-        let mut target_active = target.into_active_model();
-        target_active.status = Set(retired.as_str().to_owned());
-        target_active.updated_at = Set(stamp);
-        ts_submission_repository::update(&tx, target_active).await?;
+    let retired_target = retired_target(&row, outcome)?;
+    store_verdict(&tx, row, next, outcome, &stamp).await?;
+    if let Some((target_id, retired)) = retired_target {
+        retire_target(&tx, target_id, retired, &stamp).await?;
     }
 
     tx.commit().await?;
@@ -140,6 +117,57 @@ pub async fn requeue_interrupted(
     now: NaiveDateTime,
 ) -> Result<u64, AppError> {
     ts_submission_repository::requeue_in_flight(db, &format_timestamp(now)).await
+}
+
+/// The submission an accepted replacement or cancellation supersedes, with the status it moves to.
+fn retired_target(
+    row: &ts_submission::Model,
+    outcome: &TsOutcome,
+) -> Result<Option<(i64, TsSubmissionStatus)>, AppError> {
+    let operation = TsOperation::parse(&row.operation)?;
+    Ok(match (outcome.accepted, row.target_submission_id) {
+        (true, Some(target_id)) => operation
+            .target_status_on_acceptance()
+            .map(|retired| (target_id, retired)),
+        _ => None,
+    })
+}
+
+async fn store_verdict(
+    db: &impl ConnectionTrait,
+    row: ts_submission::Model,
+    next: TsSubmissionStatus,
+    outcome: &TsOutcome,
+    stamp: &str,
+) -> Result<(), AppError> {
+    let mut active = row.into_active_model();
+    active.status = Set(next.as_str().to_owned());
+    active.protocol = Set(outcome.protocol.clone());
+    active.outcome_code = Set(outcome.code.clone());
+    active.outcome_message = Set(outcome.message.clone());
+    active.last_error = Set(None);
+    active.resolved_at = Set(Some(stamp.to_owned()));
+    if outcome.accepted {
+        active.sent_at = Set(Some(stamp.to_owned()));
+    }
+    active.updated_at = Set(stamp.to_owned());
+    ts_submission_repository::update(db, active).await?;
+    Ok(())
+}
+
+async fn retire_target(
+    db: &impl ConnectionTrait,
+    target_id: i64,
+    retired: TsSubmissionStatus,
+    stamp: &str,
+) -> Result<(), AppError> {
+    let target = ts_submission_repository::find_row(db, target_id).await?;
+    transition_guard(&target, retired)?;
+    let mut active = target.into_active_model();
+    active.status = Set(retired.as_str().to_owned());
+    active.updated_at = Set(stamp.to_owned());
+    ts_submission_repository::update(db, active).await?;
+    Ok(())
 }
 
 /// Delay before the next attempt: 1 min doubling per attempt, capped at 6 hours.

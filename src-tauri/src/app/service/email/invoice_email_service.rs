@@ -7,7 +7,7 @@ use crate::app::model::email::{
     EmailAccount, EmailConnectionCheck, EmailDraft, InvoiceEmail, InvoiceEmailFilters,
     InvoiceEmailStatus, SendInvoiceEmailInput,
 };
-use crate::app::model::invoice::InvoiceStatus;
+use crate::app::model::invoice::{InvoicePdf, InvoiceStatus};
 use crate::app::repository::client_repository;
 use crate::app::repository::email::{
     invoice_email_repository, MailAttachment, MailGateway, OutgoingMail,
@@ -48,57 +48,32 @@ pub async fn send(
     gateway: &dyn MailGateway,
     input: SendInvoiceEmailInput,
 ) -> Result<InvoiceEmail, AppError> {
-    let recipient = input.recipient.trim().to_lowercase();
-    validate::validate_required(&recipient, "Destinatario")?;
-    validate::validate_email(&recipient)?;
+    let recipient = normalized_recipient(&input.recipient)?;
     let subject = input.subject.trim().to_string();
-    validate::validate_required(&subject, "Oggetto")?;
-    validate::validate_required(&input.body, "Testo dell'email")?;
+    ensure_message_complete(&subject, &input.body)?;
 
     let account = email_account_service::saved(db).await?;
     let session = email_credential_service::session(secrets, &account)?;
     let document = invoice_pdf_service::load_document(db, input.invoice_id).await?;
     ensure_sendable(&document)?;
     let pdf = invoice_pdf_service::render_document(&document)?;
+    let attachment_name = pdf.file_name.clone();
 
-    let mail = OutgoingMail {
-        from_address: account.sender_address.clone(),
-        from_name: account.sender_name.clone(),
-        to: recipient.clone(),
-        bcc: bcc(&account, &recipient),
-        subject: subject.clone(),
-        body: input.body.trim_end().to_string(),
-        attachment: Some(MailAttachment {
-            file_name: pdf.file_name.clone(),
-            content_type: "application/pdf".to_string(),
-            bytes: pdf.bytes,
-        }),
-    };
-    let outcome = gateway.send(&session, &mail).await;
-    let error = outcome.as_ref().err().map(ToString::to_string);
-    let record = record(
-        db,
-        input.invoice_id,
-        &recipient,
-        &subject,
-        &pdf.file_name,
-        error.clone(),
-    )
-    .await?;
+    let mail = outgoing_mail(&account, &recipient, &subject, &input.body, pdf);
+    let error = gateway
+        .send(&session, &mail)
+        .await
+        .err()
+        .map(|e| e.to_string());
+    let sent = record(db, input.invoice_id, &mail, &attachment_name, error.clone()).await?;
     if let Some(error) = error {
         log::warn!(target: "email", invoice_id = input.invoice_id; "invoice email not sent");
         return Err(AppError::External(error));
     }
-    if input.remember_recipient
-        && document
-            .client
-            .email
-            .as_deref()
-            .is_none_or(|e| e.trim().is_empty())
-    {
-        client_repository::update_email(db, document.client.id, &recipient).await?;
+    if input.remember_recipient {
+        save_recipient_if_none_on_file(db, &document, &recipient).await?;
     }
-    Ok(record)
+    Ok(sent)
 }
 
 /// Sends the template as it is, for invoices emailed in bulk from the list.
@@ -176,6 +151,53 @@ fn ensure_sendable(document: &InvoiceDocument) -> Result<(), AppError> {
     }
 }
 
+fn normalized_recipient(raw: &str) -> Result<String, AppError> {
+    let recipient = raw.trim().to_lowercase();
+    validate::validate_required(&recipient, "Destinatario")?;
+    validate::validate_email(&recipient)?;
+    Ok(recipient)
+}
+
+fn ensure_message_complete(subject: &str, body: &str) -> Result<(), AppError> {
+    validate::validate_required(subject, "Oggetto")?;
+    validate::validate_required(body, "Testo dell'email")
+}
+
+fn outgoing_mail(
+    account: &EmailAccount,
+    recipient: &str,
+    subject: &str,
+    body: &str,
+    pdf: InvoicePdf,
+) -> OutgoingMail {
+    OutgoingMail {
+        from_address: account.sender_address.clone(),
+        from_name: account.sender_name.clone(),
+        to: recipient.to_string(),
+        bcc: bcc(account, recipient),
+        subject: subject.to_string(),
+        body: body.trim_end().to_string(),
+        attachment: Some(MailAttachment {
+            file_name: pdf.file_name,
+            content_type: "application/pdf".to_string(),
+            bytes: pdf.bytes,
+        }),
+    }
+}
+
+/// An address typed by hand never overwrites the one in the patient's file.
+async fn save_recipient_if_none_on_file(
+    db: &impl ConnectionTrait,
+    document: &InvoiceDocument,
+    recipient: &str,
+) -> Result<(), AppError> {
+    let on_file = document.client.email.as_deref().map(str::trim);
+    if on_file.is_none_or(str::is_empty) {
+        client_repository::update_email(db, document.client.id, recipient).await?;
+    }
+    Ok(())
+}
+
 /// A copy to the sender, unless the sender is the recipient.
 fn bcc(account: &EmailAccount, recipient: &str) -> Option<String> {
     (account.bcc_self && account.sender_address != recipient)
@@ -185,8 +207,7 @@ fn bcc(account: &EmailAccount, recipient: &str) -> Option<String> {
 async fn record(
     db: &impl ConnectionTrait,
     invoice_id: i64,
-    recipient: &str,
-    subject: &str,
+    mail: &OutgoingMail,
     attachment_name: &str,
     error: Option<String>,
 ) -> Result<InvoiceEmail, AppError> {
@@ -197,8 +218,8 @@ async fn record(
     };
     let active = ActiveModel {
         invoice_id: Set(invoice_id),
-        recipient: Set(recipient.to_string()),
-        subject: Set(subject.to_string()),
+        recipient: Set(mail.to.clone()),
+        subject: Set(mail.subject.clone()),
         attachment_name: Set(attachment_name.to_string()),
         status: Set(status.as_str().to_string()),
         error: Set(error),

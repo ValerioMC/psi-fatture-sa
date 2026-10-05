@@ -90,37 +90,40 @@ pub fn validate_invoice_lines(lines: &[InvoiceLineInput]) -> Result<(), AppError
             "La fattura deve contenere almeno una riga".to_string(),
         ));
     }
-    for (idx, l) in lines.iter().enumerate() {
-        let row = idx + 1;
-        if l.description.trim().is_empty() {
-            return Err(AppError::Invalid(format!(
-                "Riga {row}: descrizione obbligatoria"
-            )));
-        }
-        if l.quantity < 1 {
-            return Err(AppError::Invalid(format!(
-                "Riga {row}: la quantità deve essere almeno 1"
-            )));
-        }
-        if !l.unit_price.is_finite() || l.unit_price < 0.0 {
-            return Err(AppError::Invalid(format!(
-                "Riga {row}: prezzo unitario non valido"
-            )));
-        }
-        if !l.vat_rate.is_finite() || !(0.0..=100.0).contains(&l.vat_rate) {
-            return Err(AppError::Invalid(format!(
-                "Riga {row}: aliquota IVA non valida (0-100)"
-            )));
-        }
-        if l.amount_override
-            .is_some_and(|amount| !amount.is_finite() || amount < 0.0)
-        {
-            return Err(AppError::Invalid(format!("Riga {row}: importo non valido")));
-        }
+    for (index, line) in lines.iter().enumerate() {
+        validate_invoice_line(index + 1, line)?;
     }
+    ensure_positive_total(lines)
+}
+
+/// `row` is the 1-based position the user sees in the form.
+fn validate_invoice_line(row: usize, line: &InvoiceLineInput) -> Result<(), AppError> {
+    let invalid = |problem: &str| Err(AppError::Invalid(format!("Riga {row}: {problem}")));
+    if line.description.trim().is_empty() {
+        return invalid("descrizione obbligatoria");
+    }
+    if line.quantity < 1 {
+        return invalid("la quantità deve essere almeno 1");
+    }
+    if !line.unit_price.is_finite() || line.unit_price < 0.0 {
+        return invalid("prezzo unitario non valido");
+    }
+    if !line.vat_rate.is_finite() || !(0.0..=100.0).contains(&line.vat_rate) {
+        return invalid("aliquota IVA non valida (0-100)");
+    }
+    if line
+        .amount_override
+        .is_some_and(|amount| !amount.is_finite() || amount < 0.0)
+    {
+        return invalid("importo non valido");
+    }
+    Ok(())
+}
+
+fn ensure_positive_total(lines: &[InvoiceLineInput]) -> Result<(), AppError> {
     let total: f64 = lines
         .iter()
-        .map(|l| InvoiceLineData::from(l).net_amount())
+        .map(|line| InvoiceLineData::from(line).net_amount())
         .sum();
     if total <= 0.0 {
         return Err(AppError::Invalid(

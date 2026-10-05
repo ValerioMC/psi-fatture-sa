@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use super::update_service;
 use crate::app::common::AppError;
-use crate::app::model::update::Platform;
+use crate::app::model::update::{LatestRelease, Platform, UpdateCheck};
 use crate::app::repository::release::{bundle_file_repository, BundleInstaller, ReleaseGateway};
 
 /// Only files of this repository's releases are ever installed.
@@ -26,47 +26,79 @@ pub struct UpdateTarget<'a> {
 
 /// Returns the installed version. Nothing is downloaded unless a newer bundle for this Mac exists.
 pub async fn install(target: UpdateTarget<'_>) -> Result<String, AppError> {
-    if !matches!(target.platform, Platform::MacOsArm64 | Platform::MacOsX64) {
-        return Err(AppError::Invalid(
-            "L'installazione dall'app è disponibile solo su Mac".to_string(),
-        ));
-    }
+    ensure_mac(target.platform)?;
     let bundle = app_bundle_of(target.running_executable)?;
     let release = target.gateway.latest().await?;
     let check = update_service::evaluate(&release, target.current_version, target.platform)?;
-    if !check.update_available {
-        return Err(AppError::Conflict(format!(
-            "Hai già l'ultima versione ({})",
-            check.current_version
-        )));
+    ensure_newer(&check)?;
+    let url = trusted_bundle_url(&release, target.platform, &check.latest_version)?;
+
+    let image = download_image(&target, &url).await?;
+    install_from_image(&target, &image, &bundle)?;
+    log::info!(target: "update", version:% = check.latest_version, bundle:? = bundle; "update installed");
+    Ok(check.latest_version)
+}
+
+fn ensure_mac(platform: Platform) -> Result<(), AppError> {
+    if matches!(platform, Platform::MacOsArm64 | Platform::MacOsX64) {
+        return Ok(());
     }
-    let url = update_service::bundle_url(&release, target.platform)
+    Err(AppError::Invalid(
+        "L'installazione dall'app è disponibile solo su Mac".to_string(),
+    ))
+}
+
+fn ensure_newer(check: &UpdateCheck) -> Result<(), AppError> {
+    if check.update_available {
+        return Ok(());
+    }
+    Err(AppError::Conflict(format!(
+        "Hai già l'ultima versione ({})",
+        check.current_version
+    )))
+}
+
+/// The bundle for this Mac, refused unless it comes from this repository's releases.
+fn trusted_bundle_url(
+    release: &LatestRelease,
+    platform: Platform,
+    version: &str,
+) -> Result<String, AppError> {
+    update_service::bundle_url(release, platform)
         .filter(|url| url.starts_with(DOWNLOAD_PREFIX))
         .ok_or_else(|| {
             AppError::External(format!(
-                "La versione {} non ha un pacchetto per {}",
-                check.latest_version,
-                target.platform.label()
+                "La versione {version} non ha un pacchetto per {}",
+                platform.label()
             ))
-        })?;
+        })
+}
 
+async fn download_image(target: &UpdateTarget<'_>, url: &str) -> Result<PathBuf, AppError> {
     bundle_file_repository::reset_folder(target.work_dir)?;
     let image = target.work_dir.join(IMAGE_NAME);
-    target.gateway.download(&url, &image).await?;
+    target.gateway.download(url, &image).await?;
+    Ok(image)
+}
+
+/// Mounts the image and swaps the bundle. The image is unmounted and deleted whatever the outcome.
+fn install_from_image(
+    target: &UpdateTarget<'_>,
+    image: &Path,
+    bundle: &Path,
+) -> Result<(), AppError> {
     let mount_point = target.work_dir.join(MOUNT_NAME);
     bundle_file_repository::reset_folder(&mount_point)?;
-    target.installer.attach(&image, &mount_point)?;
+    target.installer.attach(image, &mount_point)?;
     let replaced = bundle_file_repository::find_app_in(&mount_point)
-        .and_then(|source| replace_bundle(target.installer, &source, &bundle));
+        .and_then(|source| replace_bundle(target.installer, &source, bundle));
     if let Err(error) = target.installer.detach(&mount_point) {
         log::warn!(target: "update", error:% = error; "disk image left mounted");
     }
-    if let Err(error) = bundle_file_repository::remove_tree(&image) {
+    if let Err(error) = bundle_file_repository::remove_tree(image) {
         log::warn!(target: "update", error:% = error; "downloaded image not deleted");
     }
-    replaced?;
-    log::info!(target: "update", version:% = check.latest_version, bundle:? = bundle; "update installed");
-    Ok(check.latest_version)
+    replaced
 }
 
 /// The `.app` directory the executable runs from; a development binary has none.

@@ -14,48 +14,19 @@ use app::controller::{
     print_controller::*, service_controller::*, terms_controller::*, ts::ts_controller::*,
     update_controller::*,
 };
-use app::repository::email::{LettreMailGateway, MailGateway};
-use app::repository::release::{
-    BundleInstaller, DiskImageInstaller, GithubReleaseGateway, ReleaseGateway,
-};
+use app::repository::email::LettreMailGateway;
+use app::repository::release::{DiskImageInstaller, GithubReleaseGateway, ReleaseGateway};
 use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
 use app::repository::ts::sistema_ts::{HttpSistemaTsGateway, SistemaTsGateway};
 use app::service::backup::RotatingBackups;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let db = tauri::async_runtime::block_on(app::db::connection::init_db())
-        .expect("Failed to initialize database");
-
-    let secrets: Arc<dyn SecretStore> = Arc::new(EncryptedFileSecretStore::new(
-        app::db::connection::secrets_path(),
-        Box::new(OsMachineId::default()),
-    ));
-    let ts_gateway: Arc<dyn SistemaTsGateway> =
-        Arc::new(HttpSistemaTsGateway::new().expect("Failed to load the Sistema TS certificates"));
-    app::scheduler::ts_worker::spawn(db.clone(), secrets.clone(), ts_gateway.clone());
-    let mail_gateway: Arc<dyn MailGateway> = Arc::new(LettreMailGateway);
-    let backups = Arc::new(RotatingBackups::new(
-        app::db::connection::db_path(),
-        app::db::connection::backups_dir(),
-    ));
-    app::scheduler::backup_worker::spawn(db.clone(), backups.clone());
-    let release_gateway: Arc<dyn ReleaseGateway> = Arc::new(
-        GithubReleaseGateway::new(env!("CARGO_PKG_VERSION"))
-            .expect("Failed to build the release check client"),
-    );
-    let bundle_installer: Arc<dyn BundleInstaller> = Arc::new(DiskImageInstaller);
+    let state = build_app_state();
+    spawn_workers(&state);
 
     tauri::Builder::default()
-        .manage(AppState {
-            db,
-            secrets,
-            ts_gateway,
-            mail_gateway,
-            backups,
-            release_gateway,
-            bundle_installer,
-        })
+        .manage(state)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -140,4 +111,43 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Opens the archive and builds every gateway the commands share. A failure here stops the app.
+fn build_app_state() -> AppState {
+    let db = tauri::async_runtime::block_on(app::db::connection::init_db())
+        .expect("Failed to initialize database");
+    let secrets: Arc<dyn SecretStore> = Arc::new(EncryptedFileSecretStore::new(
+        app::db::connection::secrets_path(),
+        Box::new(OsMachineId::default()),
+    ));
+    let ts_gateway: Arc<dyn SistemaTsGateway> =
+        Arc::new(HttpSistemaTsGateway::new().expect("Failed to load the Sistema TS certificates"));
+    let backups = Arc::new(RotatingBackups::new(
+        app::db::connection::db_path(),
+        app::db::connection::backups_dir(),
+    ));
+    let release_gateway: Arc<dyn ReleaseGateway> = Arc::new(
+        GithubReleaseGateway::new(env!("CARGO_PKG_VERSION"))
+            .expect("Failed to build the release check client"),
+    );
+    AppState {
+        db,
+        secrets,
+        ts_gateway,
+        mail_gateway: Arc::new(LettreMailGateway),
+        backups,
+        release_gateway,
+        bundle_installer: Arc::new(DiskImageInstaller),
+    }
+}
+
+/// The background work: the Sistema TS queue and the daily backup.
+fn spawn_workers(state: &AppState) {
+    app::scheduler::ts_worker::spawn(
+        state.db.clone(),
+        state.secrets.clone(),
+        state.ts_gateway.clone(),
+    );
+    app::scheduler::backup_worker::spawn(state.db.clone(), state.backups.clone());
 }

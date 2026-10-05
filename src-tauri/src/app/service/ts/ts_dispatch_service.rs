@@ -38,13 +38,9 @@ pub async fn dispatch_due(
 ) -> Result<TsDispatchSummary, AppError> {
     let _pass = DISPATCH_LOCK.lock().await;
     let settings = ts_settings_service::get(db).await?;
-    let (due, elsewhere): (Vec<TsSubmission>, Vec<TsSubmission>) = transition::due(db, now)
-        .await?
-        .into_iter()
-        .partition(|s| s.environment == settings.environment);
-
+    let (due, waiting_other_environment) = due_in_environment(db, &settings, now).await?;
     let mut summary = TsDispatchSummary {
-        waiting_other_environment: elsewhere.len() as u32,
+        waiting_other_environment,
         ..Default::default()
     };
     if due.is_empty() {
@@ -57,21 +53,42 @@ pub async fn dispatch_due(
             return Ok(summary);
         }
     };
-
     for submission in due {
-        match dispatch_one(db, gateway, &session, &settings, &submission, now).await? {
-            TsDispatchAttempt::Accepted => summary.accepted += 1,
-            TsDispatchAttempt::Rejected => summary.rejected += 1,
-            TsDispatchAttempt::Retrying => summary.retrying += 1,
-            TsDispatchAttempt::Skipped => {}
-            TsDispatchAttempt::StopPass(reason) => {
-                summary.retrying += 1;
-                summary.blocked = Some(reason.to_string());
-                break;
-            }
+        let attempt = dispatch_one(db, gateway, &session, &settings, &submission, now).await?;
+        if !tally(&mut summary, attempt) {
+            break;
         }
     }
     Ok(summary)
+}
+
+/// What is due in the selected environment, and how many due submissions wait for the other one.
+async fn due_in_environment(
+    db: &DatabaseConnection,
+    settings: &TsSettings,
+    now: NaiveDateTime,
+) -> Result<(Vec<TsSubmission>, u32), AppError> {
+    let (due, elsewhere): (Vec<TsSubmission>, Vec<TsSubmission>) = transition::due(db, now)
+        .await?
+        .into_iter()
+        .partition(|s| s.environment == settings.environment);
+    Ok((due, elsewhere.len() as u32))
+}
+
+/// Counts the attempt in the summary; false when it ends the pass.
+fn tally(summary: &mut TsDispatchSummary, attempt: TsDispatchAttempt) -> bool {
+    match attempt {
+        TsDispatchAttempt::Accepted => summary.accepted += 1,
+        TsDispatchAttempt::Rejected => summary.rejected += 1,
+        TsDispatchAttempt::Retrying => summary.retrying += 1,
+        TsDispatchAttempt::Skipped => {}
+        TsDispatchAttempt::StopPass(reason) => {
+            summary.retrying += 1;
+            summary.blocked = Some(reason);
+            return false;
+        }
+    }
+    true
 }
 
 async fn dispatch_one(
@@ -152,47 +169,80 @@ async fn settle(
     result: Result<TsCallResponse, TsGatewayError>,
     now: NaiveDateTime,
 ) -> Result<TsDispatchAttempt, AppError> {
-    let response = match result {
-        Ok(response) => response,
-        Err(error) => {
-            let reason = error.to_string();
-            transition::release_for_retry(db, submission.id, &reason, now).await?;
-            return Ok(match error {
-                TsGatewayError::Authentication
-                | TsGatewayError::Network(_)
-                | TsGatewayError::UnavailableEnvironment => TsDispatchAttempt::StopPass(reason),
-                _ => TsDispatchAttempt::Retrying,
-            });
-        }
-    };
+    match result {
+        Ok(response) => settle_response(db, submission, &response, now).await,
+        Err(error) => retry_after_failed_call(db, submission, error, now).await,
+    }
+}
 
+/// An unreachable service or a refused login stops the pass; other failures retry later.
+async fn retry_after_failed_call(
+    db: &DatabaseConnection,
+    submission: &TsSubmission,
+    error: TsGatewayError,
+    now: NaiveDateTime,
+) -> Result<TsDispatchAttempt, AppError> {
+    let reason = error.to_string();
+    transition::release_for_retry(db, submission.id, &reason, now).await?;
+    let stops_pass = matches!(
+        error,
+        TsGatewayError::Authentication
+            | TsGatewayError::Network(_)
+            | TsGatewayError::UnavailableEnvironment
+    );
+    Ok(if stops_pass {
+        TsDispatchAttempt::StopPass(reason)
+    } else {
+        TsDispatchAttempt::Retrying
+    })
+}
+
+async fn settle_response(
+    db: &DatabaseConnection,
+    submission: &TsSubmission,
+    response: &TsCallResponse,
+    now: NaiveDateTime,
+) -> Result<TsDispatchAttempt, AppError> {
     if response.accepted() {
-        transition::record_outcome(db, submission.id, &outcome_of(&response, true), now).await?;
+        transition::record_outcome(db, submission.id, &outcome_of(response, true), now).await?;
         return Ok(TsDispatchAttempt::Accepted);
     }
     if response.is_retryable_rejection() {
-        let reason = response
-            .summary_message()
-            .unwrap_or_else(|| "Errore temporaneo".to_string());
-        transition::release_for_retry(db, submission.id, &reason, now).await?;
-        return Ok(if response.is_credential_rejection() {
-            TsDispatchAttempt::StopPass(reason)
-        } else {
-            TsDispatchAttempt::Retrying
-        });
+        return retry_after_rejection(db, submission, response, now).await;
     }
-    if submission.attempt_count > 0 && confirms_earlier_attempt(submission.operation, &response) {
-        let outcome = TsOutcome {
-            accepted: true,
-            protocol: None,
-            code: response.summary_code(),
-            message: Some("Già registrato dal Sistema TS con un tentativo precedente".to_string()),
-        };
-        transition::record_outcome(db, submission.id, &outcome, now).await?;
+    if submission.attempt_count > 0 && confirms_earlier_attempt(submission.operation, response) {
+        transition::record_outcome(db, submission.id, &earlier_success(response), now).await?;
         return Ok(TsDispatchAttempt::Accepted);
     }
-    transition::record_outcome(db, submission.id, &outcome_of(&response, false), now).await?;
+    transition::record_outcome(db, submission.id, &outcome_of(response, false), now).await?;
     Ok(TsDispatchAttempt::Rejected)
+}
+
+/// A temporary refusal waits for the next attempt; a refused credential stops the pass.
+async fn retry_after_rejection(
+    db: &DatabaseConnection,
+    submission: &TsSubmission,
+    response: &TsCallResponse,
+    now: NaiveDateTime,
+) -> Result<TsDispatchAttempt, AppError> {
+    let reason = response
+        .summary_message()
+        .unwrap_or_else(|| "Errore temporaneo".to_string());
+    transition::release_for_retry(db, submission.id, &reason, now).await?;
+    Ok(if response.is_credential_rejection() {
+        TsDispatchAttempt::StopPass(reason)
+    } else {
+        TsDispatchAttempt::Retrying
+    })
+}
+
+fn earlier_success(response: &TsCallResponse) -> TsOutcome {
+    TsOutcome {
+        accepted: true,
+        protocol: None,
+        code: response.summary_code(),
+        message: Some("Già registrato dal Sistema TS con un tentativo precedente".to_string()),
+    }
 }
 
 /// After a call whose answer was lost, the retry meets its own earlier success.

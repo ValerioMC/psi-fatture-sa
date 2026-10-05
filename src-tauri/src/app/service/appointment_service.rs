@@ -1,4 +1,4 @@
-use sea_orm::{ActiveValue::Set, DatabaseConnection, TransactionTrait};
+use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
 use crate::app::common::AppError;
 use crate::app::entity::appointment as appointments;
@@ -55,42 +55,16 @@ pub async fn create_recurring(
     db: &DatabaseConnection,
     input: CreateRecurringAppointmentsInput,
 ) -> Result<Vec<Appointment>, AppError> {
-    if input.dates.is_empty() {
-        return Err(AppError::Invalid(
-            "Seleziona almeno una data per la ricorrenza".to_string(),
-        ));
-    }
-    for date in &input.dates {
-        validate_appointment_fields(input.client_id, date, &input.start_time, &input.end_time)?;
-    }
-
+    validate_recurrence(&input)?;
     let tx = db.begin().await?;
-
-    let group_id = appointment_repository::insert_recurrence_group(&tx, input.client_id).await?;
-
-    let mut ids = Vec::new();
-    for date in &input.dates {
-        let active = build_active(
-            input.client_id,
-            input.service_id,
-            date,
-            &input.start_time,
-            &input.end_time,
-            "scheduled",
-            Some(input.notes.clone()),
-            Some(group_id),
-        );
-        let model = appointment_repository::insert(&tx, active).await?;
-        ids.push(model.id);
-    }
-
+    let ids = insert_recurrence(&tx, &input).await?;
     tx.commit().await?;
 
-    let mut results = Vec::new();
+    let mut created = Vec::with_capacity(ids.len());
     for id in ids {
-        results.push(appointment_repository::find_by_id(db, id).await?);
+        created.push(appointment_repository::find_by_id(db, id).await?);
     }
-    Ok(results)
+    Ok(created)
 }
 
 /// Updates an appointment and returns the updated record.
@@ -133,6 +107,41 @@ pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), AppError> {
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
+
+fn validate_recurrence(input: &CreateRecurringAppointmentsInput) -> Result<(), AppError> {
+    if input.dates.is_empty() {
+        return Err(AppError::Invalid(
+            "Seleziona almeno una data per la ricorrenza".to_string(),
+        ));
+    }
+    for date in &input.dates {
+        validate_appointment_fields(input.client_id, date, &input.start_time, &input.end_time)?;
+    }
+    Ok(())
+}
+
+/// One recurrence group and a scheduled appointment per date; returns their ids in date order.
+async fn insert_recurrence(
+    db: &impl ConnectionTrait,
+    input: &CreateRecurringAppointmentsInput,
+) -> Result<Vec<i64>, AppError> {
+    let group_id = appointment_repository::insert_recurrence_group(db, input.client_id).await?;
+    let mut ids = Vec::with_capacity(input.dates.len());
+    for date in &input.dates {
+        let active = build_active(
+            input.client_id,
+            input.service_id,
+            date,
+            &input.start_time,
+            &input.end_time,
+            "scheduled",
+            Some(input.notes.clone()),
+            Some(group_id),
+        );
+        ids.push(appointment_repository::insert(db, active).await?.id);
+    }
+    Ok(ids)
+}
 
 /// Validates the shared fields of appointment inputs.
 fn validate_appointment_fields(

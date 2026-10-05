@@ -66,3 +66,21 @@ fn every_placeholder_is_offered_and_the_default_uses_only_known_ones() {
     assert!(email_template_renderer::unknown_placeholders(DEFAULT_BODY).is_empty());
     assert!(email_template_renderer::unknown_placeholders(DEFAULT_SUBJECT).is_empty());
 }
+
+#[test]
+fn lists_each_unknown_placeholder_once_subject_first() {
+    let mixed = template("Fattura {foo}", "{bar} e ancora {foo}");
+
+    assert_eq!(unknown_placeholders(&mixed), vec!["foo", "bar"]);
+}
+
+#[test]
+fn length_limits_count_characters_not_bytes() {
+    assert!(ensure_max_length("àèìòù", 5, "Oggetto").is_ok());
+    assert_eq!(
+        ensure_max_length("àèìòùa", 5, "Oggetto")
+            .unwrap_err()
+            .to_string(),
+        "Oggetto: massimo 5 caratteri"
+    );
+}

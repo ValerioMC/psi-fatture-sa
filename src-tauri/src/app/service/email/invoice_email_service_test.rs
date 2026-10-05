@@ -240,3 +240,12 @@ async fn checks_the_login_and_says_where_invoices_leave_from() {
     let check = check_connection(&db, &store, &failing).await.unwrap();
     assert!(!check.ok && check.message.contains("rete assente"));
 }
+
+#[test]
+fn recipient_is_trimmed_and_lowercased() {
+    assert_eq!(
+        normalized_recipient("  Luca.Bianchi@Example.IT ").unwrap(),
+        "luca.bianchi@example.it"
+    );
+    assert!(normalized_recipient("   ").is_err());
+}

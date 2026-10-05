@@ -107,45 +107,65 @@ pub fn fill(template: &EmailTemplate, values: &EmailValues) -> EmailPreview {
 }
 
 fn validate_template(template: &EmailTemplate) -> Result<(), AppError> {
-    if template.subject.is_empty() {
+    validate_subject(&template.subject)?;
+    validate_body(&template.body)?;
+    ensure_known_placeholders(template)
+}
+
+fn validate_subject(subject: &str) -> Result<(), AppError> {
+    if subject.is_empty() {
         return Err(AppError::Invalid(
             "L'oggetto dell'email non può essere vuoto".to_string(),
         ));
     }
-    if template.subject.contains('\n') {
+    if subject.contains('\n') {
         return Err(AppError::Invalid(
             "L'oggetto dell'email sta su una sola riga".to_string(),
         ));
     }
-    if template.subject.chars().count() > SUBJECT_MAX_LENGTH {
-        return Err(AppError::Invalid(format!(
-            "Oggetto: massimo {SUBJECT_MAX_LENGTH} caratteri"
-        )));
-    }
-    if template.body.is_empty() {
+    ensure_max_length(subject, SUBJECT_MAX_LENGTH, "Oggetto")
+}
+
+fn validate_body(body: &str) -> Result<(), AppError> {
+    if body.is_empty() {
         return Err(AppError::Invalid(
             "Il testo dell'email non può essere vuoto".to_string(),
         ));
     }
-    if template.body.chars().count() > BODY_MAX_LENGTH {
+    ensure_max_length(body, BODY_MAX_LENGTH, "Testo")
+}
+
+/// Counted in characters, not bytes: accented letters count as one.
+fn ensure_max_length(text: &str, max: usize, field: &str) -> Result<(), AppError> {
+    if text.chars().count() > max {
         return Err(AppError::Invalid(format!(
-            "Testo: massimo {BODY_MAX_LENGTH} caratteri"
+            "{field}: massimo {max} caratteri"
         )));
     }
+    Ok(())
+}
+
+fn ensure_known_placeholders(template: &EmailTemplate) -> Result<(), AppError> {
+    let unknown = unknown_placeholders(template);
+    if unknown.is_empty() {
+        return Ok(());
+    }
+    let names: Vec<String> = unknown.iter().map(|name| format!("{{{name}}}")).collect();
+    Err(AppError::Invalid(format!(
+        "Segnaposto sconosciuti: {}",
+        names.join(", ")
+    )))
+}
+
+/// Unknown names in subject and body, each listed once, subject first.
+fn unknown_placeholders(template: &EmailTemplate) -> Vec<String> {
     let mut unknown = email_template_renderer::unknown_placeholders(&template.subject);
     for name in email_template_renderer::unknown_placeholders(&template.body) {
         if !unknown.contains(&name) {
             unknown.push(name);
         }
     }
-    if !unknown.is_empty() {
-        let names: Vec<String> = unknown.iter().map(|name| format!("{{{name}}}")).collect();
-        return Err(AppError::Invalid(format!(
-            "Segnaposto sconosciuti: {}",
-            names.join(", ")
-        )));
-    }
-    Ok(())
+    unknown
 }
 
 #[cfg(test)]

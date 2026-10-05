@@ -264,3 +264,25 @@ async fn submissions_for_another_environment_wait() {
     assert_eq!(summary.waiting_other_environment, 1);
     assert!(gateway.recorded().is_empty());
 }
+
+#[test]
+fn tally_counts_each_attempt_and_stops_on_a_blocking_one() {
+    let mut summary = TsDispatchSummary::default();
+
+    assert!(tally(&mut summary, TsDispatchAttempt::Accepted));
+    assert!(tally(&mut summary, TsDispatchAttempt::Rejected));
+    assert!(tally(&mut summary, TsDispatchAttempt::Skipped));
+    assert!(!tally(
+        &mut summary,
+        TsDispatchAttempt::StopPass("Servizio non raggiungibile".to_string())
+    ));
+
+    assert_eq!(
+        (summary.accepted, summary.rejected, summary.retrying),
+        (1, 1, 1)
+    );
+    assert_eq!(
+        summary.blocked.as_deref(),
+        Some("Servizio non raggiungibile")
+    );
+}
