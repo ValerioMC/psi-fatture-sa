@@ -202,14 +202,12 @@ pub async fn delete_lines(
     Ok(())
 }
 
-/// Returns the next invoice number string for the given year.
-///
-/// Uses `initial_invoice_number` from config as a floor so numbering
-/// never starts below the configured value.
+/// The next invoice number of the year, never below the configured
+/// `initial_invoice_number`.
 pub async fn next_invoice_number(
     db: &impl sea_orm::ConnectionTrait,
     year: i64,
-) -> Result<String, AppError> {
+) -> Result<i64, AppError> {
     #[derive(FromQueryResult)]
     struct Row {
         max_num: i64,
@@ -228,8 +226,7 @@ pub async fn next_invoice_number(
     .await?;
 
     let (max_num, initial) = row.map(|r| (r.max_num, r.initial)).unwrap_or((0, 1));
-    let next = std::cmp::max(max_num, initial - 1) + 1;
-    Ok(format!("{:03}", next))
+    Ok(std::cmp::max(max_num, initial - 1) + 1)
 }
 
 /// Returns true when another invoice (different id) already uses the given

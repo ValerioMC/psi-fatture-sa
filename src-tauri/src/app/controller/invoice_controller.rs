@@ -7,7 +7,7 @@ use crate::app::model::invoice::{
     InvoiceLineInput, MonthlyInvoicePreview, UpdateInvoiceInput,
 };
 use crate::app::model::tax::InvoiceTotals;
-use crate::app::service::invoice_service;
+use crate::app::service::invoice::invoice_service;
 
 /// The live totals of an invoice being edited, before it is saved.
 #[tauri::command]

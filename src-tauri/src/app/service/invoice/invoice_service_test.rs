@@ -10,13 +10,13 @@ fn last_day_of_month_handles_regular_and_leap_years() {
 
 #[test]
 fn paid_date_kept_for_paid_and_cleared_otherwise() {
-    let kept = resolve_paid_date(&InvoiceStatus::Paid, Some("2026-07-01".to_string()));
+    let kept = resolve_paid_date(&InvoiceStatus::Paid, Some("2026-07-01"));
     assert_eq!(kept, Some("2026-07-01".to_string()));
 
     let defaulted = resolve_paid_date(&InvoiceStatus::Paid, None);
     assert!(defaulted.is_some());
 
-    let cleared = resolve_paid_date(&InvoiceStatus::Issued, Some("2026-07-01".to_string()));
+    let cleared = resolve_paid_date(&InvoiceStatus::Issued, Some("2026-07-01"));
     assert_eq!(cleared, None);
 }
 

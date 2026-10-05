@@ -1,5 +1,5 @@
-//! Rules an invoice change must respect beyond its own fields: the numbering
-//! order of the year and the data the production Sistema TS already holds.
+//! Rules an invoice change must respect beyond its own fields: the year's
+//! numbering (unique, in date order) and the data the production Sistema TS holds.
 
 use sea_orm::ConnectionTrait;
 
@@ -10,8 +10,23 @@ use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::ts::ts_submission_repository;
 use crate::app::service::italian_format::date_long;
 
+/// A number is used once per year: "007" and "7" count as the same number.
+pub(super) async fn ensure_number_free(
+    db: &impl ConnectionTrait,
+    year: i64,
+    number: i64,
+    exclude_id: i64,
+) -> Result<(), AppError> {
+    if !invoice_repository::invoice_number_taken(db, year, number, exclude_id).await? {
+        return Ok(());
+    }
+    Err(AppError::Conflict(format!(
+        "Numero fattura {number} già utilizzato nel {year}: scegli un numero libero"
+    )))
+}
+
 /// Numbers must follow dates: a higher number never carries an earlier date.
-pub async fn ensure_chronological(
+pub(super) async fn ensure_chronological(
     db: &impl ConnectionTrait,
     year: i64,
     number: i64,
@@ -37,16 +52,13 @@ pub async fn ensure_chronological(
 }
 
 /// Whether the production Sistema TS holds this invoice's expense document.
-pub async fn held_by_sistema_ts(
-    db: &impl ConnectionTrait,
-    invoice_id: i64,
-) -> Result<bool, AppError> {
+async fn held_by_sistema_ts(db: &impl ConnectionTrait, invoice_id: i64) -> Result<bool, AppError> {
     ts_submission_repository::invoice_holds_ts_data(db, invoice_id, TsEnvironment::Produzione).await
 }
 
 /// A transmitted invoice keeps the id the Sistema TS knows it by and stays paid;
 /// amounts and patient may change, then a replacement realigns the Sistema TS.
-pub async fn ensure_ts_allows_update(
+pub(super) async fn ensure_ts_allows_update(
     db: &impl ConnectionTrait,
     current: &Invoice,
     number: i64,
@@ -68,7 +80,7 @@ pub async fn ensure_ts_allows_update(
 }
 
 /// A bulk status change may not move a transmitted invoice off "paid".
-pub async fn ensure_ts_allows_status(
+pub(super) async fn ensure_ts_allows_status(
     db: &impl ConnectionTrait,
     invoice_ids: &[i64],
     status: &InvoiceStatus,
@@ -96,5 +108,5 @@ fn ensure_stays_paid(status: &InvoiceStatus, invoice_number: &str) -> Result<(),
 }
 
 #[cfg(test)]
-#[path = "invoice_guard_service_test.rs"]
+#[path = "invoice_guard_test.rs"]
 mod tests;

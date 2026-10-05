@@ -181,7 +181,7 @@ async fn use_production(db: &DatabaseConnection) {
 }
 #[tokio::test]
 async fn invoice_deletion_is_refused_while_accepted_and_cascades_after_cancellation() {
-    use crate::app::service::invoice_service;
+    use crate::app::service::invoice::invoice_service;
 
     let db = setup().await;
     use_production(&db).await;

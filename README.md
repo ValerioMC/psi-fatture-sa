@@ -504,7 +504,7 @@ psi-fatture-sa/
 │   │   ├── app/
 │   │   │   ├── app_state.rs # Stato condiviso dai comandi (DB, credenziali, gateway)
 │   │   │   ├── controller/ # Comandi Tauri (API layer); ts/ per il Sistema TS
-│   │   │   ├── service/    # Logica di business; ts/ Sistema TS, email/ invii, pdf/ fattura in PDF
+│   │   │   ├── service/    # Logica di business; invoice/ fatture, ts/ Sistema TS, email/ invii, pdf/ PDF
 │   │   │   ├── repository/ # Accesso dati (SeaORM, SQL) e servizi esterni
 │   │   │   │   ├── invoice/    # Fatture e proiezione delle righe lette
 │   │   │   │   ├── secret/     # Archivio cifrato delle credenziali
@@ -518,6 +518,7 @@ psi-fatture-sa/
 │   │   └── test_support/   # Test double e fixture condivisi (solo in `cargo test`)
 │   ├── tauri.conf.json     # Configurazione Tauri
 │   └── Cargo.toml          # Dipendenze Rust
+├── CLAUDE.md               # Regole di progetto e di qualità del codice
 ├── LICENSE                 # Licenza PolyForm Strict 1.0.0
 └── package.json            # Dipendenze frontend
 ```
@@ -533,6 +534,9 @@ psi-fatture-sa/
   e le struct di riga dichiarate dentro una sola funzione di query.
 - **Sottopackage per dominio** quando un concetto ha più file (`ts/`, `invoice/`,
   `secret/`). I tipi di servizio interni al package sono `pub(super)`.
+- **Un service per entità**: in `service/invoice/` solo `invoice_service` è pubblico; le
+  regole (`invoice_guard`) e i tipi di appoggio (`ClientSessions`, `InvoiceContent`) sono
+  moduli privati del package. Le regole di qualità del codice sono in `CLAUDE.md`.
 - **Errori tipizzati**: controller, service e repository restituiscono
   `Result<_, AppError>` (`app/common/app_error.rs`): `Invalid` (dato da correggere),
   `NotFound`, `Conflict` (contrasta con lo stato salvato: numero già usato, fattura
