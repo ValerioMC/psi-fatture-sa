@@ -20,7 +20,7 @@ import TaxSplit from '@/components/dashboard/TaxSplit.vue'
 import { useConfigStore } from '@/stores/config'
 import { errorMessage } from '@/stores/toast'
 import { formatCurrency, formatDateShort, splitCurrency, ITALIAN_MONTHS } from '@/utils/format'
-import { estimateForfettarioTax, estimateOrdinarioTax } from '@/utils/tax'
+import { collectionRate as collectionRateOf, greeting as greetingFor, previousMonth, taxEstimate as estimateTax, unbilledMonth, type UnbilledMonth } from '@/utils/dashboard'
 import { summariseAttention, type Attention } from '@/utils/attention'
 import { draftByMonth, pendingByMonth } from '@/utils/monthlyPending'
 import { plural } from '@/utils/labels'
@@ -35,17 +35,12 @@ const currentMonth = now.getMonth() + 1
 const selectedYear = ref(currentYear)
 const data = ref<DashboardData | null>(null)
 const yearInvoices = ref<Invoice[]>([])
-const unbilled = ref<{ month: number; year: number; sessions: number; amount: number } | null>(null)
+const unbilled = ref<UnbilledMonth | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const firstFiveYears = ref(false)
 
-const greeting = computed(() => {
-  const hour = now.getHours()
-  const name = configStore.config?.first_name
-  const salutation = hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
-  return name ? `${salutation}, ${name}` : salutation
-})
+const greeting = computed(() => greetingFor(now.getHours(), configStore.config?.first_name))
 
 /**
  * The sessions of last month that were held but never invoiced: the most
@@ -54,13 +49,8 @@ const greeting = computed(() => {
 async function loadUnbilled(): Promise<void> {
   unbilled.value = null
   if (selectedYear.value !== currentYear) return
-  const month = currentMonth === 1 ? 12 : currentMonth - 1
-  const year = currentMonth === 1 ? currentYear - 1 : currentYear
-  const previews = await previewMonthlyInvoices(year, month)
-  const sessions = previews.reduce((sum, preview) => sum + preview.appointment_count, 0)
-  if (sessions === 0) return
-  const amount = previews.reduce((sum, preview) => sum + preview.estimated_due, 0)
-  unbilled.value = { month, year, sessions, amount }
+  const { year, month } = previousMonth(currentYear, currentMonth)
+  unbilled.value = unbilledMonth(await previewMonthlyInvoices(year, month), year, month)
 }
 
 async function load(): Promise<void> {
@@ -88,30 +78,13 @@ function shiftYear(delta: number): void {
 }
 
 const hero = computed(() => splitCurrency(data.value?.total_revenue ?? 0))
-const collectionRate = computed(() => {
-  if (!data.value || data.value.total_revenue === 0) return 0
-  return Math.round((data.value.paid_revenue / data.value.total_revenue) * 100)
-})
+const collectionRate = computed(() => collectionRateOf(data.value))
 
 const isForfettario = computed(() => configStore.config?.tax_regime !== 'ordinario')
 
 const taxEstimate = computed(() => {
   if (!data.value || !configStore.config) return null
-  const revenue = data.value.total_net_revenue
-  if (revenue <= 0) return null
-  const { coefficient } = configStore.config
-  if (isForfettario.value) {
-    const estimate = estimateForfettarioTax(revenue, coefficient, firstFiveYears.value)
-    return { revenue, net: estimate.netIncome, contributions: estimate.inpsContribution, tax: estimate.substituteTax, taxLabel: `Imposta sostitutiva ${estimate.substituteTaxRate}%` }
-  }
-  const estimate = estimateOrdinarioTax(revenue, coefficient)
-  return {
-    revenue,
-    net: estimate.netIncome,
-    contributions: estimate.inpsContribution,
-    tax: estimate.irpef + estimate.addizionaleRegionale + estimate.addizionaleComunale,
-    taxLabel: 'IRPEF e addizionali',
-  }
+  return estimateTax(data.value.total_net_revenue, configStore.config.coefficient, isForfettario.value, firstFiveYears.value)
 })
 
 const attention = computed<Attention>(() => summariseAttention(yearInvoices.value))

@@ -494,10 +494,10 @@ psi-fatture-sa/
 │   │   ├── email/          # Casella, modello, invio e storico delle email ai pazienti
 │   │   ├── legal/          # Testo delle condizioni d'uso, uguale in accettazione e in Impostazioni
 │   │   └── sts/            # Pannelli del Sistema Tessera Sanitaria
-│   ├── composables/        # Tema, focus trap, form profilo, smooth scroll
+│   ├── composables/        # Stato e azioni delle viste: form fattura e paziente, azioni in blocco, tema
 │   ├── legal/              # Condizioni d'uso e loro versione
 │   ├── stores/             # State management (Pinia), notifiche
-│   └── utils/              # Formattazione, fisco, validazione, stato fatture
+│   └── utils/              # Logica pura con i suoi test: fisco, filtri e riepiloghi, agenda, validazione
 ├── src-tauri/              # Backend Rust + Tauri
 │   ├── src/
 │   │   ├── lib.rs          # Avvio: stato condiviso, worker, registrazione comandi

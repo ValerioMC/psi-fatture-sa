@@ -6,7 +6,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { CalendarDays, Check, Clock, Plus, Repeat } from 'lucide-vue-next'
-import { listAppointments, updateAppointment } from '@/api'
+import { listAppointments } from '@/api'
 import { useClientsStore } from '@/stores/clients'
 import { useServicesStore } from '@/stores/services'
 import { useToastStore } from '@/stores/toast'
@@ -19,7 +19,17 @@ import StatusBadge from '@/components/ui/StatusBadge.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import AppointmentModal from './AppointmentModal.vue'
+import { useAppointmentStatus } from '@/composables/useAppointmentStatus'
 import { formatMonthYear, minutesBetween, parseIsoDate, toIsoDate, todayIso } from '@/utils/format'
+import {
+  appointmentsByDate,
+  bookedMinutes,
+  dayHeading,
+  loadWindow,
+  monthGrid,
+  monthStats as monthStatsOf,
+  type CalendarCell,
+} from '@/utils/agenda'
 import { plural } from '@/utils/labels'
 
 const clientsStore = useClientsStore()
@@ -31,6 +41,7 @@ const viewYear = ref(new Date().getFullYear())
 const viewMonth = ref(new Date().getMonth())
 const selectedDate = ref(today)
 const appointments = ref<Appointment[]>([])
+const { setStatus } = useAppointmentStatus(appointments)
 const loading = ref(false)
 
 const modalOpen = ref(false)
@@ -39,59 +50,16 @@ const editing = ref<Appointment | null>(null)
 
 const WEEKDAYS = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
 
-interface CalendarCell {
-  date: string
-  day: number
-  inMonth: boolean
-  weekend: boolean
-}
-
-/** Six-by-seven or five-by-seven grid, Monday first, padded with the neighbouring months. */
-const cells = computed<CalendarCell[]>(() => {
-  const first = new Date(viewYear.value, viewMonth.value, 1)
-  const leading = (first.getDay() + 6) % 7
-  const daysInMonth = new Date(viewYear.value, viewMonth.value + 1, 0).getDate()
-  const total = Math.ceil((leading + daysInMonth) / 7) * 7
-  return Array.from({ length: total }, (_, index) => {
-    const date = new Date(viewYear.value, viewMonth.value, index - leading + 1)
-    const weekday = (date.getDay() + 6) % 7
-    return { date: toIsoDate(date), day: date.getDate(), inMonth: date.getMonth() === viewMonth.value, weekend: weekday >= 5 }
-  })
-})
-
-const byDate = computed(() => {
-  const map = new Map<string, Appointment[]>()
-  for (const appointment of appointments.value) {
-    const list = map.get(appointment.date) ?? []
-    list.push(appointment)
-    map.set(appointment.date, list)
-  }
-  for (const list of map.values()) list.sort((a, b) => a.start_time.localeCompare(b.start_time))
-  return map
-})
-
+const cells = computed(() => monthGrid(viewYear.value, viewMonth.value))
+const byDate = computed(() => appointmentsByDate(appointments.value))
 const dayList = computed(() => byDate.value.get(selectedDate.value) ?? [])
-const dayLabel = computed(() => {
-  const label = parseIsoDate(selectedDate.value).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })
-  return label.charAt(0).toUpperCase() + label.slice(1)
-})
-const dayMinutes = computed(() =>
-  dayList.value.filter((item) => item.status !== 'cancelled').reduce((sum, item) => sum + minutesBetween(item.start_time, item.end_time), 0),
-)
-
-const monthStats = computed(() => {
-  const prefix = `${viewYear.value}-${String(viewMonth.value + 1).padStart(2, '0')}`
-  const live = appointments.value.filter((item) => item.status !== 'cancelled' && item.date.startsWith(prefix))
-  const heldNotBilled = live.filter((item) => item.status === 'completed' && item.invoice_id === undefined).length
-  const toConfirm = live.filter((item) => item.status === 'scheduled' && item.date < today).length
-  const completed = live.filter((item) => item.status === 'completed').length
-  return { total: live.length, heldNotBilled, toConfirm, completed }
-})
+const dayLabel = computed(() => dayHeading(selectedDate.value))
+const dayMinutes = computed(() => bookedMinutes(dayList.value))
+const monthStats = computed(() => monthStatsOf(appointments.value, viewYear.value, viewMonth.value, today))
 
 async function load(): Promise<void> {
   loading.value = true
-  const from = toIsoDate(new Date(viewYear.value, viewMonth.value, -6))
-  const to = toIsoDate(new Date(viewYear.value, viewMonth.value + 1, 7))
+  const { from, to } = loadWindow(viewYear.value, viewMonth.value)
   try {
     appointments.value = await listAppointments(from, to)
   } catch (error) {
@@ -129,32 +97,6 @@ function openEdit(appointment: Appointment): void {
   editing.value = appointment
   modalDate.value = appointment.date
   modalOpen.value = true
-}
-
-async function setStatus(appointment: Appointment, status: AppointmentStatus, announce = true): Promise<void> {
-  const previous = appointment.status
-  try {
-    const updated = await updateAppointment({
-      id: appointment.id,
-      client_id: appointment.client_id,
-      service_id: appointment.service_id,
-      date: appointment.date,
-      start_time: appointment.start_time,
-      end_time: appointment.end_time,
-      status,
-      notes: appointment.notes,
-      recurrence_group_id: appointment.recurrence_group_id,
-    })
-    appointments.value = appointments.value.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
-    if (announce) {
-      toast.notify(`Seduta con ${appointment.client_name} segnata come svolta`, {
-        label: 'Annulla',
-        run: () => setStatus({ ...appointment, status }, previous, false),
-      })
-    }
-  } catch (error) {
-    toast.notifyError(error, 'Aggiornamento non riuscito')
-  }
 }
 
 /** A session in a day cell: a soft slip of its status colour, so a busy week reads as texture at a glance. */

@@ -5,14 +5,14 @@
  * on the database. Filters live in the URL, so the dashboard can link here
  * already filtered ("3 fatture scadute" → ?status=overdue).
  */
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { CalendarRange, CircleCheck, FileText, Hourglass, Pencil, Plus, Search, Send, Sigma, Trash2, X } from 'lucide-vue-next'
-import { checkEmailConnection } from '@/api'
 import { useInvoicesStore } from '@/stores/invoices'
-import { errorMessage, useToastStore } from '@/stores/toast'
+import { useToastStore } from '@/stores/toast'
 import { useEmailStore } from '@/stores/email'
-import type { Invoice, InvoiceStatus } from '@/types'
+import { useStsStore } from '@/stores/sts'
+import type { InvoiceStatus } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -21,106 +21,49 @@ import StatusBadge from '@/components/ui/StatusBadge.vue'
 import InvoiceSeal from '@/components/ui/InvoiceSeal.vue'
 import TsMark from '@/components/ui/TsMark.vue'
 import MailMark from '@/components/ui/MailMark.vue'
-import { useStsStore } from '@/stores/sts'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import StatTile from '@/components/ui/StatTile.vue'
 import SparkLine from '@/components/ui/SparkLine.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
-import type { SegmentOption } from '@/components/ui/types'
-import { formatCurrency, formatDate, todayIso } from '@/utils/format'
-import { INVOICE_STATUS, INVOICE_STATUS_ORDER, PAYMENT_METHOD_LABEL, isInvoiceStatus, plural } from '@/utils/labels'
+import { useInvoiceListFilters } from '@/composables/useInvoiceListFilters'
+import { useInvoiceSelection } from '@/composables/useInvoiceSelection'
+import { useBulkInvoiceStatus } from '@/composables/useBulkInvoiceStatus'
+import { useBulkInvoiceEmail } from '@/composables/useBulkInvoiceEmail'
+import { useInvoiceDeletion } from '@/composables/useInvoiceDeletion'
+import { formatCurrency, formatDate } from '@/utils/format'
+import { PAYMENT_METHOD_LABEL, plural } from '@/utils/labels'
+import {
+  BULK_STATUS_OPTIONS as BULK_OPTIONS,
+  invoicesInStatus,
+  monthlyTotals as monthlyTotalsOf,
+  paidShare as paidShareOf,
+  searchInvoices,
+  statusDistribution,
+  statusFilterOptions,
+  summarise,
+  yearOptions,
+} from '@/utils/invoiceList'
 
-type StatusFilter = InvoiceStatus | 'all'
-
-const route = useRoute()
 const router = useRouter()
 const invoicesStore = useInvoicesStore()
 const sts = useStsStore()
 const email = useEmailStore()
 const toast = useToastStore()
 const currentYear = new Date().getFullYear()
+const YEAR_OPTIONS = yearOptions(currentYear)
 
-function queryYear(): number | 0 {
-  const raw = Number(route.query.year)
-  return Number.isInteger(raw) && raw >= 0 ? raw : currentYear
-}
-function queryStatus(): StatusFilter {
-  const raw = String(route.query.status ?? '')
-  return isInvoiceStatus(raw) ? raw : 'all'
-}
-
-/** 0 means every year. */
-const year = ref<number>(queryYear())
-const status = ref<StatusFilter>(queryStatus())
-const search = ref(String(route.query.q ?? ''))
-
-watch([year, status], () => {
-  void router.replace({
-    query: {
-      ...(year.value !== currentYear ? { year: year.value } : {}),
-      ...(status.value !== 'all' ? { status: status.value } : {}),
-    },
-  })
-})
-
-const YEAR_OPTIONS: SegmentOption<number>[] = [
-  { value: currentYear, label: String(currentYear) },
-  { value: currentYear - 1, label: String(currentYear - 1) },
-  { value: currentYear - 2, label: String(currentYear - 2) },
-  { value: 0, label: 'Tutti gli anni' },
-]
-
-function normalise(text: string): string {
-  return text.toLocaleLowerCase('it-IT').normalize('NFD').replace(/\p{Diacritic}/gu, '')
-}
-
-const searched = computed(() => {
-  const needle = normalise(search.value.trim())
-  if (needle === '') return invoicesStore.invoices
-  return invoicesStore.invoices.filter((invoice) =>
-    normalise(`${invoice.invoice_number} ${invoice.client_name}`).includes(needle),
-  )
-})
-
-const statusOptions = computed<SegmentOption<StatusFilter>[]>(() => [
-  { value: 'all', label: 'Tutte', count: searched.value.length },
-  ...INVOICE_STATUS_ORDER.map((value) => ({
-    value,
-    label: INVOICE_STATUS[value].label,
-    count: searched.value.filter((invoice) => invoice.status === value).length,
-  })),
-])
-
-const visible = computed(() =>
-  status.value === 'all' ? searched.value : searched.value.filter((invoice) => invoice.status === status.value),
-)
-
-const summary = computed(() => {
-  const live = visible.value.filter((invoice) => invoice.status !== 'cancelled')
-  const sum = (list: Invoice[]): number => list.reduce((total, invoice) => total + invoice.total_due, 0)
-  return {
-    count: visible.value.length,
-    total: sum(live),
-    paid: sum(live.filter((invoice) => invoice.status === 'paid')),
-    pending: sum(live.filter((invoice) => invoice.status === 'issued' || invoice.status === 'overdue')),
-    overdue: live.filter((invoice) => invoice.status === 'overdue').length,
-  }
-})
-
-const paidShare = computed(() => (summary.value.total > 0 ? Math.round((summary.value.paid / summary.value.total) * 100) : 0))
-
-/** Invoiced amount per month of issue, for the trend under the total. Only a single year has months to show. */
-const monthlyTotals = computed(() => {
-  const totals = Array.from({ length: 12 }, () => 0)
-  for (const invoice of visible.value) {
-    if (invoice.status === 'cancelled') continue
-    totals[Number(invoice.issue_date.slice(5, 7)) - 1] += invoice.total_due
-  }
-  return totals
-})
+const { year, status, search, clearFilters } = useInvoiceListFilters(currentYear)
+const searched = computed(() => searchInvoices(invoicesStore.invoices, search.value))
+const statusOptions = computed(() => statusFilterOptions(searched.value))
+const visible = computed(() => invoicesInStatus(searched.value, status.value))
+const summary = computed(() => summarise(visible.value))
+const paidShare = computed(() => paidShareOf(summary.value))
+/** Only a single year has months to show. */
+const monthlyTotals = computed(() => monthlyTotalsOf(visible.value))
 const lastMonthIndex = computed(() => (year.value === currentYear ? new Date().getMonth() : 11))
+const distribution = computed(() => statusDistribution(visible.value))
 
 /** How the listed invoices split across statuses, drawn as one segmented bar. */
 const STATUS_FILL: Record<InvoiceStatus, string> = {
@@ -130,20 +73,15 @@ const STATUS_FILL: Record<InvoiceStatus, string> = {
   overdue: 'bg-danger',
   cancelled: 'bg-border-strong',
 }
-const distribution = computed(() => {
-  const total = visible.value.length
-  if (total === 0) return []
-  return INVOICE_STATUS_ORDER.map((value) => ({
-    value,
-    label: INVOICE_STATUS[value].label,
-    count: visible.value.filter((invoice) => invoice.status === value).length,
-  }))
-    .filter((segment) => segment.count > 0)
-    .map((segment) => ({ ...segment, share: (segment.count / total) * 100 }))
-})
+
+const selection = useInvoiceSelection(() => visible.value, () => invoicesStore.invoices)
+const { selected, allVisibleSelected, someVisibleSelected, toggleAll, toggle, clearSelection } = selection
+const { bulkTarget, bulkConfirmOpen, bulkRunning, bulkBlastRadius, runBulk } = useBulkInvoiceStatus(selection)
+const { bulkEmailOpen, bulkEmailProgress, emailable, bulkEmailBlastRadius, bulkEmailMessage, runBulkEmail } = useBulkInvoiceEmail(selection)
+const { toDelete, deleting, confirmDelete } = useInvoiceDeletion()
 
 async function load(): Promise<void> {
-  selected.value = new Set()
+  clearSelection()
   await invoicesStore.fetchInvoices({ year: year.value === 0 ? undefined : year.value })
   if (invoicesStore.error) toast.notifyError(invoicesStore.error, 'Caricamento non riuscito')
 }
@@ -155,142 +93,6 @@ onMounted(() => {
   sts.load().catch(() => undefined)
   email.load().catch(() => undefined)
 })
-
-// ─── Selection and bulk status ──────────────────────────────────────────────
-
-const selected = ref<Set<number>>(new Set())
-const bulkTarget = ref<InvoiceStatus>('paid')
-const bulkConfirmOpen = ref(false)
-const bulkRunning = ref(false)
-
-const allVisibleSelected = computed(
-  () => visible.value.length > 0 && visible.value.every((invoice) => selected.value.has(invoice.id)),
-)
-const someVisibleSelected = computed(
-  () => !allVisibleSelected.value && visible.value.some((invoice) => selected.value.has(invoice.id)),
-)
-const selectedInvoices = computed(() => invoicesStore.invoices.filter((invoice) => selected.value.has(invoice.id)))
-
-function toggleAll(): void {
-  selected.value = allVisibleSelected.value ? new Set() : new Set(visible.value.map((invoice) => invoice.id))
-}
-
-function toggle(id: number): void {
-  const next = new Set(selected.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  selected.value = next
-}
-
-const BULK_OPTIONS: SegmentOption<InvoiceStatus>[] = (['issued', 'paid', 'overdue', 'cancelled'] as const).map((value) => ({
-  value,
-  label: INVOICE_STATUS[value].label,
-  tone: INVOICE_STATUS[value].tone,
-}))
-
-const bulkBlastRadius = computed(() => {
-  const count = selectedInvoices.value.length
-  const amount = selectedInvoices.value.reduce((total, invoice) => total + invoice.total_due, 0)
-  const target = INVOICE_STATUS[bulkTarget.value].label.toLocaleLowerCase('it-IT')
-  const paidNote = bulkTarget.value === 'paid' ? ', con data di pagamento oggi' : ''
-  return `${plural(count, 'fattura', 'fatture')} per ${formatCurrency(amount)} ${count === 1 ? 'passerà' : 'passeranno'} a “${target}”${paidNote}.`
-})
-
-async function runBulk(): Promise<void> {
-  bulkRunning.value = true
-  const ids = [...selected.value]
-  try {
-    await invoicesStore.bulkUpdateStatus(ids, bulkTarget.value, bulkTarget.value === 'paid' ? todayIso() : undefined)
-    toast.notify(`${plural(ids.length, 'fattura aggiornata', 'fatture aggiornate')}`)
-    selected.value = new Set()
-    bulkConfirmOpen.value = false
-  } catch (error) {
-    toast.notifyError(error, 'Aggiornamento non riuscito')
-  } finally {
-    bulkRunning.value = false
-  }
-}
-
-// ─── Bulk email ─────────────────────────────────────────────────────────────
-
-const bulkEmailOpen = ref(false)
-const bulkEmailProgress = ref<{ done: number; total: number } | null>(null)
-
-/** Drafts and cancelled invoices are never emailed; they are left out and said so. */
-const emailable = computed(() => selectedInvoices.value.filter((invoice) => invoice.status !== 'draft' && invoice.status !== 'cancelled'))
-
-const bulkEmailBlastRadius = computed(() => {
-  const count = emailable.value.length
-  const again = emailable.value.filter((invoice) => email.stateOf(invoice.id).kind === 'sent').length
-  const skipped = selectedInvoices.value.length - count
-  const parts = [`${plural(count, 'fattura partirà', 'fatture partiranno')} via email ai pazienti, con il PDF allegato e il modello salvato.`]
-  if (again > 0) parts.push(`${plural(again, 'era già stata inviata', 'erano già state inviate')} e ${again === 1 ? 'arriverà' : 'arriveranno'} di nuovo.`)
-  if (skipped > 0) parts.push(`${plural(skipped, 'bozza o annullata resta', 'bozze o annullate restano')} fuori.`)
-  return parts.join(' ')
-})
-
-const bulkEmailMessage = computed(() =>
-  bulkEmailProgress.value
-    ? `Invio ${Math.min(bulkEmailProgress.value.done + 1, bulkEmailProgress.value.total)} di ${bulkEmailProgress.value.total}…`
-    : 'Chi non ha un indirizzo email nella scheda viene saltato.',
-)
-
-/** One login first, so a wrong password stops here instead of failing every invoice. */
-async function runBulkEmail(): Promise<void> {
-  const targets = [...emailable.value]
-  bulkEmailProgress.value = { done: 0, total: targets.length }
-  try {
-    const check = await checkEmailConnection()
-    if (!check.ok) {
-      toast.notifyError(check.message, 'Nessuna email inviata')
-      return
-    }
-    let sent = 0
-    const failures: string[] = []
-    for (const invoice of targets) {
-      try {
-        await email.sendPrepared(invoice.id)
-        sent += 1
-      } catch (error) {
-        failures.push(`N. ${invoice.invoice_number}: ${errorMessage(error)}`)
-      }
-      bulkEmailProgress.value = { done: bulkEmailProgress.value.done + 1, total: targets.length }
-    }
-    if (failures.length === 0) toast.notify(`${plural(sent, 'fattura inviata', 'fatture inviate')} ai pazienti`)
-    else toast.notifyError(`${plural(sent, 'inviata', 'inviate')}, ${plural(failures.length, 'non riuscita', 'non riuscite')}. ${failures[0]}`)
-    selected.value = new Set()
-    bulkEmailOpen.value = false
-  } catch (error) {
-    toast.notifyError(error, 'Invio non riuscito')
-  } finally {
-    bulkEmailProgress.value = null
-  }
-}
-
-// ─── Delete ─────────────────────────────────────────────────────────────────
-
-const toDelete = ref<Invoice | null>(null)
-const deleting = ref(false)
-
-async function confirmDelete(): Promise<void> {
-  const invoice = toDelete.value
-  if (invoice === null) return
-  deleting.value = true
-  try {
-    await invoicesStore.removeInvoice(invoice.id)
-    toast.notify(`Fattura N. ${invoice.invoice_number} eliminata`)
-    toDelete.value = null
-  } catch (error) {
-    toast.notifyError(error, 'Eliminazione non riuscita')
-  } finally {
-    deleting.value = false
-  }
-}
-
-function clearFilters(): void {
-  search.value = ''
-  status.value = 'all'
-}
 </script>
 
 <template>

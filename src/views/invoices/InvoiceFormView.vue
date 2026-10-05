@@ -5,17 +5,13 @@
  * to the total it saves. A line's amount can be typed by hand, replacing
  * quantity × price; quantity visibility starts from the patient, then the profile.
  */
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { Check, ClipboardList, NotebookPen, Plus, Receipt, Trash2, TriangleAlert, UserRound } from 'lucide-vue-next'
-import { useInvoicesStore } from '@/stores/invoices'
 import { useClientsStore } from '@/stores/clients'
 import { useServicesStore } from '@/stores/services'
 import { useConfigStore } from '@/stores/config'
 import { useStsStore } from '@/stores/sts'
-import { errorMessage, useToastStore } from '@/stores/toast'
-import { getInvoice } from '@/api'
-import type { CreateInvoiceInput, InvoiceLineInput, InvoiceStatus, PaymentMethod, UpdateInvoiceInput } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -25,67 +21,32 @@ import ComboBox from '@/components/ui/ComboBox.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import type { ComboOption, SegmentOption } from '@/components/ui/types'
-import { formatCurrency, todayIso } from '@/utils/format'
-import { enpapIncludesBollo, hasAmountOverride, lineNetAmount } from '@/utils/tax'
+import type { ComboOption } from '@/components/ui/types'
+import { formatCurrency } from '@/utils/format'
+import { hasAmountOverride, lineNetAmount } from '@/utils/tax'
 import { useInvoiceTotals } from '@/composables/useInvoiceTotals'
+import { useInvoiceForm } from '@/composables/useInvoiceForm'
+import { useInvoiceFormLines } from '@/composables/useInvoiceFormLines'
+import { useHideQuantityDefault } from '@/composables/useHideQuantityDefault'
 import { clientDisplayName } from '@/utils/client'
-import { INVOICE_STATUS, INVOICE_STATUS_ORDER, PAYMENT_METHOD_LABEL, PAYMENT_METHOD_ORDER } from '@/utils/labels'
+import { INVOICE_STATUS_OPTIONS as STATUS_OPTIONS, enpapDescription as describeEnpap } from '@/utils/invoiceForm'
+import { PAYMENT_METHOD_LABEL, PAYMENT_METHOD_ORDER } from '@/utils/labels'
 
 const route = useRoute()
-const router = useRouter()
-const invoicesStore = useInvoicesStore()
 const clientsStore = useClientsStore()
 const servicesStore = useServicesStore()
 const configStore = useConfigStore()
 const sts = useStsStore()
-const toast = useToastStore()
 
 const editId = route.params.id ? Number(route.params.id) : null
 const isEdit = editId !== null
-const loading = ref(isEdit)
-const loadError = ref<string | null>(null)
-const saving = ref(false)
-const nextNumber = ref<string | null>(null)
-
-interface FormLine extends InvoiceLineInput {
-  key: number
-}
-
-let lineKey = 0
-function blankLine(): FormLine {
-  return { key: lineKey++, service_id: undefined, description: '', quantity: 1, unit_price: 0, vat_rate: 0, amount_override: null }
-}
-
-const form = reactive({
-  client_id: null as number | null,
-  invoice_number: '',
-  issue_date: todayIso(),
-  due_date: '',
-  status: 'draft' as InvoiceStatus,
-  payment_method: 'bonifico' as PaymentMethod,
-  notes: '',
-  apply_enpap: true,
-  hide_quantity: false,
-  paid_date: '',
-  lines: [blankLine()] as FormLine[],
-})
-
-/** Set once the user flips the switch, so a patient change stops overriding their choice. */
-const hideQuantityChosen = ref(isEdit)
-
-type FieldKey = 'client' | 'invoice_number' | 'issue_date' | 'due_date' | `line-${number}`
-const errors = reactive<Partial<Record<FieldKey, string>>>({})
+const { form, errors, loading, loadError, saving, nextNumber, nextKey, onSubmit } = useInvoiceForm(editId)
+const { addLine, removeLine, applyService, typeAmount, commitAmount, resetAmount } = useInvoiceFormLines(form, nextKey)
+const { hideQuantityChosen, hideQuantityOrigin, chooseHideQuantity } = useHideQuantityDefault(form, isEdit)
 
 const clientOptions = computed<ComboOption[]>(() =>
   clientsStore.clients.map((client) => ({ value: client.id, label: clientDisplayName(client), detail: client.fiscal_code })),
 )
-
-const STATUS_OPTIONS: SegmentOption<InvoiceStatus>[] = INVOICE_STATUS_ORDER.map((value) => ({
-  value,
-  label: INVOICE_STATUS[value].label,
-  tone: INVOICE_STATUS[value].tone,
-}))
 
 const taxRegime = computed(() => configStore.config?.tax_regime ?? 'forfettario')
 const taxProfile = computed(() => ({
@@ -93,11 +54,7 @@ const taxProfile = computed(() => ({
   enpap_excludes_bollo: configStore.config?.enpap_excludes_bollo ?? false,
 }))
 const totals = useInvoiceTotals(() => form.lines, () => form.apply_enpap)
-const enpapDescription = computed(() =>
-  enpapIncludesBollo(taxProfile.value)
-    ? 'Addebitato al paziente su imponibile e marca da bollo, che nel forfettario è compenso.'
-    : 'Addebitato al paziente sul solo imponibile, senza la marca da bollo.',
-)
+const enpapDescription = computed(() => describeEnpap(taxProfile.value))
 
 /** The production Sistema TS holds this invoice: its number, date and paid status are fixed. */
 const heldBySts = computed(() => {
@@ -105,159 +62,6 @@ const heldBySts = computed(() => {
   const kind = sts.stateOf(editId).kind
   return kind === 'accepted' || kind === 'sending'
 })
-
-const selectedClient = computed(() => clientsStore.clients.find((client) => client.id === form.client_id))
-const patientHideQuantity = computed(() => selectedClient.value?.hide_quantity_in_invoice ?? null)
-const defaultHideQuantity = computed(() => patientHideQuantity.value ?? configStore.config?.hide_quantity_in_invoice ?? false)
-const hideQuantityOrigin = computed(() =>
-  patientHideQuantity.value === null ? 'Predefinito dalle impostazioni di fatturazione.' : 'Predefinito per questo paziente.',
-)
-
-watch(defaultHideQuantity, (hide) => {
-  if (!hideQuantityChosen.value) form.hide_quantity = hide
-}, { immediate: true })
-
-function chooseHideQuantity(hide: boolean): void {
-  hideQuantityChosen.value = true
-  form.hide_quantity = hide
-}
-
-/** Live while typing; an emptied field waits for `resetAmount` on change. */
-function typeAmount(line: FormLine, event: Event): void {
-  const amount = (event.target as HTMLInputElement).valueAsNumber
-  if (Number.isFinite(amount)) line.amount_override = amount
-}
-
-function commitAmount(line: FormLine, event: Event): void {
-  if ((event.target as HTMLInputElement).value.trim() === '') resetAmount(line)
-}
-
-function resetAmount(line: FormLine): void {
-  line.amount_override = null
-}
-
-function addLine(): void {
-  form.lines.push(blankLine())
-}
-
-function removeLine(key: number): void {
-  form.lines = form.lines.filter((line) => line.key !== key)
-}
-
-function applyService(line: FormLine): void {
-  const service = servicesStore.services.find((candidate) => candidate.id === line.service_id)
-  if (service === undefined) return
-  line.description = service.name
-  line.unit_price = service.default_price
-  line.vat_rate = service.vat_rate
-}
-
-onMounted(async () => {
-  try {
-    await Promise.all([
-      clientsStore.fetchClients(),
-      servicesStore.fetchServices(false),
-      configStore.isConfigured ? Promise.resolve() : configStore.loadConfig(),
-      isEdit && !sts.loaded ? sts.load() : Promise.resolve(),
-    ])
-    const presetClient = Number(route.query.client)
-    if (!isEdit && Number.isInteger(presetClient) && presetClient > 0) form.client_id = presetClient
-    if (!isEdit) {
-      nextNumber.value = await invoicesStore.nextNumber(new Date().getFullYear())
-      return
-    }
-    const invoice = await getInvoice(editId)
-    Object.assign(form, {
-      client_id: invoice.client_id,
-      invoice_number: invoice.invoice_number,
-      issue_date: invoice.issue_date,
-      due_date: invoice.due_date ?? '',
-      status: invoice.status,
-      payment_method: invoice.payment_method,
-      notes: invoice.notes,
-      apply_enpap: invoice.apply_enpap,
-      hide_quantity: invoice.hide_quantity,
-      paid_date: invoice.paid_date ?? '',
-      lines: invoice.lines.map((line) => ({
-        key: lineKey++,
-        service_id: line.service_id,
-        description: line.description,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        vat_rate: line.vat_rate,
-        amount_override: line.amount_override ?? null,
-      })),
-    })
-  } catch (error) {
-    loadError.value = errorMessage(error)
-  } finally {
-    loading.value = false
-  }
-})
-
-function validate(): boolean {
-  for (const key of Object.keys(errors) as FieldKey[]) delete errors[key]
-  if (form.client_id === null) errors.client = 'Scegli il paziente a cui intestare la fattura.'
-  if (isEdit && form.invoice_number.trim() !== '') {
-    const number = Number(form.invoice_number.trim())
-    if (!Number.isInteger(number) || number < 1) errors.invoice_number = 'Un numero intero maggiore di zero.'
-  }
-  if (!form.issue_date) errors.issue_date = 'Indica la data di emissione.'
-  if (form.due_date && form.due_date < form.issue_date) errors.due_date = 'La scadenza non può precedere l’emissione.'
-  form.lines.forEach((line, index) => {
-    const key = `line-${index}` as const
-    if (!line.description.trim()) errors[key] = 'Serve una descrizione.'
-    else if (!Number.isInteger(line.quantity) || line.quantity < 1) errors[key] = 'La quantità è un intero da 1 in su.'
-    else if (!Number.isFinite(line.unit_price) || line.unit_price < 0) errors[key] = 'Prezzo non valido.'
-    else if (!Number.isFinite(line.vat_rate) || line.vat_rate < 0 || line.vat_rate > 100) errors[key] = 'IVA tra 0 e 100.'
-    else if (hasAmountOverride(line) && (!Number.isFinite(line.amount_override) || line.amount_override < 0)) errors[key] = 'Importo non valido.'
-  })
-  return Object.keys(errors).length === 0
-}
-
-async function onSubmit(): Promise<void> {
-  if (form.lines.length === 0) {
-    toast.notifyError('Aggiungi almeno una riga alla fattura.')
-    return
-  }
-  if (!validate() || form.client_id === null) return
-
-  const lines: InvoiceLineInput[] = form.lines.map(({ key: _key, ...line }) => ({ ...line, service_id: line.service_id || undefined }))
-  const base: CreateInvoiceInput = {
-    client_id: form.client_id,
-    issue_date: form.issue_date,
-    due_date: form.due_date || undefined,
-    status: form.status,
-    payment_method: form.payment_method,
-    notes: form.notes,
-    apply_enpap: form.apply_enpap,
-    hide_quantity: form.hide_quantity,
-    lines,
-  }
-
-  saving.value = true
-  try {
-    if (editId !== null) {
-      const input: UpdateInvoiceInput = {
-        ...base,
-        id: editId,
-        invoice_number: form.invoice_number.trim() || undefined,
-        paid_date: form.status === 'paid' ? form.paid_date || undefined : undefined,
-      }
-      const saved = await invoicesStore.editInvoice(input)
-      toast.notify(`Fattura N. ${saved.invoice_number} aggiornata`)
-      void router.push(`/invoices/${saved.id}`)
-    } else {
-      const saved = await invoicesStore.addInvoice(base)
-      toast.notify(`Fattura N. ${saved.invoice_number} creata`)
-      void router.push(`/invoices/${saved.id}`)
-    }
-  } catch (error) {
-    toast.notifyError(error, 'Salvataggio non riuscito')
-  } finally {
-    saving.value = false
-  }
-}
 </script>
 
 <template>

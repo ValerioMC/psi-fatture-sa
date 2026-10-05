@@ -4,14 +4,10 @@
  * and the Sistema Tessera Sanitaria consent. Codice fiscale, P.IVA, CAP,
  * provincia and email are checked when the field is left, and again on save.
  */
-import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { ArrowRight, Check, FilePlus, FileText, IdCard, MapPin, ShieldCheck, ShieldOff, Trash2, TriangleAlert } from 'lucide-vue-next'
-import { useClientsStore } from '@/stores/clients'
 import { useConfigStore } from '@/stores/config'
-import { errorMessage, useToastStore } from '@/stores/toast'
-import { getClient, listInvoices } from '@/api'
-import type { ClientType, CreateClientInput, Invoice } from '@/types'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -24,180 +20,29 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
-import type { SegmentOption } from '@/components/ui/types'
-import { ageOn, clientDisplayName } from '@/utils/client'
+import { useClientForm } from '@/composables/useClientForm'
 import { formatCurrency, formatDateShort } from '@/utils/format'
 import { plural } from '@/utils/labels'
 import {
-  validateCap,
-  validateCodiceFiscale,
-  validateEmail,
-  validatePartitaIva,
-  validateProvincia,
-  type ValidationResult,
-} from '@/utils/validation'
+  CLIENT_TYPE_OPTIONS as TYPE_OPTIONS,
+  cardDescription as describeCard,
+  cardPlace as placeOf,
+  historyTotal as totalOf,
+} from '@/utils/clientForm'
 
 const route = useRoute()
-const router = useRouter()
-const clientsStore = useClientsStore()
 const configStore = useConfigStore()
-const toast = useToastStore()
 
 const editId = route.params.id ? Number(route.params.id) : null
 const isEdit = editId !== null
-const loading = ref(isEdit)
-const loadError = ref<string | null>(null)
-const saving = ref(false)
-const deleteOpen = ref(false)
-const deleting = ref(false)
-
-const form = reactive<CreateClientInput>({
-  client_type: 'persona_fisica',
-  first_name: '',
-  last_name: '',
-  birth_date: undefined,
-  gender: undefined,
-  fiscal_code: '',
-  vat_number: undefined,
-  address: '',
-  city: '',
-  province: '',
-  zip_code: '',
-  email: undefined,
-  phone: '',
-  notes: undefined,
-  sts_authorization: false,
-  hide_quantity_in_invoice: null,
-})
+const { form, errors, loading, loadError, saving, deleteOpen, deleting, history, displayName, check, onSubmit, confirmDelete } =
+  useClientForm(editId)
 
 const profileHidesQuantity = computed(() => configStore.config?.hide_quantity_in_invoice ?? false)
-
-const TYPE_OPTIONS: SegmentOption<ClientType>[] = [
-  { value: 'persona_fisica', label: 'Persona fisica' },
-  { value: 'azienda', label: 'Azienda o ente' },
-]
-
-type Field = 'first_name' | 'last_name' | 'fiscal_code' | 'vat_number' | 'email' | 'zip_code' | 'province'
-const errors = reactive<Partial<Record<Field, string>>>({})
-
-function required(value: string | undefined, message: string): ValidationResult {
-  return value && value.trim() !== '' ? { valid: true } : { valid: false, message }
-}
-
-const VALIDATORS: Record<Field, () => ValidationResult> = {
-  first_name: () => (form.client_type === 'azienda' ? { valid: true } : required(form.first_name, 'Serve il nome.')),
-  last_name: () => required(form.last_name, form.client_type === 'azienda' ? 'Serve la ragione sociale.' : 'Serve il cognome.'),
-  fiscal_code: () => {
-    const presence = required(form.fiscal_code, 'Serve il codice fiscale.')
-    return presence.valid ? validateCodiceFiscale(form.fiscal_code) : presence
-  },
-  vat_number: () => (form.client_type === 'azienda' ? validatePartitaIva(form.vat_number ?? '') : { valid: true }),
-  email: () => validateEmail(form.email ?? ''),
-  zip_code: () => validateCap(form.zip_code),
-  province: () => validateProvincia(form.province),
-}
-
-function check(field: Field): void {
-  const result = VALIDATORS[field]()
-  if (result.valid) delete errors[field]
-  else errors[field] = result.message
-}
-
-function checkAll(): boolean {
-  ;(Object.keys(VALIDATORS) as Field[]).forEach(check)
-  return Object.keys(errors).length === 0
-}
-
-const displayName = computed(() => clientDisplayName(form))
-
 /** The record card beside the form: how the patient reads at a glance, updated as it is typed. */
-const cardDescription = computed(() => {
-  if (form.client_type === 'azienda') return 'Azienda o ente'
-  const age = ageOn(form.birth_date)
-  return age === null ? 'Persona fisica' : `${age} anni`
-})
-const cardPlace = computed(() => {
-  const place = [form.zip_code, form.city].filter(Boolean).join(' ')
-  return [form.address, place + (form.province ? ` (${form.province})` : '')].filter((part) => part.trim() !== '')
-})
-
-// The patient's invoices, newest first: the history an edit is made against.
-const history = ref<Invoice[]>([])
-const historyTotal = computed(() =>
-  history.value.filter((invoice) => invoice.status !== 'cancelled').reduce((sum, invoice) => sum + invoice.total_due, 0),
-)
-
-onMounted(async () => {
-  if (configStore.config === null) void configStore.loadConfig().catch(() => undefined)
-  if (editId === null) return
-  void listInvoices({ client_id: editId })
-    .then((invoices) => {
-      history.value = [...invoices].sort((a, b) => b.issue_date.localeCompare(a.issue_date))
-    })
-    .catch(() => { history.value = [] })
-  try {
-    const client = await getClient(editId)
-    Object.assign(form, {
-      client_type: client.client_type,
-      first_name: client.first_name,
-      last_name: client.last_name,
-      birth_date: client.birth_date,
-      gender: client.gender,
-      fiscal_code: client.fiscal_code,
-      vat_number: client.vat_number,
-      address: client.address,
-      city: client.city,
-      province: client.province,
-      zip_code: client.zip_code,
-      email: client.email,
-      phone: client.phone,
-      notes: client.notes,
-      sts_authorization: client.sts_authorization,
-      hide_quantity_in_invoice: client.hide_quantity_in_invoice,
-    })
-  } catch (error) {
-    loadError.value = errorMessage(error)
-  } finally {
-    loading.value = false
-  }
-})
-
-async function onSubmit(): Promise<void> {
-  if (!checkAll()) {
-    toast.notifyError('Alcuni campi vanno corretti prima di salvare.')
-    return
-  }
-  saving.value = true
-  try {
-    if (editId !== null) {
-      await clientsStore.editClient({ id: editId, ...form })
-      toast.notify(`${displayName.value} aggiornato`)
-    } else {
-      await clientsStore.addClient({ ...form })
-      toast.notify(`${displayName.value} aggiunto ai pazienti`)
-    }
-    void router.push('/clients')
-  } catch (error) {
-    toast.notifyError(error, 'Salvataggio non riuscito')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function confirmDelete(): Promise<void> {
-  if (editId === null) return
-  deleting.value = true
-  try {
-    await clientsStore.removeClient(editId)
-    toast.notify(`${displayName.value} eliminato dall'anagrafica`)
-    void router.push('/clients')
-  } catch (error) {
-    toast.notifyError(error, 'Eliminazione non riuscita')
-    deleteOpen.value = false
-  } finally {
-    deleting.value = false
-  }
-}
+const cardDescription = computed(() => describeCard(form))
+const cardPlace = computed(() => placeOf(form))
+const historyTotal = computed(() => totalOf(history.value))
 </script>
 
 <template>
