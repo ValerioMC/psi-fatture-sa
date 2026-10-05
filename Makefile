@@ -7,7 +7,7 @@ MANIFEST   := src-tauri/Cargo.toml
 BUNDLE_DIR := src-tauri/target/release/bundle
 
 .DEFAULT_GOAL := help
-.PHONY: help dev build build-sogei app install install-prod test test-frontend test-backend lint fmt
+.PHONY: help dev build build-sogei app install install-prod test test-frontend test-backend lint lint-backend lint-frontend fmt
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -52,8 +52,13 @@ test-frontend: ## vue-tsc typecheck and vitest
 test-backend: ## cargo test (invoice totals, validation, config)
 	$(CARGO) test --manifest-path $(MANIFEST)
 
-lint: ## clippy over the backend, as CI runs it
+lint: lint-backend lint-frontend ## clippy and ESLint, as CI runs them
+
+lint-backend: ## clippy over the backend
 	$(CARGO) clippy --manifest-path $(MANIFEST) --all-targets -- -D warnings
+
+lint-frontend: ## ESLint over the frontend (eslint.config.js)
+	$(NPM) run lint
 
 fmt: ## cargo fmt --check over the backend, as CI runs it
 	$(CARGO) fmt --manifest-path $(MANIFEST) --check

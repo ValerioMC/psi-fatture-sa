@@ -49,7 +49,7 @@ Layering, one-type-per-file, typed errors and test placement are described in
 ## Before handing work back
 
 ```bash
-make fmt lint test     # cargo fmt --check, clippy -D warnings, vue-tsc, vitest, cargo test
+make fmt lint test     # cargo fmt --check, clippy -D warnings, ESLint, vue-tsc, vitest, cargo test
 ```
 
 Update `README.md` when structure, commands or configuration change.

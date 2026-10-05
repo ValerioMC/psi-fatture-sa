@@ -559,7 +559,8 @@ psi-fatture-sa/
 
 ```bash
 # Frontend (vitest): logica fiscale, validazione (codice fiscale, P.IVA, IBAN…),
-# sigillo delle fatture, soglia forfettario, date locali, ricorrenze, tema, notifiche
+# sigillo delle fatture, soglia forfettario, date locali, ricorrenze, tema, notifiche,
+# filtri e riepiloghi della lista fatture, form di fattura e paziente, agenda e dashboard
 npm test
 
 # Backend (cargo): calcolo totali fattura, validazione input, Sistema TS (buste SOAP,
@@ -580,7 +581,7 @@ Il progetto integra **Rustfmt** (formatter) e **Clippy** (linter), entrambi stru
 
 Il workflow `.github/workflows/lint.yml` esegue entrambi i check automaticamente ad ogni push e pull request su `main`. Un warning Clippy non risolto blocca il check CI.
 
-La versione di Rust è fissata in `rust-toolchain.toml` (radice del repo) e letta sia da `rustup` in locale sia dai workflow `lint.yml` e `release.yml`: CI e macchina locale usano lo stesso compilatore, quindi un nuovo lint di Clippy non può rompere la CI a sorpresa. Per aggiornarla, cambia `channel`, esegui `make fmt lint test-backend`, correggi i nuovi warning e committa tutto insieme. Prima di ogni push basta `make fmt lint`, gli stessi comandi della CI.
+La versione di Rust è fissata in `rust-toolchain.toml` (radice del repo) e letta sia da `rustup` in locale sia dai workflow `lint.yml` e `release.yml`: CI e macchina locale usano lo stesso compilatore, quindi un nuovo lint di Clippy non può rompere la CI a sorpresa. Per aggiornarla, cambia `channel`, esegui `make fmt lint test-backend`, correggi i nuovi warning e committa tutto insieme. Prima di ogni push basta `make fmt lint`, gli stessi comandi della CI (Clippy ed ESLint).
 
 ### Rustfmt — formattazione
 
@@ -600,8 +601,6 @@ La configurazione si trova in `src-tauri/rustfmt.toml`:
 |---------|--------|---------|
 | `edition` | `"2021"` | Allineato all'edizione Rust del progetto |
 | `max_width` | `100` | Lunghezza massima di riga (default 80) |
-| `imports_granularity` | `"Module"` | Raggruppa gli `use` per modulo |
-| `group_imports` | `"StdExternalCrate"` | Ordine: std → crate esterne → crate interne |
 
 ### Clippy — linting
 
@@ -621,6 +620,23 @@ Il file `.vscode/settings.json` già presente nel repo configura:
 
 - **Format-on-save** automatico per i file `.rs`
 - **Clippy come checker** in tempo reale al posto del semplice `cargo check` — i warning appaiono direttamente nell'editor mentre scrivi
+
+## Qualità del codice frontend
+
+**ESLint** controlla `src/` e `scripts/` con le regole raccomandate di JavaScript,
+`typescript-eslint` e `eslint-plugin-vue` (`eslint.config.js`). Lo stesso workflow
+`.github/workflows/lint.yml` lo esegue in un job a parte, e un errore blocca il check CI.
+
+```bash
+npm run lint          # ESLint su tutto il frontend
+make lint-frontend    # lo stesso, da make
+make lint             # Clippy ed ESLint insieme, come la CI
+```
+
+Le eccezioni alle regole raccomandate sono in fondo a `eslint.config.js`, ognuna con il
+suo motivo. Le regole di impaginazione dei template sono spente, perché i template usano
+uno stile compatto su una riga. `vue/no-mutating-props` controlla solo la sostituzione di
+una prop: `ProfileSections.vue` modifica il form reattivo che il genitore le passa.
 
 ## Stack tecnologico
 
