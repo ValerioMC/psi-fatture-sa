@@ -121,6 +121,8 @@ export const saveInvoicePdf = (invoiceId: number, path: string) =>
   invoke<void>('save_invoice_pdf', { invoiceId, path })
 export const getInvoicePdfName = (invoiceId: number) =>
   invoke<string>('get_invoice_pdf_name', { invoiceId })
+/** Opens the system print dialog for the page the webview shows. */
+export const printCurrentPage = () => invoke<void>('print_current_page')
 
 // ─── Appointments ────────────────────────────────────────────────────────────
 

@@ -2,10 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, Printer } from 'lucide-vue-next'
-import { invoke } from '@tauri-apps/api/core'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
-import { getInvoice, getClient, getConfig } from '@/api'
+import { getInvoice, getClient, getConfig, printCurrentPage } from '@/api'
 import type { Invoice, Client, ProfessionalConfig } from '@/types'
 import { formatCurrency, formatDateLong } from '@/utils/format'
 import { hasAmountOverride } from '@/utils/tax'
@@ -92,11 +91,6 @@ const legalNotes = computed((): string[] => {
     lines.push(`Si richiede di operare una ritenuta d'acconto del 20% pari a ${formatCurrency(invoice.value.ritenuta_acconto)}.`)
   return lines
 })
-
-/** Opens the native OS print dialog via Tauri. */
-async function handlePrint(): Promise<void> {
-  await invoke('print_current_page')
-}
 </script>
 
 <template>
@@ -109,7 +103,7 @@ async function handlePrint(): Promise<void> {
         <p class="flex-1 text-center text-sm text-text-subtle" data-tauri-drag-region>
           Per il paziente il PDF lo prepara l’app: dalla fattura, <span class="font-medium text-text-muted">Salva PDF</span> o <span class="font-medium text-text-muted">Invia al paziente</span>.
         </p>
-        <AppButton v-if="!loading && invoice" variant="primary" :icon="Printer" @click="handlePrint">Stampa</AppButton>
+        <AppButton v-if="!loading && invoice" variant="primary" :icon="Printer" @click="printCurrentPage()">Stampa</AppButton>
       </div>
     </div>
 

@@ -483,7 +483,7 @@ rimuove i pacchetti installati senza salvarli.
 psi-fatture-sa/
 ├── src/                    # Frontend Vue 3 + TypeScript
 │   ├── api.ts              # Wrapper chiamate Tauri invoke
-│   ├── types.ts            # Tipi condivisi frontend
+│   ├── types/              # Tipi condivisi, un file per dominio come model/ nel backend
 │   ├── style.css           # Token del design system, campi, movimenti
 │   ├── views/              # Pagine dell'applicazione (settings/: una per contesto)
 │   ├── components/
