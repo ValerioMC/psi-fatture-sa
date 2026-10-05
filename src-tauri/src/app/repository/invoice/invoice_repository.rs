@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
     EntityTrait, FromQueryResult, QueryFilter, QueryOrder, Statement,
@@ -15,36 +17,7 @@ pub async fn find_ids(
     db: &DatabaseConnection,
     filters: &InvoiceFilters,
 ) -> Result<Vec<i64>, AppError> {
-    let mut conditions = vec!["1=1".to_string()];
-    let mut values: Vec<sea_orm::Value> = Vec::new();
-
-    if let Some(y) = filters.year {
-        conditions.push("i.year = ?".to_string());
-        values.push(y.into());
-    }
-    if let Some(s) = filters.status.as_deref().filter(|s| !s.is_empty()) {
-        conditions.push("i.status = ?".to_string());
-        values.push(s.into());
-    }
-    if let Some(cid) = filters.client_id {
-        conditions.push("i.client_id = ?".to_string());
-        values.push(cid.into());
-    }
-    if let Some(q) = filters
-        .search
-        .as_deref()
-        .map(str::trim)
-        .filter(|q| !q.is_empty())
-    {
-        let pattern = format!("%{q}%");
-        conditions.push(
-            "(lower(c.first_name || ' ' || c.last_name) LIKE lower(?) OR i.invoice_number LIKE ?)"
-                .to_string(),
-        );
-        values.push(pattern.clone().into());
-        values.push(pattern.into());
-    }
-
+    let (conditions, values) = filter_clauses(filters);
     let sql = format!(
         "SELECT i.id FROM invoices i
          JOIN clients c ON i.client_id = c.id
@@ -66,6 +39,39 @@ pub async fn find_ids(
     .await?;
 
     Ok(rows.into_iter().map(|r| r.id).collect())
+}
+
+/// The `WHERE` conditions of the list filters, with their values in placeholder order.
+fn filter_clauses(filters: &InvoiceFilters) -> (Vec<&'static str>, Vec<sea_orm::Value>) {
+    let mut conditions = vec!["1=1"];
+    let mut values: Vec<sea_orm::Value> = Vec::new();
+
+    if let Some(y) = filters.year {
+        conditions.push("i.year = ?");
+        values.push(y.into());
+    }
+    if let Some(s) = filters.status.as_deref().filter(|s| !s.is_empty()) {
+        conditions.push("i.status = ?");
+        values.push(s.into());
+    }
+    if let Some(cid) = filters.client_id {
+        conditions.push("i.client_id = ?");
+        values.push(cid.into());
+    }
+    if let Some(q) = filters
+        .search
+        .as_deref()
+        .map(str::trim)
+        .filter(|q| !q.is_empty())
+    {
+        let pattern = format!("%{q}%");
+        conditions.push(
+            "(lower(c.first_name || ' ' || c.last_name) LIKE lower(?) OR i.invoice_number LIKE ?)",
+        );
+        values.push(pattern.clone().into());
+        values.push(pattern.into());
+    }
+    (conditions, values)
 }
 
 /// Loads a full invoice (with client_name and lines) by id.
@@ -120,26 +126,31 @@ pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<I
     .all(db)
     .await?;
 
-    let mut lines_by_invoice: std::collections::HashMap<i64, Vec<InvoiceLine>> =
-        std::collections::HashMap::new();
+    Ok(in_requested_order(ids, rows, lines_by_invoice(line_models)))
+}
+
+fn lines_by_invoice(line_models: Vec<invoice_line::Model>) -> HashMap<i64, Vec<InvoiceLine>> {
+    let mut grouped: HashMap<i64, Vec<InvoiceLine>> = HashMap::new();
     for m in line_models {
-        lines_by_invoice
-            .entry(m.invoice_id)
-            .or_default()
-            .push(into_line(m));
+        grouped.entry(m.invoice_id).or_default().push(into_line(m));
     }
+    grouped
+}
 
-    let mut by_id: std::collections::HashMap<i64, InvoiceRow> =
-        rows.into_iter().map(|r| (r.id, r)).collect();
-
-    Ok(ids
-        .iter()
+/// Ids with no row are skipped; an invoice with no lines gets an empty list.
+fn in_requested_order(
+    ids: &[i64],
+    rows: Vec<InvoiceRow>,
+    mut lines: HashMap<i64, Vec<InvoiceLine>>,
+) -> Vec<Invoice> {
+    let mut by_id: HashMap<i64, InvoiceRow> = rows.into_iter().map(|r| (r.id, r)).collect();
+    ids.iter()
         .filter_map(|id| {
             by_id
                 .remove(id)
-                .map(|row| row.into_invoice(lines_by_invoice.remove(id).unwrap_or_default()))
+                .map(|row| row.into_invoice(lines.remove(id).unwrap_or_default()))
         })
-        .collect())
+        .collect()
 }
 
 /// Inserts a new invoice record.

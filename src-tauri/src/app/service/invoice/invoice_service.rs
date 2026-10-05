@@ -11,8 +11,9 @@ use crate::app::model::invoice::{
     InvoiceLineInput, InvoiceStatus, MonthlyInvoicePreview, UpdateInvoiceInput,
 };
 use crate::app::model::tax::{InvoiceLineData, InvoiceTotals, TaxRules};
+use crate::app::repository::appointment::appointment_repository;
 use crate::app::repository::invoice::invoice_repository;
-use crate::app::repository::{appointment_repository, service_repository};
+use crate::app::repository::service_repository;
 use crate::app::service::support::tax_calculator::{calculate_invoice_totals, rules_for};
 use crate::app::service::support::validation as validate;
 use crate::app::service::ts::ts_submission_service;

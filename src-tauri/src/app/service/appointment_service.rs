@@ -5,7 +5,7 @@ use crate::app::entity::appointment as appointments;
 use crate::app::model::appointment::{
     Appointment, CreateAppointmentInput, CreateRecurringAppointmentsInput, UpdateAppointmentInput,
 };
-use crate::app::repository::appointment_repository;
+use crate::app::repository::appointment::appointment_repository;
 use crate::app::service::support::validation as validate;
 
 /// Lists appointments with optional date range and client filters.

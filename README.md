@@ -513,6 +513,7 @@ psi-fatture-sa/
 │   │   │   │   ├── pdf/        # PDF della fattura
 │   │   │   │   └── support/    # Funzioni pure condivise: validazione, calcolo fiscale, formati italiani
 │   │   │   ├── repository/ # Accesso dati (SeaORM, SQL) e servizi esterni
+│   │   │   │   ├── appointment/ # Appuntamenti e riga letta con paziente e prestazione
 │   │   │   │   ├── invoice/    # Fatture e proiezione delle righe lette
 │   │   │   │   ├── secret/     # Archivio cifrato delle credenziali
 │   │   │   │   ├── email/      # Casella, modello, registro invii e gateway SMTP (lettre)

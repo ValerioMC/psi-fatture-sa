@@ -2,9 +2,10 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait, FromQueryResult, Statement,
 };
 
+use super::AppointmentRow;
 use crate::app::common::AppError;
 use crate::app::entity::{appointment as appointments, recurrence_group as recurrence_groups};
-use crate::app::model::appointment::{Appointment, AppointmentStatus};
+use crate::app::model::appointment::Appointment;
 
 /// Returns all appointments matching the given optional filters.
 pub async fn find_all(
@@ -158,49 +159,15 @@ async fn load_appointments_by_sql(
     sql: &str,
     values: Vec<sea_orm::Value>,
 ) -> Result<Vec<Appointment>, AppError> {
-    #[derive(FromQueryResult)]
-    struct Row {
-        id: i64,
-        client_id: i64,
-        service_id: Option<i64>,
-        date: String,
-        start_time: String,
-        end_time: String,
-        status: String,
-        notes: Option<String>,
-        recurrence_group_id: Option<i64>,
-        invoice_id: Option<i64>,
-        created_at: String,
-        updated_at: String,
-        client_name: String,
-        service_name: Option<String>,
-    }
-
-    let rows = Row::find_by_statement(Statement::from_sql_and_values(
+    let rows = AppointmentRow::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         sql,
         values,
     ))
     .all(db)
     .await?;
-
     Ok(rows
         .into_iter()
-        .map(|r| Appointment {
-            id: r.id,
-            client_id: r.client_id,
-            client_name: r.client_name,
-            service_id: r.service_id,
-            service_name: r.service_name,
-            date: r.date,
-            start_time: r.start_time,
-            end_time: r.end_time,
-            status: AppointmentStatus::from(r.status),
-            notes: r.notes.unwrap_or_default(),
-            recurrence_group_id: r.recurrence_group_id,
-            invoice_id: r.invoice_id,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
-        })
+        .map(AppointmentRow::into_appointment)
         .collect())
 }

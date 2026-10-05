@@ -5,7 +5,7 @@ use std::io::{Cursor, Read};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 
-use super::{ReportOutcome, XmlNode};
+use super::{ReportColumns, ReportOutcome, XmlNode};
 use crate::app::model::ts::{
     TsCallResponse, TsDocumentId, TsEsito, TsExpenseTotal, TsMessage, TsQueryResult,
     TsRemoteDocument, TsReportRow,
@@ -155,58 +155,32 @@ fn unzip_report(encoded: &str) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&raw).into_owned())
 }
 
-/// Parses `report.csv`: `;`-separated, header first, dates as dd/mm/yyyy,
-/// one `TOTALE xx` / `TOTALE xx RIMBORSATO` column pair per expense type.
+/// Parses `report.csv`: `;`-separated, header first, dates as dd/mm/yyyy.
 fn report_rows(csv: &str) -> Result<Vec<TsReportRow>, String> {
     let mut lines = csv.lines().filter(|l| !l.trim().is_empty());
-    let header: Vec<String> = lines
-        .next()
-        .map(|h| h.split(';').map(|c| c.trim().to_uppercase()).collect())
-        .unwrap_or_default();
-    let column = |name: &str| header.iter().position(|h| h == name);
-    let required = |name: &str| column(name).ok_or(format!("Colonna {name} assente nel report"));
+    let columns = ReportColumns::from_header(lines.next().unwrap_or_default())?;
+    lines.map(|line| report_row(line, &columns)).collect()
+}
 
-    let vat = required("PARTITA IVA")?;
-    let issue = required("DATA EMISSIONE")?;
-    let number = required("DOCUMENTO FISCALE NUMERO")?;
-    let payment = required("DATA PAGAMENTO")?;
-    let protocol = required("PROTOCOLLO")?;
-    let sent = required("DATA INVIO")?;
-    let kind = required("TIPO INVIO")?;
-    let totals: Vec<usize> = header
-        .iter()
-        .enumerate()
-        .filter(|(_, h)| h.starts_with("TOTALE ") && !h.ends_with("RIMBORSATO"))
-        .map(|(i, _)| i)
-        .collect();
-    let refunds: Vec<usize> = header
-        .iter()
-        .enumerate()
-        .filter(|(_, h)| h.starts_with("TOTALE ") && h.ends_with("RIMBORSATO"))
-        .map(|(i, _)| i)
-        .collect();
-
-    lines
-        .map(|line| {
-            let cells: Vec<&str> = line.split(';').map(str::trim).collect();
-            let cell = |i: usize| cells.get(i).copied().unwrap_or_default().to_string();
-            let sum = |columns: &[usize]| -> Result<f64, String> {
-                columns.iter().map(|i| parse_amount(&cell(*i))).sum()
-            };
-            Ok(TsReportRow {
-                vat_number: cell(vat),
-                issue_date: italian_to_iso(&cell(issue)),
-                document_number: cell(number),
-                payment_date: italian_to_iso(&cell(payment)),
-                protocol: cell(protocol),
-                sent_date: italian_to_iso(&cell(sent)),
-                send_kind: cell(kind),
-                amount: sum(&totals)?,
-                refunded_amount: sum(&refunds)?,
-                invoice_id: None,
-            })
-        })
-        .collect()
+/// A missing cell reads as empty, so a missing amount counts as 0.
+fn report_row(line: &str, columns: &ReportColumns) -> Result<TsReportRow, String> {
+    let cells: Vec<&str> = line.split(';').map(str::trim).collect();
+    let cell = |i: usize| cells.get(i).copied().unwrap_or_default().to_string();
+    let sum = |indexes: &[usize]| -> Result<f64, String> {
+        indexes.iter().map(|i| parse_amount(&cell(*i))).sum()
+    };
+    Ok(TsReportRow {
+        vat_number: cell(columns.vat_number),
+        issue_date: italian_to_iso(&cell(columns.issue_date)),
+        document_number: cell(columns.document_number),
+        payment_date: italian_to_iso(&cell(columns.payment_date)),
+        protocol: cell(columns.protocol),
+        sent_date: italian_to_iso(&cell(columns.sent_date)),
+        send_kind: cell(columns.send_kind),
+        amount: sum(&columns.totals)?,
+        refunded_amount: sum(&columns.refunds)?,
+        invoice_id: None,
+    })
 }
 
 fn parse_amount(value: &str) -> Result<f64, String> {

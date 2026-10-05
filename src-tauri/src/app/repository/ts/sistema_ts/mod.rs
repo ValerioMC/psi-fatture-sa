@@ -13,6 +13,7 @@ pub mod sistema_ts_gateway;
 pub mod ts_gateway_error;
 pub mod ts_session;
 
+mod report_columns;
 mod xml_node;
 
 pub use credentials::Credentials;
@@ -25,4 +26,5 @@ pub use sistema_ts_gateway::SistemaTsGateway;
 pub use ts_gateway_error::TsGatewayError;
 pub use ts_session::TsSession;
 
+use report_columns::ReportColumns;
 use xml_node::XmlNode;

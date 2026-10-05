@@ -1,4 +1,4 @@
-pub mod appointment_repository;
+pub mod appointment;
 pub mod backup_repository;
 pub mod client_repository;
 pub mod config_repository;
