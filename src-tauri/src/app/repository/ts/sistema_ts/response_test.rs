@@ -71,6 +71,15 @@ fn reads_a_cancelled_document_from_the_point_query() {
 }
 
 #[test]
+fn a_total_without_its_amount_is_an_error_rather_than_zero() {
+    let without_amount = QUERY_CANCELLED.replace("<importo>90.0</importo>", "");
+
+    let error = query_response(&without_amount).unwrap_err();
+
+    assert_eq!(error, "Importo assente nei totali della risposta");
+}
+
+#[test]
 fn missing_document_is_not_found_rather_than_an_error() {
     assert_eq!(
         query_response(QUERY_NOT_FOUND).unwrap(),

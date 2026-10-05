@@ -117,3 +117,16 @@ async fn bulk_status_changes_spare_transmitted_invoices() {
             .is_ok()
     );
 }
+
+#[test]
+fn reads_a_stored_number_with_its_padding() {
+    assert_eq!(stored_number("007").unwrap(), 7);
+}
+
+#[test]
+fn refuses_a_stored_number_that_is_not_numeric() {
+    let error = stored_number("7bis").unwrap_err();
+
+    assert!(matches!(error, AppError::Database(_)));
+    assert!(error.to_string().contains("«7bis»"));
+}

@@ -108,7 +108,11 @@ fn totals_of(node: &XmlNode, name: &str) -> Result<Vec<TsExpenseTotal>, String> 
         .map(|total| {
             Ok(TsExpenseTotal {
                 expense_type: total.text_of("tipoSpesa").unwrap_or_default(),
-                amount: parse_amount(&total.text_of("importo").unwrap_or_default())?,
+                amount: parse_amount(
+                    &total
+                        .text_of("importo")
+                        .ok_or("Importo assente nei totali della risposta")?,
+                )?,
             })
         })
         .collect()
