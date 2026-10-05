@@ -7,7 +7,7 @@ use crate::app::app_state::AppState;
 use crate::app::common::AppError;
 use crate::app::model::backup::{BackupFile, BackupOverview, BackupReason};
 use crate::app::repository::backup_repository;
-use crate::app::service::backup_service;
+use crate::app::service::backup::backup_service;
 
 /// Saves a copy of the whole archive where the professional chose.
 #[tauri::command]

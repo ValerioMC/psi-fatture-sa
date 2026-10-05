@@ -20,7 +20,7 @@ use app::repository::release::{
 };
 use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
 use app::repository::ts::sistema_ts::{HttpSistemaTsGateway, SistemaTsGateway};
-use app::service::rotating_backup_service::RotatingBackups;
+use app::service::backup::RotatingBackups;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

@@ -5,6 +5,8 @@ use crate::app::common::AppError;
 use crate::app::model::update::{LatestRelease, Platform, ReleaseVersion, UpdateCheck};
 use crate::app::repository::release::ReleaseGateway;
 
+pub use super::update_install_service::{install, UpdateTarget};
+
 pub async fn check(
     gateway: &dyn ReleaseGateway,
     current_version: &str,
@@ -15,7 +17,7 @@ pub async fn check(
 }
 
 /// Compares `release` with this build; a tag that is not a version is the server's fault.
-pub fn evaluate(
+pub(super) fn evaluate(
     release: &LatestRelease,
     current_version: &str,
     platform: Platform,
@@ -38,7 +40,7 @@ pub fn evaluate(
 }
 
 /// The bundle published for `platform`, if the release has one.
-pub fn bundle_url(release: &LatestRelease, platform: Platform) -> Option<String> {
+pub(super) fn bundle_url(release: &LatestRelease, platform: Platform) -> Option<String> {
     platform
         .asset_name()
         .and_then(|wanted| release.assets.iter().find(|asset| asset.name == wanted))

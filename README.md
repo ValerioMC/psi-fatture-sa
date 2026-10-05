@@ -387,7 +387,7 @@ su macOS). Ogni copia è coerente (`VACUUM INTO`, include le modifiche ancora ne
 Password del Sistema TS e della casella email restano fuori: sono cifrate per questo
 computer.
 
-- **Backup automatici**: `RotatingBackups` (`src-tauri/src/app/service/rotating_backup_service.rs`)
+- **Backup automatici**: `RotatingBackups` (`src-tauri/src/app/service/backup/rotating_backup_service.rs`)
   scrive le copie in `backups/` accanto a `database.db`, con nomi
   `psi-fatture-AAAAMMGG-HHMMSS[-N]-(auto|manual).db`. Il worker `scheduler/backup_worker.rs`
   controlla 5 secondi dopo l'avvio e poi ogni ora: se nessuna copia porta la data di oggi ne
@@ -504,7 +504,13 @@ psi-fatture-sa/
 │   │   ├── app/
 │   │   │   ├── app_state.rs # Stato condiviso dai comandi (DB, credenziali, gateway)
 │   │   │   ├── controller/ # Comandi Tauri (API layer); ts/ per il Sistema TS
-│   │   │   ├── service/    # Logica di business; invoice/ fatture, ts/ Sistema TS, email/ invii, pdf/ PDF
+│   │   │   ├── service/    # Logica di business, un service per entità
+│   │   │   │   ├── invoice/    # Fatture: invoice_service più regole e tipi privati
+│   │   │   │   ├── backup/     # Copia su richiesta (backup_service) e rotazione (RotatingBackups)
+│   │   │   │   ├── update/     # Controllo della release (update_service) e installazione su Mac
+│   │   │   │   ├── ts/         # Sistema TS: coda, invio, credenziali, impostazioni
+│   │   │   │   ├── email/      # Invio fatture e modello dell'email
+│   │   │   │   └── pdf/        # PDF della fattura
 │   │   │   ├── repository/ # Accesso dati (SeaORM, SQL) e servizi esterni
 │   │   │   │   ├── invoice/    # Fatture e proiezione delle righe lette
 │   │   │   │   ├── secret/     # Archivio cifrato delle credenziali
@@ -536,7 +542,8 @@ psi-fatture-sa/
   `secret/`). I tipi di servizio interni al package sono `pub(super)`.
 - **Un service per entità**: in `service/invoice/` solo `invoice_service` è pubblico; le
   regole (`invoice_guard`) e i tipi di appoggio (`ClientSessions`, `InvoiceContent`) sono
-  moduli privati del package. Le regole di qualità del codice sono in `CLAUDE.md`.
+  moduli privati del package. Allo stesso modo `backup/` espone `backup_service` e
+  `RotatingBackups`, `update/` solo `update_service` (che riesporta l'installazione) e in `ts/` `ts_document_service` è privato. Le regole di qualità del codice sono in `CLAUDE.md`.
 - **Errori tipizzati**: controller, service e repository restituiscono
   `Result<_, AppError>` (`app/common/app_error.rs`): `Invalid` (dato da correggere),
   `NotFound`, `Conflict` (contrasta con lo stato salvato: numero già usato, fattura

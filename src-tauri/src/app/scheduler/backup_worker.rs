@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use sea_orm::DatabaseConnection;
 
-use crate::app::service::rotating_backup_service::RotatingBackups;
+use crate::app::service::backup::RotatingBackups;
 
 const FIRST_CHECK_AFTER: Duration = Duration::from_secs(5);
 const CHECK_EVERY: Duration = Duration::from_secs(3600);

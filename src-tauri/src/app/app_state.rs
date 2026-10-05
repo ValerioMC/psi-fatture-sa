@@ -6,7 +6,7 @@ use crate::app::repository::email::MailGateway;
 use crate::app::repository::release::{BundleInstaller, ReleaseGateway};
 use crate::app::repository::secret::SecretStore;
 use crate::app::repository::ts::sistema_ts::SistemaTsGateway;
-use crate::app::service::rotating_backup_service::RotatingBackups;
+use crate::app::service::backup::RotatingBackups;
 
 /// Application state shared across all Tauri commands.
 pub struct AppState {

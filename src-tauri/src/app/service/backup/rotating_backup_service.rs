@@ -12,7 +12,7 @@ use crate::app::common::AppError;
 use crate::app::model::backup::{BackupFile, BackupOverview, BackupReason};
 use crate::app::repository::backup_repository;
 
-pub const KEEP: usize = 10;
+const KEEP: usize = 10;
 const PREFIX: &str = "psi-fatture-";
 const EXTENSION: &str = ".db";
 const STAMP: &str = "%Y%m%d-%H%M%S";

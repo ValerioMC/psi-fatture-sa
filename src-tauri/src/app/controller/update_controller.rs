@@ -3,8 +3,7 @@ use tauri::{AppHandle, State};
 use crate::app::app_state::AppState;
 use crate::app::common::AppError;
 use crate::app::model::update::{Platform, UpdateCheck};
-use crate::app::service::update_install_service::{self, UpdateTarget};
-use crate::app::service::update_service;
+use crate::app::service::update::update_service::{self, UpdateTarget};
 
 /// The version of this build, as the release that produced it was tagged.
 #[tauri::command]
@@ -34,7 +33,7 @@ pub async fn install_update(app: AppHandle, state: State<'_, AppState>) -> Resul
     let current = app.package_info().version.to_string();
     let running_executable = std::env::current_exe()?;
     let work_dir = std::env::temp_dir().join("psi-fatture-update");
-    update_install_service::install(UpdateTarget {
+    update_service::install(UpdateTarget {
         gateway: state.release_gateway.as_ref(),
         installer: state.bundle_installer.as_ref(),
         current_version: &current,

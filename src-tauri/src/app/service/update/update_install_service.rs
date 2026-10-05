@@ -4,13 +4,13 @@
 
 use std::path::{Path, PathBuf};
 
+use super::update_service;
 use crate::app::common::AppError;
 use crate::app::model::update::Platform;
 use crate::app::repository::release::{bundle_file_repository, BundleInstaller, ReleaseGateway};
-use crate::app::service::update_service;
 
 /// Only files of this repository's releases are ever installed.
-pub const DOWNLOAD_PREFIX: &str = "https://github.com/ValerioMC/psi-fatture-sa/releases/download/";
+const DOWNLOAD_PREFIX: &str = "https://github.com/ValerioMC/psi-fatture-sa/releases/download/";
 const IMAGE_NAME: &str = "PSI-Fatture-update.dmg";
 const MOUNT_NAME: &str = "volume";
 
@@ -70,7 +70,7 @@ pub async fn install(target: UpdateTarget<'_>) -> Result<String, AppError> {
 }
 
 /// The `.app` directory the executable runs from; a development binary has none.
-pub fn app_bundle_of(executable: &Path) -> Result<PathBuf, AppError> {
+fn app_bundle_of(executable: &Path) -> Result<PathBuf, AppError> {
     executable
         .ancestors()
         .find(|path| path.extension().is_some_and(|ext| ext == "app"))
