@@ -7,3 +7,18 @@ pub struct TsDocumentId {
     pub issue_date: String,
     pub number: String,
 }
+
+impl TsDocumentId {
+    /// The id exists only once all three parts were stored, when the submission was claimed.
+    pub fn from_stored(
+        vat_number: Option<String>,
+        issue_date: Option<String>,
+        number: Option<String>,
+    ) -> Option<TsDocumentId> {
+        Some(TsDocumentId {
+            vat_number: vat_number?,
+            issue_date: issue_date?,
+            number: number?,
+        })
+    }
+}

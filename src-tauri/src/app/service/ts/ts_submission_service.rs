@@ -97,7 +97,10 @@ pub async fn invoice_out_of_date(
     else {
         return Ok(false);
     };
-    let (Some(sent), Some(id)) = (row.document_fingerprint.clone(), document_id_of(&row)) else {
+    let (Some(sent), Some(id)) = (
+        row.document_fingerprint.clone(),
+        ts_submission_repository::document_id_of(&row),
+    ) else {
         return Ok(false);
     };
     let vat_number = id.vat_number.clone();
@@ -168,27 +171,9 @@ async fn enqueue_follow_up(
 pub(crate) fn require_document_id(
     row: &crate::app::entity::ts_submission::Model,
 ) -> Result<TsDocumentId, AppError> {
-    document_id_of(row).ok_or_else(|| {
+    ts_submission_repository::document_id_of(row).ok_or_else(|| {
         AppError::Invalid("La trasmissione originale non ha un identificativo".to_string())
     })
-}
-
-/// The id an accepted submission was sent under, which follow-ups must reuse.
-pub(crate) fn document_id_of(
-    row: &crate::app::entity::ts_submission::Model,
-) -> Option<TsDocumentId> {
-    match (
-        &row.document_vat_number,
-        &row.document_issue_date,
-        &row.document_number,
-    ) {
-        (Some(vat_number), Some(issue_date), Some(number)) => Some(TsDocumentId {
-            vat_number: vat_number.clone(),
-            issue_date: issue_date.clone(),
-            number: number.clone(),
-        }),
-        _ => None,
-    }
 }
 
 fn ensure_accepted(

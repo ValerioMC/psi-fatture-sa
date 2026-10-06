@@ -181,6 +181,15 @@ pub async fn requeue_in_flight(db: &impl ConnectionTrait, now: &str) -> Result<u
     Ok(result.rows_affected())
 }
 
+/// The id a submission was sent under, which follow-ups must reuse; none before it was claimed.
+pub fn document_id_of(row: &ts_submission::Model) -> Option<TsDocumentId> {
+    TsDocumentId::from_stored(
+        row.document_vat_number.clone(),
+        row.document_issue_date.clone(),
+        row.document_number.clone(),
+    )
+}
+
 pub async fn insert(
     db: &impl ConnectionTrait,
     active: ActiveModel,
