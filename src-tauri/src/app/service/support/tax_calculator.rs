@@ -43,12 +43,7 @@ pub fn calculate_invoice_totals(lines: &[InvoiceLineData], rules: &TaxRules) -> 
         (net + line.net_amount(), tax + line.vat_amount())
     });
 
-    let needs_bollo = total_tax == 0.0 && total_net > MARCA_DA_BOLLO_THRESHOLD;
-    let marca_da_bollo = if needs_bollo {
-        MARCA_DA_BOLLO_AMOUNT
-    } else {
-        0.0
-    };
+    let marca_da_bollo = marca_da_bollo_due(total_net, total_tax);
 
     let enpap_base = if rules.enpap_includes_bollo {
         total_net + marca_da_bollo
@@ -70,6 +65,14 @@ pub fn calculate_invoice_totals(lines: &[InvoiceLineData], rules: &TaxRules) -> 
         marca_da_bollo,
         total_gross: round_cents(total_gross),
         total_due: round_cents(total_due),
+    }
+}
+
+fn marca_da_bollo_due(total_net: f64, total_tax: f64) -> f64 {
+    if total_tax == 0.0 && total_net > MARCA_DA_BOLLO_THRESHOLD {
+        MARCA_DA_BOLLO_AMOUNT
+    } else {
+        0.0
     }
 }
 

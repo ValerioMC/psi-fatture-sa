@@ -62,13 +62,12 @@ impl TsCallResponse {
 
     /// Every error and warning description, skipping the plain success line.
     pub fn summary_message(&self) -> Option<String> {
-        let lines: Vec<String> = self
+        let reported: Vec<&TsMessage> = self
             .messages
             .iter()
             .filter(|m| m.is_error() || m.kind == "W")
-            .map(|m| format!("{} {}", m.code, m.description))
             .collect();
-        (!lines.is_empty()).then(|| lines.join(" · "))
+        (!reported.is_empty()).then(|| TsMessage::joined(reported))
     }
 }
 

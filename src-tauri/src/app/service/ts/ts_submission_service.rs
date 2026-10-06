@@ -7,7 +7,8 @@ use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, Transaction
 use crate::app::common::AppError;
 use crate::app::entity::ts_submission::ActiveModel;
 use crate::app::model::ts::{
-    TsDocumentId, TsEnvironment, TsOperation, TsSubmission, TsSubmissionFilters, TsSubmissionStatus,
+    TsDocumentId, TsEnvironment, TsOperation, TsSettings, TsSubmission, TsSubmissionFilters,
+    TsSubmissionStatus,
 };
 use crate::app::repository::ts::ts_submission_repository;
 use crate::app::service::support::validation as validate;
@@ -33,25 +34,10 @@ pub async fn enqueue_invio(
     let tx = db.begin().await?;
 
     let settings = ts_settings_service::get(&tx).await?;
-    if settings.vat_number.trim().is_empty() {
-        return Err(AppError::Invalid(
-            "Indica la partita IVA del Sistema TS nelle Impostazioni".to_string(),
-        ));
-    }
+    ensure_vat_number_is_set(&settings)?;
     ts_document_service::build(&tx, invoice_id, &settings.vat_number, None).await?;
     ensure_nothing_in_flight(&tx, invoice_id).await?;
-    if ts_submission_repository::invoice_has_status(
-        &tx,
-        invoice_id,
-        &[TsSubmissionStatus::Accettata],
-        Some(settings.environment),
-    )
-    .await?
-    {
-        return Err(AppError::Conflict(
-            "Fattura già accettata dal Sistema TS: per correggerla usa la sostituzione".to_string(),
-        ));
-    }
+    ensure_not_accepted_yet(&tx, invoice_id, settings.environment).await?;
 
     let created = ts_submission_repository::insert(
         &tx,
@@ -123,6 +109,35 @@ pub async fn invoice_out_of_date(
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
+fn ensure_vat_number_is_set(settings: &TsSettings) -> Result<(), AppError> {
+    if settings.vat_number.trim().is_empty() {
+        return Err(AppError::Invalid(
+            "Indica la partita IVA del Sistema TS nelle Impostazioni".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+async fn ensure_not_accepted_yet(
+    db: &impl ConnectionTrait,
+    invoice_id: i64,
+    environment: TsEnvironment,
+) -> Result<(), AppError> {
+    let accepted = ts_submission_repository::invoice_has_status(
+        db,
+        invoice_id,
+        &[TsSubmissionStatus::Accettata],
+        Some(environment),
+    )
+    .await?;
+    if accepted {
+        return Err(AppError::Conflict(
+            "Fattura già accettata dal Sistema TS: per correggerla usa la sostituzione".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 async fn enqueue_follow_up(
     db: &DatabaseConnection,
     target_submission_id: i64,
@@ -132,20 +147,10 @@ async fn enqueue_follow_up(
     let tx = db.begin().await?;
 
     let target = ts_submission_repository::find_row(&tx, target_submission_id).await?;
-    if TsSubmissionStatus::parse(&target.status)? != TsSubmissionStatus::Accettata {
-        return Err(AppError::Conflict(format!(
-            "Si può chiedere {} solo di una trasmissione accettata",
-            follow_up_label(operation)
-        )));
-    }
+    ensure_accepted(&target, operation)?;
     let environment = TsEnvironment::parse(&target.environment)?;
     if operation == TsOperation::Sostituzione {
-        let id = document_id_of(&target);
-        let vat_number = id
-            .as_ref()
-            .map(|i| i.vat_number.clone())
-            .unwrap_or_default();
-        ts_document_service::build(&tx, target.invoice_id, &vat_number, id).await?;
+        check_replacement_document(&tx, &target).await?;
     }
     ensure_nothing_in_flight(&tx, target.invoice_id).await?;
 
@@ -174,6 +179,33 @@ pub(crate) fn document_id_of(
         }),
         _ => None,
     }
+}
+
+fn ensure_accepted(
+    target: &crate::app::entity::ts_submission::Model,
+    operation: TsOperation,
+) -> Result<(), AppError> {
+    if TsSubmissionStatus::parse(&target.status)? != TsSubmissionStatus::Accettata {
+        return Err(AppError::Conflict(format!(
+            "Si può chiedere {} solo di una trasmissione accettata",
+            follow_up_label(operation)
+        )));
+    }
+    Ok(())
+}
+
+/// A replacement must still be buildable from the invoice's current data.
+async fn check_replacement_document(
+    db: &impl ConnectionTrait,
+    target: &crate::app::entity::ts_submission::Model,
+) -> Result<(), AppError> {
+    let id = document_id_of(target);
+    let vat_number = id
+        .as_ref()
+        .map(|i| i.vat_number.clone())
+        .unwrap_or_default();
+    ts_document_service::build(db, target.invoice_id, &vat_number, id).await?;
+    Ok(())
 }
 
 async fn ensure_nothing_in_flight(

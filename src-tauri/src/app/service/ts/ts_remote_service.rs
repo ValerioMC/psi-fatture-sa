@@ -6,8 +6,8 @@ use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 use crate::app::common::AppError;
 use crate::app::model::ts::{
-    TsConnectionCheck, TsDocumentId, TsOperation, TsQueryResult, TsReportBasis, TsReportRow,
-    TsSettings, TsSubmissionFilters, TsSubmissionStatus,
+    TsConnectionCheck, TsDocumentId, TsMessage, TsOperation, TsQueryResult, TsReportBasis,
+    TsReportRow, TsSettings, TsSubmissionFilters, TsSubmissionStatus,
 };
 use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::secret::SecretStore;
@@ -56,14 +56,10 @@ pub async fn monthly_report(
     let mut rows = match outcome {
         ReportOutcome::Rows(rows) => rows,
         ReportOutcome::Refused(messages) => {
-            let reasons: Vec<String> = messages
-                .iter()
-                .filter(|m| m.is_error())
-                .map(|m| format!("{} {}", m.code, m.description))
-                .collect();
+            let errors = messages.iter().filter(|m| m.is_error());
             return Err(AppError::Invalid(format!(
                 "Report non disponibile: {}",
-                reasons.join(" · ")
+                TsMessage::joined(errors)
             )));
         }
     };
@@ -99,13 +95,7 @@ pub async fn check_connection(
                 settings.environment.as_str()
             ),
         },
-        Ok(TsQueryResult::Refused { messages }) => failed(
-            messages
-                .iter()
-                .map(|m| format!("{} {}", m.code, m.description))
-                .collect::<Vec<_>>()
-                .join(" · "),
-        ),
+        Ok(TsQueryResult::Refused { messages }) => failed(TsMessage::joined(&messages)),
         Err(TsGatewayError::Authentication) => {
             failed("Utente o password del Sistema TS non validi".to_string())
         }
