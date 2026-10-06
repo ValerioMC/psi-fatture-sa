@@ -51,19 +51,19 @@ pub async fn draft_invoice_count(db: &DatabaseConnection, year: i64) -> Result<i
     .await
 }
 
+#[derive(FromQueryResult)]
+struct MonthTotalRow {
+    month: i64,
+    revenue: f64,
+    invoice_count: i64,
+}
+
 /// Paid revenue per month of `year`, by issue date; months without paid invoices are absent.
 pub async fn paid_totals_by_month(
     db: &DatabaseConnection,
     year: i64,
 ) -> Result<Vec<MonthTotal>, AppError> {
-    #[derive(FromQueryResult)]
-    struct Row {
-        month: i64,
-        revenue: f64,
-        invoice_count: i64,
-    }
-
-    let rows = Row::find_by_statement(Statement::from_sql_and_values(
+    let rows = MonthTotalRow::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         "SELECT CAST(strftime('%m', issue_date) AS INTEGER) AS month,
                 CAST(COALESCE(SUM(total_due), 0) AS REAL) AS revenue,

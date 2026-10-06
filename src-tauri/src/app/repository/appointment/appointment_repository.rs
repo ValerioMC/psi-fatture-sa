@@ -14,50 +14,52 @@ pub async fn find_all(
     date_to: Option<String>,
     client_id: Option<i64>,
 ) -> Result<Vec<Appointment>, AppError> {
-    let mut conditions = vec!["1=1".to_string()];
-    let mut values: Vec<sea_orm::Value> = Vec::new();
-    if let Some(d) = date_from {
-        conditions.push("a.date >= ?".to_string());
-        values.push(d.into());
-    }
-    if let Some(d) = date_to {
-        conditions.push("a.date <= ?".to_string());
-        values.push(d.into());
-    }
-    if let Some(c) = client_id {
-        conditions.push("a.client_id = ?".to_string());
-        values.push(c.into());
-    }
-
+    let (conditions, values) = filter_clauses(date_from, date_to, client_id);
     let sql = format!(
-        "SELECT a.id, a.client_id, a.service_id, a.date, a.start_time, a.end_time,
+        "{APPOINTMENT_SELECT} WHERE {} ORDER BY a.date, a.start_time",
+        conditions.join(" AND ")
+    );
+    load_appointments_by_sql(db, &sql, values).await
+}
+
+/// The appointment columns with the client and service names, up to the `WHERE`.
+const APPOINTMENT_SELECT: &str =
+    "SELECT a.id, a.client_id, a.service_id, a.date, a.start_time, a.end_time,
                 a.status, a.notes, a.recurrence_group_id, a.invoice_id,
                 a.created_at, a.updated_at,
                 c.first_name || ' ' || c.last_name AS client_name,
                 s.name AS service_name
          FROM appointments a
          JOIN clients c ON a.client_id = c.id
-         LEFT JOIN services s ON a.service_id = s.id
-         WHERE {} ORDER BY a.date, a.start_time",
-        conditions.join(" AND ")
-    );
+         LEFT JOIN services s ON a.service_id = s.id";
 
-    load_appointments_by_sql(db, &sql, values).await
+fn filter_clauses(
+    date_from: Option<String>,
+    date_to: Option<String>,
+    client_id: Option<i64>,
+) -> (Vec<&'static str>, Vec<sea_orm::Value>) {
+    let mut conditions = vec!["1=1"];
+    let mut values: Vec<sea_orm::Value> = Vec::new();
+    if let Some(date) = date_from {
+        conditions.push("a.date >= ?");
+        values.push(date.into());
+    }
+    if let Some(date) = date_to {
+        conditions.push("a.date <= ?");
+        values.push(date.into());
+    }
+    if let Some(client) = client_id {
+        conditions.push("a.client_id = ?");
+        values.push(client.into());
+    }
+    (conditions, values)
 }
 
 /// Returns a single appointment by id.
 pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Appointment, AppError> {
-    let sql = "SELECT a.id, a.client_id, a.service_id, a.date, a.start_time, a.end_time,
-                a.status, a.notes, a.recurrence_group_id, a.invoice_id,
-                a.created_at, a.updated_at,
-                c.first_name || ' ' || c.last_name AS client_name,
-                s.name AS service_name
-         FROM appointments a
-         JOIN clients c ON a.client_id = c.id
-         LEFT JOIN services s ON a.service_id = s.id
-         WHERE a.id = ?";
+    let sql = format!("{APPOINTMENT_SELECT} WHERE a.id = ?");
 
-    let mut results = load_appointments_by_sql(db, sql, vec![id.into()]).await?;
+    let mut results = load_appointments_by_sql(db, &sql, vec![id.into()]).await?;
     results
         .pop()
         .ok_or_else(|| AppError::NotFound(format!("Appuntamento {id} non trovato")))

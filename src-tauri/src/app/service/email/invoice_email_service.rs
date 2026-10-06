@@ -11,7 +11,7 @@ use crate::app::model::email::{
 use crate::app::model::invoice::{InvoicePdf, InvoiceStatus};
 use crate::app::repository::client_repository;
 use crate::app::repository::email::{
-    invoice_email_repository, MailAttachment, MailGateway, OutgoingMail,
+    invoice_email_repository, MailAttachment, MailGateway, OutgoingMail, SmtpSession,
 };
 use crate::app::repository::secret::SecretStore;
 use crate::app::service::pdf::{invoice_pdf_service, InvoiceDocument};
@@ -61,18 +61,38 @@ pub async fn send(
     let attachment_name = pdf.file_name.clone();
 
     let mail = outgoing_mail(&account, &recipient, &subject, &input.body, pdf);
+    let sent = deliver_and_record(
+        db,
+        gateway,
+        &session,
+        &mail,
+        &attachment_name,
+        input.invoice_id,
+    )
+    .await?;
+    if input.remember_recipient {
+        save_recipient_if_none_on_file(db, &document, &recipient).await?;
+    }
+    Ok(sent)
+}
+
+async fn deliver_and_record(
+    db: &impl ConnectionTrait,
+    gateway: &dyn MailGateway,
+    session: &SmtpSession,
+    mail: &OutgoingMail,
+    attachment_name: &str,
+    invoice_id: i64,
+) -> Result<InvoiceEmail, AppError> {
     let error = gateway
-        .send(&session, &mail)
+        .send(session, mail)
         .await
         .err()
         .map(|e| e.to_string());
-    let sent = record(db, input.invoice_id, &mail, &attachment_name, error.clone()).await?;
+    let sent = record(db, invoice_id, mail, attachment_name, error.clone()).await?;
     if let Some(error) = error {
-        log::warn!(target: "email", invoice_id = input.invoice_id; "invoice email not sent");
+        log::warn!(target: "email", invoice_id = invoice_id; "invoice email not sent");
         return Err(AppError::External(error));
-    }
-    if input.remember_recipient {
-        save_recipient_if_none_on_file(db, &document, &recipient).await?;
     }
     Ok(sent)
 }

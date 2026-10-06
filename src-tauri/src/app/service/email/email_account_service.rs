@@ -3,6 +3,7 @@ use sea_orm::{ActiveValue::Set, ConnectionTrait};
 use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::email_account::{self, ActiveModel};
+use crate::app::entity::professional_config;
 use crate::app::model::email::{
     EmailAccount, EmailProvider, EmailProviderPreset, EmailSecurity, UpdateEmailAccountInput,
 };
@@ -116,19 +117,22 @@ fn validate_account(account: &EmailAccount) -> Result<(), AppError> {
     validate::validate_required(&account.username, "Nome utente")
 }
 
+fn sender_name_of(profile: &professional_config::Model) -> String {
+    format!(
+        "{} {} {}",
+        profile.title, profile.first_name, profile.last_name
+    )
+    .trim()
+    .to_string()
+}
+
 async fn proposed(db: &impl ConnectionTrait) -> Result<EmailAccount, AppError> {
     let profile = config_repository::find(db).await?;
     let sender_address = profile
         .as_ref()
         .map(|p| p.pec_email.trim().to_lowercase())
         .unwrap_or_default();
-    let sender_name = profile
-        .map(|p| {
-            format!("{} {} {}", p.title, p.first_name, p.last_name)
-                .trim()
-                .to_string()
-        })
-        .unwrap_or_default();
+    let sender_name = profile.map(|p| sender_name_of(&p)).unwrap_or_default();
     let provider = if sender_address.is_empty() {
         EmailProvider::Psypec
     } else {

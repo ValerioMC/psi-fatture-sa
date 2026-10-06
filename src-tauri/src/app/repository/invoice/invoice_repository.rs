@@ -59,21 +59,22 @@ fn filter_clauses(filters: &InvoiceFilters) -> (Vec<&'static str>, Vec<sea_orm::
         conditions.push("i.client_id = ?");
         values.push(cid.into());
     }
-    if let Some(q) = filters
+    if let Some(query) = filters
         .search
         .as_deref()
         .map(str::trim)
         .filter(|q| !q.is_empty())
     {
-        let pattern = format!("%{q}%");
-        conditions.push(
-            "(lower(c.first_name || ' ' || c.last_name) LIKE lower(?) OR i.invoice_number LIKE ?)",
-        );
+        conditions.push(SEARCH_CONDITION);
+        let pattern = format!("%{query}%");
         values.push(pattern.clone().into());
         values.push(pattern.into());
     }
     (conditions, values)
 }
+
+const SEARCH_CONDITION: &str =
+    "(lower(c.first_name || ' ' || c.last_name) LIKE lower(?) OR i.invoice_number LIKE ?)";
 
 /// Loads a full invoice (with client_name and lines) by id.
 pub async fn load_invoice(db: &impl ConnectionTrait, id: i64) -> Result<Invoice, AppError> {
@@ -93,6 +94,36 @@ pub async fn load_invoice(db: &impl ConnectionTrait, id: i64) -> Result<Invoice,
     Ok(row.into_invoice(lines))
 }
 
+fn in_clause_of(ids: &[i64]) -> (String, Vec<sea_orm::Value>) {
+    let placeholders = vec!["?"; ids.len()].join(", ");
+    (placeholders, ids.iter().map(|id| (*id).into()).collect())
+}
+
+async fn find_rows(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<InvoiceRow>, AppError> {
+    let (placeholders, values) = in_clause_of(ids);
+    let sql = format!(
+        "SELECT i.*, c.first_name || ' ' || c.last_name AS client_name
+         FROM invoices i
+         JOIN clients c ON i.client_id = c.id
+         WHERE i.id IN ({placeholders})"
+    );
+    let statement = Statement::from_sql_and_values(sea_orm::DatabaseBackend::Sqlite, &sql, values);
+    Ok(InvoiceRow::find_by_statement(statement).all(db).await?)
+}
+
+async fn find_line_models(
+    db: &DatabaseConnection,
+    ids: &[i64],
+) -> Result<Vec<invoice_line::Model>, AppError> {
+    let (placeholders, values) = in_clause_of(ids);
+    let sql =
+        format!("SELECT * FROM invoice_lines WHERE invoice_id IN ({placeholders}) ORDER BY id");
+    let statement = Statement::from_sql_and_values(sea_orm::DatabaseBackend::Sqlite, &sql, values);
+    Ok(invoice_line::Model::find_by_statement(statement)
+        .all(db)
+        .await?)
+}
+
 /// Loads multiple invoices (with client_name and lines) in two queries,
 /// preserving the order of the given ids.
 pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<Invoice>, AppError> {
@@ -100,33 +131,8 @@ pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<I
         return Ok(vec![]);
     }
 
-    let placeholders = vec!["?"; ids.len()].join(", ");
-    let id_values: Vec<sea_orm::Value> = ids.iter().map(|id| (*id).into()).collect();
-
-    let sql = format!(
-        "SELECT i.*, c.first_name || ' ' || c.last_name AS client_name
-         FROM invoices i
-         JOIN clients c ON i.client_id = c.id
-         WHERE i.id IN ({placeholders})"
-    );
-    let rows = InvoiceRow::find_by_statement(Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Sqlite,
-        &sql,
-        id_values.clone(),
-    ))
-    .all(db)
-    .await?;
-
-    let lines_sql =
-        format!("SELECT * FROM invoice_lines WHERE invoice_id IN ({placeholders}) ORDER BY id");
-    let line_models = invoice_line::Model::find_by_statement(Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Sqlite,
-        &lines_sql,
-        id_values,
-    ))
-    .all(db)
-    .await?;
-
+    let rows = find_rows(db, ids).await?;
+    let line_models = find_line_models(db, ids).await?;
     Ok(in_requested_order(ids, rows, lines_by_invoice(line_models)))
 }
 
@@ -331,18 +337,16 @@ pub async fn bulk_update_status(
         return Ok(0);
     }
 
-    let placeholders: Vec<String> = ids.iter().map(|_| "?".to_string()).collect();
-    let in_clause = placeholders.join(", ");
-    let now = timestamp::now();
-
+    let (placeholders, id_values) = in_clause_of(ids);
     let sql = format!(
-        "UPDATE invoices SET status = ?, paid_date = ?, updated_at = ? WHERE id IN ({in_clause})"
+        "UPDATE invoices SET status = ?, paid_date = ?, updated_at = ? WHERE id IN ({placeholders})"
     );
-
-    let mut values: Vec<sea_orm::Value> = vec![status.into(), paid_date.clone().into(), now.into()];
-    for id in ids {
-        values.push((*id).into());
-    }
+    let mut values: Vec<sea_orm::Value> = vec![
+        status.into(),
+        paid_date.clone().into(),
+        timestamp::now().into(),
+    ];
+    values.extend(id_values);
 
     let result = db
         .execute(Statement::from_sql_and_values(

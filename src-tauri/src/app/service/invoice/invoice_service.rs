@@ -63,10 +63,7 @@ pub async fn update(
     let number = resolve_invoice_number(input.invoice_number.as_deref(), &current.invoice_number)?;
 
     let tx = db.begin().await?;
-    guard::ensure_ts_allows_update(&tx, &current, number, content.issue_date, content.status)
-        .await?;
-    guard::ensure_number_free(&tx, year, number, input.id).await?;
-    guard::ensure_chronological(&tx, year, number, content.issue_date, input.id).await?;
+    ensure_update_allowed(&tx, &current, &content, year, number).await?;
 
     let totals = compute_totals(&tx, content.lines, content.apply_enpap).await?;
     let hide_quantity = input.hide_quantity.unwrap_or(current.hide_quantity);
@@ -189,6 +186,18 @@ fn validate_content(content: &InvoiceContent) -> Result<(), AppError> {
     validate::validate_id(content.client_id, "Cliente")?;
     validate::validate_invoice_dates(content.issue_date, content.due_date)?;
     validate::validate_invoice_lines(content.lines)
+}
+
+async fn ensure_update_allowed(
+    tx: &impl ConnectionTrait,
+    current: &Invoice,
+    content: &InvoiceContent<'_>,
+    year: i64,
+    number: i64,
+) -> Result<(), AppError> {
+    guard::ensure_ts_allows_update(tx, current, number, content.issue_date, content.status).await?;
+    guard::ensure_number_free(tx, year, number, current.id).await?;
+    guard::ensure_chronological(tx, year, number, content.issue_date, current.id).await
 }
 
 /// The explicit override when given and not blank, otherwise the number the invoice has.

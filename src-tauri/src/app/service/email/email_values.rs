@@ -1,4 +1,5 @@
-use crate::app::model::client::ClientType;
+use crate::app::model::client::{Client, ClientType};
+use crate::app::model::config::ProfessionalConfig;
 use crate::app::model::email::EmailPlaceholder;
 use crate::app::service::pdf::InvoiceDocument;
 use crate::app::service::support::italian_format::{currency, date_long};
@@ -15,19 +16,33 @@ pub struct EmailValues {
     pub professional: String,
 }
 
+fn patient_name(client: &Client) -> String {
+    match client.client_type {
+        ClientType::Azienda => client.last_name.trim().to_string(),
+        ClientType::PersonaFisica => {
+            format!("{} {}", client.first_name.trim(), client.last_name.trim())
+                .trim()
+                .to_string()
+        }
+    }
+}
+
+fn professional_name(config: &ProfessionalConfig) -> String {
+    format!(
+        "{} {} {}",
+        config.title, config.first_name, config.last_name
+    )
+    .split_whitespace()
+    .collect::<Vec<_>>()
+    .join(" ")
+}
+
 impl EmailValues {
     pub fn of(document: &InvoiceDocument) -> Self {
         let client = &document.client;
         let config = &document.config;
         let invoice = &document.invoice;
-        let patient = match client.client_type {
-            ClientType::Azienda => client.last_name.trim().to_string(),
-            ClientType::PersonaFisica => {
-                format!("{} {}", client.first_name.trim(), client.last_name.trim())
-                    .trim()
-                    .to_string()
-            }
-        };
+        let patient = patient_name(client);
         let patient_first_name = match client.first_name.trim() {
             "" => patient.clone(),
             first => first.to_string(),
@@ -43,13 +58,7 @@ impl EmailValues {
                 .as_deref()
                 .map(date_long)
                 .unwrap_or_default(),
-            professional: format!(
-                "{} {} {}",
-                config.title, config.first_name, config.last_name
-            )
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" "),
+            professional: professional_name(config),
         }
     }
 

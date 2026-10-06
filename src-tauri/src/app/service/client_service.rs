@@ -32,25 +32,7 @@ pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result
         input.vat_number.as_deref(),
     )?;
 
-    let active = ActiveModel {
-        client_type: Set(input.client_type.as_str().to_owned()),
-        first_name: Set(input.first_name),
-        last_name: Set(input.last_name),
-        birth_date: Set(input.birth_date),
-        gender: Set(input.gender),
-        fiscal_code: Set(input.fiscal_code),
-        vat_number: Set(input.vat_number),
-        address: Set(input.address),
-        city: Set(input.city),
-        province: Set(input.province),
-        zip_code: Set(input.zip_code),
-        email: Set(input.email),
-        phone: Set(input.phone),
-        notes: Set(input.notes),
-        sts_authorization: Set(input.sts_authorization as i32),
-        hide_quantity_in_invoice: Set(input.hide_quantity_in_invoice.map(i32::from)),
-        ..Default::default()
-    };
+    let active = client_record(input);
 
     let model = client_repository::insert(db, active).await?;
     Ok(into_domain(model))
@@ -65,28 +47,10 @@ pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result
         input.vat_number.as_deref(),
     )?;
 
-    let now = timestamp::now();
-    let active = ActiveModel {
-        id: Set(input.id),
-        client_type: Set(input.client_type.as_str().to_owned()),
-        first_name: Set(input.first_name),
-        last_name: Set(input.last_name),
-        birth_date: Set(input.birth_date),
-        gender: Set(input.gender),
-        fiscal_code: Set(input.fiscal_code),
-        vat_number: Set(input.vat_number),
-        address: Set(input.address),
-        city: Set(input.city),
-        province: Set(input.province),
-        zip_code: Set(input.zip_code),
-        email: Set(input.email),
-        phone: Set(input.phone),
-        notes: Set(input.notes),
-        sts_authorization: Set(input.sts_authorization as i32),
-        hide_quantity_in_invoice: Set(input.hide_quantity_in_invoice.map(i32::from)),
-        updated_at: Set(now),
-        ..Default::default()
-    };
+    let id = input.id;
+    let mut active = client_record(input.into());
+    active.id = Set(id);
+    active.updated_at = Set(timestamp::now());
 
     let model = client_repository::update(db, active).await?;
     Ok(into_domain(model))
@@ -106,6 +70,29 @@ pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), AppError> {
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
+
+/// The client row as both creation and update store it; the caller adds the id and timestamp it updates.
+fn client_record(input: CreateClientInput) -> ActiveModel {
+    ActiveModel {
+        client_type: Set(input.client_type.as_str().to_owned()),
+        first_name: Set(input.first_name),
+        last_name: Set(input.last_name),
+        birth_date: Set(input.birth_date),
+        gender: Set(input.gender),
+        fiscal_code: Set(input.fiscal_code),
+        vat_number: Set(input.vat_number),
+        address: Set(input.address),
+        city: Set(input.city),
+        province: Set(input.province),
+        zip_code: Set(input.zip_code),
+        email: Set(input.email),
+        phone: Set(input.phone),
+        notes: Set(input.notes),
+        sts_authorization: Set(input.sts_authorization as i32),
+        hide_quantity_in_invoice: Set(input.hide_quantity_in_invoice.map(i32::from)),
+        ..Default::default()
+    }
+}
 
 /// Validates the shared fields of client inputs.
 fn validate_client_fields(
