@@ -58,3 +58,11 @@ export function greeting(hour: number, firstName: string | undefined): string {
   const salutation = hour < 13 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
   return firstName ? `${salutation}, ${firstName}` : salutation
 }
+
+/** Rounds an axis maximum up to a step whose quarters are still clean numbers, without doubling the headroom. */
+export function niceCeiling(value: number): number {
+  if (value <= 0) return 1000
+  const magnitude = 10 ** Math.floor(Math.log10(value))
+  const step = [1, 1.2, 1.6, 2, 2.4, 3, 4, 5, 6, 8, 10].find((candidate) => candidate * magnitude >= value) ?? 10
+  return step * magnitude
+}

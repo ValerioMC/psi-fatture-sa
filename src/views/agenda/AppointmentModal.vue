@@ -21,6 +21,7 @@ import type { ComboOption, SegmentOption } from '@/components/ui/types'
 import { clientDisplayName } from '@/utils/client'
 import { formatDateLong, minutesBetween, todayIso } from '@/utils/format'
 import { APPOINTMENT_STATUS, APPOINTMENT_STATUS_ORDER, plural } from '@/utils/labels'
+import { endTimeAfterStartChange } from '@/utils/agenda'
 import { weeklyDates } from '@/utils/recurrence'
 
 const props = defineProps<{
@@ -101,12 +102,8 @@ watch(
   { immediate: true },
 )
 
-/** Keeps the session length when the start moves (50 minutes when there is none yet). */
 function onStartChange(): void {
-  const length = minutesBetween(form.start_time, form.end_time) || 50
-  const [hours, minutes] = form.start_time.split(':').map(Number)
-  const end = hours * 60 + minutes + length
-  form.end_time = `${String(Math.floor(end / 60) % 24).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`
+  form.end_time = endTimeAfterStartChange(form.start_time, form.end_time)
 }
 
 function toggleWeekday(value: number): void {

@@ -8,6 +8,7 @@
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { Check, ChevronsUpDown, Search } from 'lucide-vue-next'
 import type { ComboOption } from './types'
+import { searchKey } from '@/utils/search'
 
 const props = withDefaults(
   defineProps<{
@@ -33,15 +34,11 @@ const listRef = ref<HTMLElement | null>(null)
 
 const selected = computed(() => props.options.find((option) => option.value === model.value) ?? null)
 
-function normalise(text: string): string {
-  return text.toLocaleLowerCase('it-IT').normalize('NFD').replace(/\p{Diacritic}/gu, '')
-}
-
 const filtered = computed(() => {
-  const needle = normalise(query.value.trim())
+  const needle = searchKey(query.value.trim())
   if (needle === '') return props.options
   return props.options.filter((option) =>
-    normalise(`${option.label} ${option.detail ?? ''}`).includes(needle),
+    searchKey(`${option.label} ${option.detail ?? ''}`).includes(needle),
   )
 })
 

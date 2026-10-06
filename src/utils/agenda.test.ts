@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { Appointment, AppointmentStatus } from '@/types'
-import { appointmentsByDate, bookedMinutes, dayHeading, loadWindow, monthGrid, monthStats, withAppointmentStatus } from './agenda'
+import {
+  appointmentsByDate,
+  bookedMinutes,
+  dayHeading,
+  endTimeAfterStartChange,
+  loadWindow,
+  monthGrid,
+  monthStats,
+  withAppointmentStatus,
+} from './agenda'
 
 const appointment = (id: number, date: string, start: string, end: string, status: AppointmentStatus, invoice_id?: number) =>
   ({ id, client_id: 1, client_name: 'Anna', date, start_time: start, end_time: end, status, notes: 'n', invoice_id }) as Appointment
@@ -57,5 +66,16 @@ describe('withAppointmentStatus', () => {
     expect(withAppointmentStatus(appointment(4, '2026-10-01', '09:00', '10:00', 'scheduled'), 'completed')).toEqual({
       id: 4, client_id: 1, service_id: undefined, date: '2026-10-01', start_time: '09:00', end_time: '10:00', status: 'completed', notes: 'n', recurrence_group_id: undefined,
     })
+  })
+})
+
+describe('endTimeAfterStartChange', () => {
+  it('gives a start that is not before the end the usual 50 minutes', () => {
+    expect(endTimeAfterStartChange('09:00', '09:00')).toBe('09:50')
+    expect(endTimeAfterStartChange('10:00', '09:50')).toBe('10:50')
+  })
+
+  it('wraps past midnight instead of printing an hour above 23', () => {
+    expect(endTimeAfterStartChange('23:30', '23:30')).toBe('00:20')
   })
 })

@@ -5,6 +5,7 @@
 import type { SegmentOption } from '@/components/ui/types'
 import type { Invoice, InvoiceStatus } from '@/types'
 import { formatCurrency } from '@/utils/format'
+import { searchKey } from '@/utils/search'
 import { INVOICE_STATUS, INVOICE_STATUS_ORDER, isInvoiceStatus, plural } from '@/utils/labels'
 
 export type StatusFilter = InvoiceStatus | 'all'
@@ -67,9 +68,9 @@ export const BULK_STATUS_OPTIONS: SegmentOption<InvoiceStatus>[] = (['issued', '
 
 /** Matches number or patient, ignoring case and accents ("nicolo" finds "Nicolò"). */
 export function searchInvoices<T extends Pick<Invoice, 'invoice_number' | 'client_name'>>(invoices: readonly T[], query: string): readonly T[] {
-  const needle = normalise(query.trim())
+  const needle = searchKey(query.trim())
   if (needle === '') return invoices
-  return invoices.filter((invoice) => normalise(`${invoice.invoice_number} ${invoice.client_name}`).includes(needle))
+  return invoices.filter((invoice) => searchKey(`${invoice.invoice_number} ${invoice.client_name}`).includes(needle))
 }
 
 export function invoicesInStatus<T extends Pick<Invoice, 'status'>>(invoices: readonly T[], status: StatusFilter): readonly T[] {
@@ -163,6 +164,3 @@ function sumDue(invoices: readonly InvoiceAmount[]): number {
   return invoices.reduce((total, invoice) => total + invoice.total_due, 0)
 }
 
-function normalise(text: string): string {
-  return text.toLocaleLowerCase('it-IT').normalize('NFD').replace(/\p{Diacritic}/gu, '')
-}

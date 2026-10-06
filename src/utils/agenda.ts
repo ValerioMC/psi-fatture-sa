@@ -83,3 +83,17 @@ export function withAppointmentStatus(appointment: Appointment, status: Appointm
     recurrence_group_id: appointment.recurrence_group_id,
   }
 }
+
+const DEFAULT_SESSION_MINUTES = 50
+
+/**
+ * The end time once the start field changed, given the new start and the end still in the form:
+ * the length of that range, or 50 minutes when the start is not before the end.
+ */
+export function endTimeAfterStartChange(newStart: string, currentEnd: string): string {
+  const length = minutesBetween(newStart, currentEnd) || DEFAULT_SESSION_MINUTES
+  const [hours, minutes] = newStart.split(':').map(Number)
+  const endMinutes = hours * 60 + minutes + length
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${pad(Math.floor(endMinutes / 60) % 24)}:${pad(endMinutes % 60)}`
+}

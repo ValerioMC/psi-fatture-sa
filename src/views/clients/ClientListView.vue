@@ -21,6 +21,7 @@ import AppBadge from '@/components/ui/AppBadge.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { ageOn, clientDisplayName } from '@/utils/client'
 import { plural } from '@/utils/labels'
+import { searchKey } from '@/utils/search'
 import { missingFields, patientsInCare, type MissingField } from '@/utils/patientRegister'
 
 const CARE_WINDOW_DAYS = 90
@@ -51,20 +52,16 @@ async function loadInvoices(): Promise<void> {
 const gapsById = computed(() => new Map<number, MissingField[]>(clientsStore.clients.map((client) => [client.id, missingFields(client)])))
 const gapsOf = (client: Client): MissingField[] => gapsById.value.get(client.id) ?? []
 
-function normalise(text: string): string {
-  return text.toLocaleLowerCase('it-IT').normalize('NFD').replace(/\p{Diacritic}/gu, '')
-}
-
 const sorted = computed(() =>
   [...clientsStore.clients].sort((a, b) => clientDisplayName(a).localeCompare(clientDisplayName(b), 'it')),
 )
 
 const visible = computed(() => {
-  const needle = normalise(search.value.trim())
+  const needle = searchKey(search.value.trim())
   const pool = onlyIncomplete.value ? sorted.value.filter((client) => gapsOf(client).length > 0) : sorted.value
   if (needle === '') return pool
   return pool.filter((client) =>
-    normalise(`${clientDisplayName(client)} ${client.fiscal_code} ${client.city} ${client.email ?? ''}`).includes(needle),
+    searchKey(`${clientDisplayName(client)} ${client.fiscal_code} ${client.city} ${client.email ?? ''}`).includes(needle),
   )
 })
 

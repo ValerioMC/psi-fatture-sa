@@ -6,10 +6,12 @@ import {
   describeSendKind,
   formatStsTimestamp,
   groupByInvoice,
+  invoiceDeadlineNotice,
   invoiceStsState,
   stsActions,
   stsDeadlinePhase,
   stsDeadlines,
+  stsStateSentence,
 } from './sts'
 
 function submission(overrides: Partial<TsSubmission>): TsSubmission {
@@ -202,5 +204,48 @@ describe('datePhrase', () => {
   it('keeps the plain article otherwise', () => {
     expect(datePhrase('fino', '2026-02-09')).toBe('fino al 9 febbraio 2026')
     expect(datePhrase('dal', '2026-02-02')).toBe('dal 2 febbraio 2026')
+  })
+})
+
+describe('stsStateSentence', () => {
+  const NONE = { kind: 'none', current: null, live: null, failedFollowUp: null } as const
+
+  it('asks to transmit a paid invoice and to wait for payment otherwise', () => {
+    expect(stsStateSentence(NONE, { status: 'paid' })).toBe('Spesa sanitaria da trasmettere.')
+    expect(stsStateSentence(NONE, { status: 'issued' })).toBe('Si trasmette quando la fattura risulta pagata.')
+  })
+
+  it('names the retry time of a queued submission that failed, else its operation', () => {
+    const waiting = submission({ operation: 'sostituzione' })
+    expect(stsStateSentence({ ...NONE, kind: 'queued', current: waiting }, { status: 'paid' })).toBe(
+      'Sostituzione in attesa di invio.',
+    )
+    const retrying = submission({ last_error: 'rete', next_attempt_at: '2026-10-06 10:00:00' })
+    expect(stsStateSentence({ ...NONE, kind: 'queued', current: retrying }, { status: 'paid' })).toMatch(/^Nuovo tentativo: /)
+  })
+
+  it('says a rejected invoice must be corrected and sent again', () => {
+    expect(stsStateSentence({ ...NONE, kind: 'rejected' }, { status: 'paid' })).toContain('correggi i dati e ritrasmetti')
+  })
+})
+
+describe('invoiceDeadlineNotice', () => {
+  const paid = { status: 'paid', paid_date: '2026-03-10' } as const
+
+  it('has nothing to say about an unpaid invoice', () => {
+    expect(invoiceDeadlineNotice({ status: 'issued', paid_date: undefined }, false, '2026-10-06')).toBeNull()
+  })
+
+  it('asks to send before the deadline, then only offers corrections once registered', () => {
+    expect(invoiceDeadlineNotice(paid, false, '2026-10-06')?.tone).toBe('accent')
+    expect(invoiceDeadlineNotice(paid, true, '2026-10-06')?.tone).toBe('neutral')
+  })
+
+  it('warns inside the correction window and flags a late transmission only when still pending', () => {
+    const { transmission, correction } = stsDeadlines(2026)
+    const inWindow = transmission < correction ? correction : transmission
+    expect(invoiceDeadlineNotice(paid, true, inWindow)?.tone).not.toBe('danger')
+    expect(invoiceDeadlineNotice(paid, false, '2028-01-01')?.tone).toBe('danger')
+    expect(invoiceDeadlineNotice(paid, true, '2028-01-01')).toBeNull()
   })
 })

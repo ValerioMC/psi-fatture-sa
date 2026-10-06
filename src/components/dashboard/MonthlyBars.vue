@@ -10,6 +10,7 @@
 import { computed, nextTick, ref } from 'vue'
 import type { MonthlyRevenue } from '@/types'
 import type { MonthPending } from '@/utils/monthlyPending'
+import { niceCeiling } from '@/utils/dashboard'
 import { formatCurrency, formatCurrencyCompact } from '@/utils/format'
 import { plural } from '@/utils/labels'
 import { placeTooltip, visibleTopOf, type TooltipPlacement } from '@/utils/tooltipPlacement'
@@ -61,14 +62,6 @@ const columns = computed<Column[]>(() =>
     }
   }),
 )
-
-/** Rounds the axis maximum up to a step whose quarters are still clean numbers, without doubling the headroom. */
-function niceCeiling(value: number): number {
-  if (value <= 0) return 1000
-  const magnitude = 10 ** Math.floor(Math.log10(value))
-  const step = [1, 1.2, 1.6, 2, 2.4, 3, 4, 5, 6, 8, 10].find((candidate) => candidate * magnitude >= value) ?? 10
-  return step * magnitude
-}
 
 const axisMax = computed(() => niceCeiling(Math.max(...columns.value.map((column) => column.total), 0)))
 const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map((share) => axisMax.value * share))

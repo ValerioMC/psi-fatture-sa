@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DashboardData, MonthlyInvoicePreview } from '@/types'
-import { collectionRate, greeting, previousMonth, taxEstimate, unbilledMonth } from './dashboard'
+import { collectionRate, greeting, niceCeiling, previousMonth, taxEstimate, unbilledMonth } from './dashboard'
 
 describe('previousMonth', () => {
   it('steps back one month, crossing into last year from January', () => {
@@ -48,5 +48,18 @@ describe('greeting', () => {
     expect(greeting(9, 'Maria')).toBe('Buongiorno, Maria')
     expect(greeting(15, undefined)).toBe('Buon pomeriggio')
     expect(greeting(20, '')).toBe('Buonasera')
+  })
+})
+
+describe('niceCeiling', () => {
+  it('gives an empty chart a default axis', () => {
+    expect(niceCeiling(0)).toBe(1000)
+  })
+
+  it('rounds up to a clean step without doubling the headroom', () => {
+    expect(niceCeiling(7300)).toBe(8000)
+    expect(niceCeiling(8000)).toBe(8000)
+    expect(niceCeiling(8001)).toBe(10000)
+    expect(niceCeiling(95)).toBe(100)
   })
 })

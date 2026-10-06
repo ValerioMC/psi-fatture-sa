@@ -9,9 +9,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { ArrowRight, CalendarClock, CircleCheck, ExternalLink, Hourglass, IdCard, KeyRound, Send, Settings2, UploadCloud } from 'lucide-vue-next'
 import { listClients, listInvoices } from '@/api'
+import { useDispatchAnnouncement } from '@/composables/useDispatchAnnouncement'
 import { useStsStore } from '@/stores/sts'
 import { useToastStore } from '@/stores/toast'
-import type { Client, Invoice, TsDispatchSummary, TsSubmission } from '@/types'
+import type { Client, Invoice, TsSubmission } from '@/types'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -26,12 +27,13 @@ import StsPendingTable from '@/components/sts/StsPendingTable.vue'
 import StsRemoteReport from '@/components/sts/StsRemoteReport.vue'
 import { formatCurrency, formatDateLong, todayIso } from '@/utils/format'
 import { plural } from '@/utils/labels'
-import { datePhrase, describeDispatch, stsDeadlinePhase, stsDeadlines } from '@/utils/sts'
+import { datePhrase, stsDeadlinePhase, stsDeadlines } from '@/utils/sts'
 
 type Tab = 'pending' | 'history' | 'remote'
 
 const sts = useStsStore()
 const toast = useToastStore()
+const announce = useDispatchAnnouncement()
 
 const currentYear = new Date().getFullYear()
 const YEAR_OPTIONS = [currentYear, currentYear - 1, currentYear - 2]
@@ -92,13 +94,6 @@ const tabs = computed<SegmentOption<Tab>[]>(() => [
   { value: 'history', label: 'Trasmissioni', count: yearSubmissions.value.length },
   { value: 'remote', label: 'Sul Sistema TS' },
 ])
-
-function announce(summary: TsDispatchSummary): void {
-  const line = describeDispatch(summary)
-  if (line.tone === 'success') toast.notify(line.message)
-  else if (line.tone === 'error') toast.notifyError(line.message)
-  else toast.notifyInfo(line.message)
-}
 
 async function sendNow(): Promise<void> {
   sending.value = true

@@ -14,6 +14,7 @@ import { useFocusTrap } from '@/composables/useFocusTrap'
 import { useTheme } from '@/composables/useTheme'
 import { useClientsStore } from '@/stores/clients'
 import { clientDisplayName } from '@/utils/client'
+import { searchKey } from '@/utils/search'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 
 const props = defineProps<{ open: boolean }>()
@@ -83,14 +84,10 @@ const patientItems = computed<PaletteItem[]>(() =>
   }),
 )
 
-function normalise(text: string): string {
-  return text.toLocaleLowerCase('it-IT').normalize('NFD').replace(/\p{Diacritic}/gu, '')
-}
-
 const results = computed<PaletteItem[]>(() => {
-  const needle = normalise(query.value.trim())
+  const needle = searchKey(query.value.trim())
   const matches = (item: PaletteItem): boolean =>
-    normalise(`${item.label} ${item.detail ?? ''} ${item.keywords ?? ''}`).includes(needle)
+    searchKey(`${item.label} ${item.detail ?? ''} ${item.keywords ?? ''}`).includes(needle)
   if (needle === '') return staticItems.value
   const actions = staticItems.value.filter(matches)
   const patients = patientItems.value.filter(matches).slice(0, 8)

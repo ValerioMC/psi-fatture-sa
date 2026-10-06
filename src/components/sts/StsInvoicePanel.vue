@@ -8,6 +8,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Ban, ChevronDown, RefreshCw, ScanSearch, Send, Undo2 } from 'lucide-vue-next'
 import { isTsInvoiceOutOfDate, queryTsInvoice } from '@/api'
+import { useDispatchAnnouncement } from '@/composables/useDispatchAnnouncement'
 import { useStsStore } from '@/stores/sts'
 import { useToastStore } from '@/stores/toast'
 import type { Invoice, TsDispatchSummary, TsQueryResult } from '@/types'
@@ -21,20 +22,19 @@ import {
   TS_ENVIRONMENT_LABEL,
   TS_OPERATION_LABEL,
   TS_SUBMISSION_STATUS,
-  datePhrase,
-  describeDispatch,
   describeSendKind,
   describeTsMark,
   formatStsTimestamp,
   stsActions,
-  stsDeadlinePhase,
-  stsDeadlines,
+  invoiceDeadlineNotice,
+  stsStateSentence,
 } from '@/utils/sts'
 
 const props = defineProps<{ invoice: Invoice }>()
 
 const sts = useStsStore()
 const toast = useToastStore()
+const announce = useDispatchAnnouncement()
 
 const busy = ref<'send' | 'replace' | 'cancel' | 'withdraw' | 'query' | null>(null)
 const cancelOpen = ref(false)
@@ -75,48 +75,8 @@ watch(
   { immediate: true },
 )
 
-const sentence = computed(() => {
-  const current = state.value.current
-  switch (state.value.kind) {
-    case 'none':
-      return props.invoice.status === 'paid'
-        ? 'Spesa sanitaria da trasmettere.'
-        : 'Si trasmette quando la fattura risulta pagata.'
-    case 'queued':
-      return current?.last_error
-        ? `Nuovo tentativo: ${formatStsTimestamp(current.next_attempt_at)}.`
-        : `${TS_OPERATION_LABEL[current?.operation ?? 'invio']} in attesa di invio.`
-    case 'sending':
-      return 'Invio in corso…'
-    case 'accepted':
-      return current?.sent_at ? `Registrata il ${formatStsTimestamp(current.sent_at)}.` : 'Registrata.'
-    case 'rejected':
-      return 'Il Sistema TS non l’ha accettata: correggi i dati e ritrasmetti.'
-    case 'cancelled':
-      return 'Il documento è stato cancellato dal Sistema TS.'
-  }
-  return ''
-})
-
-/** The deadline that matters for this payment year, and how close it is. */
-const deadline = computed(() => {
-  const paid = props.invoice.paid_date
-  if (props.invoice.status !== 'paid' || !paid) return null
-  const dates = stsDeadlines(Number(paid.slice(0, 4)))
-  const phase = stsDeadlinePhase(paid, todayIso())
-  const pending = state.value.kind !== 'accepted'
-  if (phase === 'open') {
-    return pending
-      ? { tone: 'accent' as const, text: `Da inviare ${datePhrase('entro', dates.transmission)}` }
-      : { tone: 'neutral' as const, text: `Correzioni senza sanzioni ${datePhrase('fino', dates.correction)}` }
-  }
-  if (phase === 'correction') {
-    return { tone: 'warn' as const, text: `Ultimi giorni senza sanzioni: ${datePhrase('fino', dates.correction)}` }
-  }
-  return pending
-    ? { tone: 'danger' as const, text: `Termine scaduto ${datePhrase('dal', dates.transmission)}: sarebbe un invio tardivo` }
-    : null
-})
+const sentence = computed(() => stsStateSentence(state.value, props.invoice))
+const deadline = computed(() => invoiceDeadlineNotice(props.invoice, state.value.kind === 'accepted', todayIso()))
 
 async function run(kind: NonNullable<typeof busy.value>, action: () => Promise<TsDispatchSummary>): Promise<void> {
   busy.value = kind
@@ -128,13 +88,6 @@ async function run(kind: NonNullable<typeof busy.value>, action: () => Promise<T
   } finally {
     busy.value = null
   }
-}
-
-function announce(summary: TsDispatchSummary): void {
-  const line = describeDispatch(summary)
-  if (line.tone === 'success') toast.notify(line.message)
-  else if (line.tone === 'error') toast.notifyError(line.message)
-  else toast.notifyInfo(line.message)
 }
 
 async function send(): Promise<void> {

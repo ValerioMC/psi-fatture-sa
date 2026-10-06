@@ -4,6 +4,7 @@
  * deadlines of the payment year (Decreto 29/10/2025).
  */
 import type {
+  Invoice,
   InvoiceStatus,
   TsDispatchSummary,
   TsEnvironment,
@@ -227,4 +228,59 @@ export function datePhrase(preposition: 'entro' | 'fino' | 'dal', iso: string): 
     dal: elided ? 'dall’' : 'dal ',
   }[preposition]
   return `${article}${day === 1 ? '1°' : day} ${month} ${year}`
+}
+
+/** The sentence under an invoice's Sistema TS mark: where it stands and what happens next. */
+export function stsStateSentence(state: InvoiceStsState, invoice: Pick<Invoice, 'status'>): string {
+  const current = state.current
+  switch (state.kind) {
+    case 'none':
+      return invoice.status === 'paid'
+        ? 'Spesa sanitaria da trasmettere.'
+        : 'Si trasmette quando la fattura risulta pagata.'
+    case 'queued':
+      return current?.last_error
+        ? `Nuovo tentativo: ${formatStsTimestamp(current.next_attempt_at)}.`
+        : `${TS_OPERATION_LABEL[current?.operation ?? 'invio']} in attesa di invio.`
+    case 'sending':
+      return 'Invio in corso…'
+    case 'accepted':
+      return current?.sent_at ? `Registrata il ${formatStsTimestamp(current.sent_at)}.` : 'Registrata.'
+    case 'rejected':
+      return 'Il Sistema TS non l’ha accettata: correggi i dati e ritrasmetti.'
+    case 'cancelled':
+      return 'Il documento è stato cancellato dal Sistema TS.'
+  }
+  return ''
+}
+
+export interface DeadlineNotice {
+  tone: 'accent' | 'neutral' | 'warn' | 'danger'
+  text: string
+}
+
+/**
+ * The deadline that matters for a paid invoice, and how close it is. Nothing for an unpaid
+ * invoice, nor for a late one already registered: there is no deadline left to act on.
+ */
+export function invoiceDeadlineNotice(
+  invoice: Pick<Invoice, 'status' | 'paid_date'>,
+  registered: boolean,
+  today: string,
+): DeadlineNotice | null {
+  const paid = invoice.paid_date
+  if (invoice.status !== 'paid' || !paid) return null
+  const dates = stsDeadlines(Number(paid.slice(0, 4)))
+  const phase = stsDeadlinePhase(paid, today)
+  if (phase === 'open') {
+    return registered
+      ? { tone: 'neutral', text: `Correzioni senza sanzioni ${datePhrase('fino', dates.correction)}` }
+      : { tone: 'accent', text: `Da inviare ${datePhrase('entro', dates.transmission)}` }
+  }
+  if (phase === 'correction') {
+    return { tone: 'warn', text: `Ultimi giorni senza sanzioni: ${datePhrase('fino', dates.correction)}` }
+  }
+  return registered
+    ? null
+    : { tone: 'danger', text: `Termine scaduto ${datePhrase('dal', dates.transmission)}: sarebbe un invio tardivo` }
 }
