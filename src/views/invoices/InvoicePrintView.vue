@@ -8,6 +8,15 @@ import { getInvoice, getClient, getConfig, printCurrentPage } from '@/api'
 import type { Invoice, Client, ProfessionalConfig } from '@/types'
 import { formatCurrency, formatDateLong } from '@/utils/format'
 import { hasAmountOverride } from '@/utils/tax'
+import { PROFESSION_LABEL } from '@/utils/labels'
+import {
+  hasVat,
+  legalNotes,
+  paymentCondition,
+  printedClientName,
+  printedPaymentLabel,
+  professionalFullName,
+} from '@/utils/invoicePrint'
 import { useSmoothScroll } from '@/composables/useSmoothScroll'
 
 const route = useRoute()
@@ -36,61 +45,11 @@ onMounted(async () => {
   }
 })
 
-const isForfettario = computed(() => config.value?.tax_regime === 'forfettario')
-const hasIva = computed(() => (invoice.value?.total_tax ?? 0) > 0)
-
-const professionalFullName = computed(() => {
-  if (!config.value) return ''
-  return [config.value.title, config.value.first_name, config.value.last_name]
-    .filter(Boolean).join(' ')
-})
-
-const professionLabel = computed(() =>
-  config.value?.profession === 'psicoterapeuta' ? 'Psicoterapeuta' : 'Psicologo',
-)
-
-const clientDisplayName = computed(() => {
-  if (!client.value) return ''
-  if (client.value.client_type === 'azienda') return client.value.last_name
-  return `${client.value.first_name} ${client.value.last_name}`.trim()
-})
-
-const PAYMENT_LABELS: Record<string, string> = {
-  bonifico: 'Bonifico bancario',
-  contanti: 'Contanti',
-  pos: 'POS / Carta di credito',
-  altro: 'Altro',
-}
-
-const PAYMENT_CONDITIONS: Record<string, string> = {
-  bonifico: 'Pagamento a vista',
-  contanti: 'Contestuale alla prestazione',
-  pos: 'Contestuale alla prestazione',
-}
-
-const legalNotes = computed((): string[] => {
-  const lines: string[] = []
-  if (!invoice.value || !config.value) return lines
-  const forfettarioNote = isForfettario.value
-    ? "Operazione senza applicazione dell'IVA effettuata ai sensi dell'art. 1, commi da 54 a 89, L. n. 190 del 2014 e modificato dalla L.n. 208 del 2015 e dalla L.n. 145 del 2018 – Regime Forfettario. Imposta non dovuta."
-    : ""
-  const enpapNote = (invoice.value.apply_enpap && invoice.value.contributo_enpap > 0)
-    ? `Contributo integrativo ENPAP 2% (${formatCurrency(invoice.value.contributo_enpap)}) addebitato al cliente ai sensi dell'art. 8, L. 21/86.`
-    : ""
-
-  if (forfettarioNote && enpapNote) {
-    lines.push(`${forfettarioNote} ${enpapNote}`)
-  } else {
-    if (forfettarioNote) lines.push(forfettarioNote)
-    if (enpapNote) lines.push(enpapNote)
-  }
-
-  if (!hasIva.value && !isForfettario.value)
-    lines.push("Operazione esente da IVA ai sensi dell'art. 10, n. 18, DPR 633/72.")
-  if (invoice.value.ritenuta_acconto > 0)
-    lines.push(`Si richiede di operare una ritenuta d'acconto del 20% pari a ${formatCurrency(invoice.value.ritenuta_acconto)}.`)
-  return lines
-})
+const hasIva = computed(() => (invoice.value ? hasVat(invoice.value) : false))
+const professionalName = computed(() => (config.value ? professionalFullName(config.value) : ''))
+const professionLabel = computed(() => (config.value ? PROFESSION_LABEL[config.value.profession] : ''))
+const clientName = computed(() => (client.value ? printedClientName(client.value) : ''))
+const notes = computed(() => (invoice.value && config.value ? legalNotes(invoice.value, config.value) : []))
 </script>
 
 <template>
@@ -136,7 +95,7 @@ const legalNotes = computed((): string[] => {
         <div class="doc-header">
           <!-- Left: professional info -->
           <div class="header-left">
-            <div class="company-name">{{ professionalFullName }}</div>
+            <div class="company-name">{{ professionalName }}</div>
             <div class="company-profession">
               {{ professionLabel }}<template v-if="config.is_psicoanalista"> &nbsp;&mdash;&nbsp; Psicoanalista</template><template v-else-if="config.specialization"> &nbsp;&mdash;&nbsp; {{ config.specialization }}</template>
             </div>
@@ -182,7 +141,7 @@ const legalNotes = computed((): string[] => {
           <!-- Destinatario -->
           <div class="info-col info-col-left">
             <div class="section-label">Destinatario</div>
-            <div class="client-name">{{ clientDisplayName }}</div>
+            <div class="client-name">{{ clientName }}</div>
             <div class="client-details">
               <template v-if="client.fiscal_code"><span class="cf-tag">C.F.</span>{{ client.fiscal_code }}<br></template>
               <template v-if="client.vat_number"><span class="cf-tag">P.IVA</span>{{ client.vat_number }}<br></template>
@@ -195,10 +154,10 @@ const legalNotes = computed((): string[] => {
           <!-- Pagamento -->
           <div class="info-col info-col-right">
             <div class="section-label">Pagamento</div>
-            <div class="payment-tag">{{ PAYMENT_LABELS[invoice.payment_method] ?? invoice.payment_method }}</div>
-            <div v-if="PAYMENT_CONDITIONS[invoice.payment_method]" class="pay-field">
+            <div class="payment-tag">{{ printedPaymentLabel(invoice.payment_method) }}</div>
+            <div v-if="paymentCondition(invoice.payment_method)" class="pay-field">
               <span class="pay-label">Condizioni</span>
-              <span class="pay-value">{{ PAYMENT_CONDITIONS[invoice.payment_method] }}</span>
+              <span class="pay-value">{{ paymentCondition(invoice.payment_method) }}</span>
             </div>
             <template v-if="invoice.payment_method === 'bonifico' && config.iban">
               <div class="pay-field">
@@ -288,9 +247,9 @@ const legalNotes = computed((): string[] => {
         <div class="footer-section">
 
           <!-- Fiscal notes -->
-          <div v-if="legalNotes.length > 0" class="legal-notes">
+          <div v-if="notes.length > 0" class="legal-notes">
             <div class="legal-notes-header">Note fiscali</div>
-            <p v-for="(note, i) in legalNotes" :key="i">{{ note }}</p>
+            <p v-for="(note, i) in notes" :key="i">{{ note }}</p>
           </div>
 
           <!-- STS tessera sanitaria authorization -->
@@ -319,7 +278,7 @@ const legalNotes = computed((): string[] => {
 
           <!-- Bottom bar -->
           <div class="bottom-bar">
-            <span class="bar-name">{{ professionalFullName }}</span>
+            <span class="bar-name">{{ professionalName }}</span>
             <span class="bar-dot">·</span>
             P.IVA&nbsp;{{ config.vat_number }}
             <span class="bar-dot">·</span>

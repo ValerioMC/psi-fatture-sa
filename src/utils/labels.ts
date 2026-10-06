@@ -2,7 +2,7 @@
  * Display labels and tones for every enumerated domain value, in one place so
  * a status reads the same in a badge, a filter, a dialog and the printed PDF.
  */
-import type { AppointmentStatus, InvoiceStatus, PaymentMethod, TaxRegime } from '@/types'
+import type { AppointmentStatus, InvoiceStatus, PaymentMethod, Profession, TaxRegime } from '@/types'
 
 /** A semantic colour role. Maps 1:1 to the -soft / -line token pairs in style.css. */
 export type Tone = 'neutral' | 'accent' | 'safe' | 'warn' | 'danger'
@@ -39,6 +39,11 @@ export const PAYMENT_METHOD_LABEL: Readonly<Record<PaymentMethod, string>> = {
 }
 
 export const PAYMENT_METHOD_ORDER: readonly PaymentMethod[] = ['bonifico', 'pos', 'contanti', 'altro']
+
+export const PROFESSION_LABEL: Readonly<Record<Profession, string>> = {
+  psicologo: 'Psicologo',
+  psicoterapeuta: 'Psicoterapeuta',
+}
 
 export const TAX_REGIME_LABEL: Readonly<Record<TaxRegime, string>> = {
   forfettario: 'Regime forfettario',

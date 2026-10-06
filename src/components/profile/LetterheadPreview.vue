@@ -5,7 +5,8 @@ import { FileText } from 'lucide-vue-next'
 import type { UpsertConfigInput } from '@/types'
 import AppCard from '@/components/ui/AppCard.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
-import { TAX_REGIME_LABEL } from '@/utils/labels'
+import { PROFESSION_LABEL, TAX_REGIME_LABEL } from '@/utils/labels'
+import { professionalFullName } from '@/utils/invoicePrint'
 
 const props = defineProps<{ form: UpsertConfigInput }>()
 
@@ -13,8 +14,8 @@ const letterhead = computed(() => {
   const form = props.form
   const place = [form.zip_code, form.city].filter(Boolean).join(' ')
   return {
-    name: [form.title, form.first_name, form.last_name].filter(Boolean).join(' ').trim() || 'Il tuo nome',
-    profession: form.profession === 'psicoterapeuta' ? 'Psicoterapeuta' : 'Psicologo',
+    name: professionalFullName(form).trim() || 'Il tuo nome',
+    profession: PROFESSION_LABEL[form.profession ?? 'psicologo'],
     lines: [
       form.address,
       place + (form.province ? ` (${form.province})` : ''),
