@@ -12,14 +12,6 @@ pub async fn list(db: &DatabaseConnection, active_only: bool) -> Result<Vec<Serv
     Ok(models.into_iter().map(into_domain).collect())
 }
 
-/// Returns a single service by id.
-pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Service, AppError> {
-    service_repository::find_by_id(db, id)
-        .await?
-        .map(into_domain)
-        .ok_or_else(|| AppError::NotFound(format!("Prestazione {id} non trovata")))
-}
-
 /// Creates a new service and returns the created record.
 pub async fn create(
     db: &DatabaseConnection,

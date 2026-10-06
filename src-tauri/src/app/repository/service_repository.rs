@@ -18,14 +18,6 @@ pub async fn find_all(
     query.all(db).await
 }
 
-/// Returns a single service by id.
-pub async fn find_by_id(
-    db: &DatabaseConnection,
-    id: i64,
-) -> Result<Option<service::Model>, sea_orm::DbErr> {
-    service::Entity::find_by_id(id).one(db).await
-}
-
 /// Inserts a new service and returns the created record.
 pub async fn insert(
     db: &DatabaseConnection,

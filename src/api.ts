@@ -72,7 +72,6 @@ export const deleteClient = (id: number) => invoke<void>('delete_client', { id }
 
 export const listServices = (activeOnly = false) =>
   invoke<Service[]>('list_services', { activeOnly })
-export const getService = (id: number) => invoke<Service>('get_service', { id })
 export const createService = (input: CreateServiceInput) =>
   invoke<Service>('create_service', { input })
 export const updateService = (input: UpdateServiceInput) =>
@@ -136,7 +135,6 @@ export const listAppointments = (
     dateTo: dateTo ?? null,
     clientId: clientId ?? null,
   })
-export const getAppointment = (id: number) => invoke<Appointment>('get_appointment', { id })
 export const createAppointment = (input: CreateAppointmentInput) =>
   invoke<Appointment>('create_appointment', { input })
 export const createRecurringAppointments = (input: CreateRecurringAppointmentsInput) =>

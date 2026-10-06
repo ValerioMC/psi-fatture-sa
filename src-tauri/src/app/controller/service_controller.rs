@@ -14,12 +14,6 @@ pub async fn list_services(
     service_service::list(&state.db, active_only).await
 }
 
-/// Returns a single service by id.
-#[tauri::command]
-pub async fn get_service(state: State<'_, AppState>, id: i64) -> Result<Service, AppError> {
-    service_service::get(&state.db, id).await
-}
-
 /// Creates a new service and returns it.
 #[tauri::command]
 pub async fn create_service(

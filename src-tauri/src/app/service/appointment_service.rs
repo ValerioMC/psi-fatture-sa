@@ -19,11 +19,6 @@ pub async fn list(
     appointment_repository::find_all(db, date_from, date_to, client_id).await
 }
 
-/// Returns a single appointment by id.
-pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Appointment, AppError> {
-    appointment_repository::find_by_id(db, id).await
-}
-
 /// Creates a single appointment and returns it.
 pub async fn create(
     db: &DatabaseConnection,

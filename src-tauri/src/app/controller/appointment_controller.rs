@@ -18,12 +18,6 @@ pub async fn list_appointments(
     appointment_service::list(&state.db, date_from, date_to, client_id).await
 }
 
-/// Returns a single appointment by id.
-#[tauri::command]
-pub async fn get_appointment(state: State<'_, AppState>, id: i64) -> Result<Appointment, AppError> {
-    appointment_service::get(&state.db, id).await
-}
-
 /// Creates a single appointment and returns it.
 #[tauri::command]
 pub async fn create_appointment(

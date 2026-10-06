@@ -561,7 +561,8 @@ psi-fatture-sa/
 ```bash
 # Frontend (vitest): logica fiscale, validazione (codice fiscale, P.IVA, IBAN…),
 # sigillo delle fatture, soglia forfettario, date locali, ricorrenze, tema, notifiche,
-# filtri e riepiloghi della lista fatture, form di fattura e paziente, agenda e dashboard
+# filtri e riepiloghi della lista fatture, form di fattura e paziente, agenda e dashboard,
+# testo della fattura stampata, stato e scadenze del Sistema TS, chiave di ricerca
 npm test
 
 # Backend (cargo): calcolo totali fattura, validazione input, Sistema TS (buste SOAP,
