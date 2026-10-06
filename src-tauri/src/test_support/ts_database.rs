@@ -24,10 +24,29 @@ pub async fn setup() -> DatabaseConnection {
     db
 }
 
+/// Forces a status. An accepted submission was necessarily sent, so it carries the document
+/// id it was sent under unless the test already gave it one.
 pub async fn force_status(db: &DatabaseConnection, id: i64, status: TsSubmissionStatus) {
     db.execute_unprepared(&format!(
         "UPDATE ts_submissions SET status = '{}' WHERE id = {id}",
         status.as_str()
+    ))
+    .await
+    .unwrap();
+    if status == TsSubmissionStatus::Accettata {
+        give_sent_document_id(db, id).await;
+    }
+}
+
+async fn give_sent_document_id(db: &DatabaseConnection, id: i64) {
+    db.execute_unprepared(&format!(
+        "UPDATE ts_submissions SET
+            document_vat_number = COALESCE(document_vat_number, '12345678901'),
+            document_issue_date = COALESCE(document_issue_date,
+                (SELECT issue_date FROM invoices WHERE invoices.id = ts_submissions.invoice_id)),
+            document_number = COALESCE(document_number,
+                (SELECT invoice_number FROM invoices WHERE invoices.id = ts_submissions.invoice_id))
+         WHERE id = {id}"
     ))
     .await
     .unwrap();

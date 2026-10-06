@@ -71,6 +71,28 @@ fn reads_a_cancelled_document_from_the_point_query() {
 }
 
 #[test]
+fn a_document_without_its_identifying_fields_is_an_error() {
+    for field in ["pIva", "dataEmissione", "numDocumento"] {
+        let without_field = QUERY_CANCELLED
+            .replace(&format!("<{field}>"), "<ignored>")
+            .replace(&format!("</{field}>"), "</ignored>");
+
+        let error = query_response(&without_field).unwrap_err();
+
+        assert_eq!(error, format!("Campo {field} assente nella risposta"));
+    }
+}
+
+#[test]
+fn a_total_without_its_expense_type_is_an_error() {
+    let without_type = QUERY_CANCELLED.replace("<tipoSpesa>SP</tipoSpesa>", "");
+
+    let error = query_response(&without_type).unwrap_err();
+
+    assert_eq!(error, "Campo tipoSpesa assente nella risposta");
+}
+
+#[test]
 fn a_total_without_its_amount_is_an_error_rather_than_zero() {
     let without_amount = QUERY_CANCELLED.replace("<importo>90.0</importo>", "");
 

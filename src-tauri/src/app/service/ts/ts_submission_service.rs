@@ -164,6 +164,15 @@ async fn enqueue_follow_up(
     ts_submission_repository::load(db, created.id).await
 }
 
+/// The id of the submission a follow-up targets; one that never got an id cannot be followed up.
+pub(crate) fn require_document_id(
+    row: &crate::app::entity::ts_submission::Model,
+) -> Result<TsDocumentId, AppError> {
+    document_id_of(row).ok_or_else(|| {
+        AppError::Invalid("La trasmissione originale non ha un identificativo".to_string())
+    })
+}
+
 /// The id an accepted submission was sent under, which follow-ups must reuse.
 pub(crate) fn document_id_of(
     row: &crate::app::entity::ts_submission::Model,
@@ -200,12 +209,9 @@ async fn check_replacement_document(
     db: &impl ConnectionTrait,
     target: &crate::app::entity::ts_submission::Model,
 ) -> Result<(), AppError> {
-    let id = document_id_of(target);
-    let vat_number = id
-        .as_ref()
-        .map(|i| i.vat_number.clone())
-        .unwrap_or_default();
-    ts_document_service::build(db, target.invoice_id, &vat_number, id).await?;
+    let id = require_document_id(target)?;
+    let vat_number = id.vat_number.clone();
+    ts_document_service::build(db, target.invoice_id, &vat_number, Some(id)).await?;
     Ok(())
 }
 

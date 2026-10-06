@@ -97,6 +97,21 @@ async fn replacement_requires_the_invoice_to_still_be_paid() {
 }
 
 #[tokio::test]
+async fn replacement_needs_the_id_the_original_was_sent_under() {
+    let db = setup().await;
+    let original = enqueue_invio(&db, 1).await.unwrap();
+    force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
+    db.execute_unprepared("UPDATE ts_submissions SET document_number = NULL")
+        .await
+        .unwrap();
+
+    let error = enqueue_replacement(&db, original.id).await.unwrap_err();
+
+    assert!(matches!(error, AppError::Invalid(_)));
+    assert!(error.to_string().contains("identificativo"));
+}
+
+#[tokio::test]
 async fn withdraws_only_unsent_submissions() {
     let db = setup().await;
     let queued = enqueue_invio(&db, 1).await.unwrap();

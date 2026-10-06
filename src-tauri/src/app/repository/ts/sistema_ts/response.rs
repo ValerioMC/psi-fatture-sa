@@ -14,7 +14,8 @@ use crate::app::model::ts::{
 const NOT_FOUND_CODE: &str = "WS96";
 const CANCELLED_CODE: &str = "W010";
 
-/// The `faultstring` of a SOAP Fault, if the body is one.
+/// The `faultstring` of a SOAP Fault, if the body is one. A body that is not XML is
+/// no fault: the caller then judges it by its HTTP status.
 pub fn fault_message(xml: &str) -> Option<String> {
     let root = XmlNode::parse(xml).ok()?;
     root.find("Fault")
@@ -84,13 +85,12 @@ fn remote_document(node: &XmlNode, messages: Vec<TsMessage>) -> Result<TsRemoteD
         .ok_or("Identificativo assente nella risposta")?;
     let number = id_node
         .child("numDocumentoFiscale")
-        .and_then(|n| n.text_of("numDocumento"))
-        .unwrap_or_default();
+        .ok_or("Numero documento assente nella risposta")?;
     Ok(TsRemoteDocument {
         id: TsDocumentId {
-            vat_number: id_node.text_of("pIva").unwrap_or_default(),
-            issue_date: id_node.text_of("dataEmissione").unwrap_or_default(),
-            number,
+            vat_number: required_text(id_node, "pIva")?,
+            issue_date: required_text(id_node, "dataEmissione")?,
+            number: required_text(number, "numDocumento")?,
         },
         payment_date: node.text_of("dataPagamento"),
         totals: totals_of(node, "totaliVociSpesa")?,
@@ -107,7 +107,7 @@ fn totals_of(node: &XmlNode, name: &str) -> Result<Vec<TsExpenseTotal>, String> 
     node.children_named(name)
         .map(|total| {
             Ok(TsExpenseTotal {
-                expense_type: total.text_of("tipoSpesa").unwrap_or_default(),
+                expense_type: required_text(total, "tipoSpesa")?,
                 amount: parse_amount(
                     &total
                         .text_of("importo")
@@ -125,6 +125,12 @@ fn esito_of(root: &XmlNode) -> Result<TsEsito, String> {
     TsEsito::parse(&node.text).map_err(|e| e.to_string())
 }
 
+fn required_text(node: &XmlNode, name: &str) -> Result<String, String> {
+    node.text_of(name)
+        .ok_or_else(|| format!("Campo {name} assente nella risposta"))
+}
+
+/// A field missing from a message reads as empty: the success line has an empty `tipo`.
 fn messages_of(response: &XmlNode) -> Vec<TsMessage> {
     response
         .child("listaMessaggi")

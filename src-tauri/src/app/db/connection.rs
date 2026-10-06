@@ -7,11 +7,9 @@ use std::path::PathBuf;
 use crate::migration::Migrator;
 
 fn data_dir() -> PathBuf {
-    let data_dir = dirs::data_local_dir()
+    dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("psi-fatture-sa");
-    std::fs::create_dir_all(&data_dir).ok();
-    data_dir
+        .join("psi-fatture-sa")
 }
 
 /// Returns the path to the SQLite database file.
@@ -31,6 +29,13 @@ pub fn secrets_path() -> PathBuf {
 
 /// Initializes the SeaORM connection pool and runs all pending migrations.
 pub async fn init_db() -> Result<DatabaseConnection, DbErr> {
+    let folder = data_dir();
+    std::fs::create_dir_all(&folder).map_err(|error| {
+        DbErr::Custom(format!(
+            "Cartella dati {} non creabile: {error}",
+            folder.display()
+        ))
+    })?;
     let db_url = format!("sqlite://{}?mode=rwc", db_path().display());
 
     let mut opts = ConnectOptions::new(db_url);

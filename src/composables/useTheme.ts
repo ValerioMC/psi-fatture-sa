@@ -11,6 +11,7 @@ const preference = ref<ThemePreference>('system')
 const systemPrefersDark = ref(false)
 let initialised = false
 
+/** Reading `localStorage` throws when site data is blocked; the theme then simply is not remembered. */
 function safeStorage(): Storage | undefined {
   try {
     return window.localStorage

@@ -18,7 +18,7 @@ use crate::app::repository::ts::sistema_ts::{SistemaTsGateway, TsGatewayError, T
 use crate::app::repository::ts::ts_submission_repository;
 use crate::app::service::ts::{
     ts_credential_service, ts_document_service, ts_settings_service,
-    ts_submission_service::document_id_of, ts_transition_service as transition,
+    ts_submission_service::require_document_id, ts_transition_service as transition,
 };
 
 /// One pass at a time: the worker and a manual "send now" never overlap.
@@ -136,9 +136,7 @@ async fn prepare(
     let target_id = match submission.target_submission_id {
         Some(target) => {
             let row = ts_submission_repository::find_row(db, target).await?;
-            Some(document_id_of(&row).ok_or_else(|| {
-                AppError::Invalid("La trasmissione originale non ha un identificativo".to_string())
-            })?)
+            Some(require_document_id(&row)?)
         }
         None => None,
     };
