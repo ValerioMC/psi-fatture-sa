@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
 use super::{invoice_guard as guard, ClientSessions, InvoiceContent};
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::invoice as invoices;
 use crate::app::entity::service as services;
@@ -71,7 +72,7 @@ pub async fn update(
     let hide_quantity = input.hide_quantity.unwrap_or(current.hide_quantity);
     let mut record = invoice_record(&content, year, number, &totals, hide_quantity);
     record.id = Set(input.id);
-    record.updated_at = Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string());
+    record.updated_at = Set(timestamp::now());
 
     invoice_repository::update_invoice(&tx, record).await?;
     invoice_repository::delete_lines(&tx, input.id).await?;
@@ -266,11 +267,10 @@ fn resolve_paid_date(status: &InvoiceStatus, paid_date: Option<&str>) -> Option<
     if *status != InvoiceStatus::Paid {
         return None;
     }
-    let today = || chrono::Local::now().format("%Y-%m-%d").to_string();
     Some(
         paid_date
             .filter(|date| !date.is_empty())
-            .map_or_else(today, str::to_owned),
+            .map_or_else(timestamp::today, str::to_owned),
     )
 }
 

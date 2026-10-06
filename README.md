@@ -521,6 +521,7 @@ psi-fatture-sa/
 │   │   │   ├── scheduler/  # Worker in background (invio coda STS, backup giornaliero)
 │   │   │   ├── entity/     # Entità database (una tabella per file)
 │   │   │   ├── model/      # DTO e tipi condivisi, un sottopackage per dominio
+│   │   │   ├── common/     # AppError e timestamp: unico formato con cui il database salva gli istanti
 │   │   │   └── db/         # Connessione e percorsi dei file dati
 │   │   ├── migration/      # Migrazioni schema SQLite
 │   │   └── test_support/   # Test double e fixture condivisi (solo in `cargo test`)

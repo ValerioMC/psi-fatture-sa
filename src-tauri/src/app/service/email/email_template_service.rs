@@ -2,6 +2,7 @@ use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
 use super::email_template_renderer;
 use super::EmailValues;
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::email_template::ActiveModel;
 use crate::app::model::email::{
@@ -62,7 +63,7 @@ pub async fn update(
         id: Set(1),
         subject: Set(template.subject.clone()),
         body: Set(template.body.clone()),
-        updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
+        updated_at: Set(timestamp::now()),
     };
     email_template_repository::save(db, active).await?;
     Ok(template)

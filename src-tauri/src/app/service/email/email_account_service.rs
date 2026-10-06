@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::email_account::{self, ActiveModel};
 use crate::app::model::email::{
@@ -55,7 +56,7 @@ pub async fn update(
         security: Set(account.security.as_str().to_string()),
         username: Set(account.username),
         bcc_self: Set(i32::from(account.bcc_self)),
-        updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
+        updated_at: Set(timestamp::now()),
     };
     email_account_repository::save(db, active).await?;
     get(db).await

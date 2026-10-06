@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use chrono::NaiveDateTime;
 use sea_orm::DatabaseConnection;
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::model::backup::{BackupFile, BackupOverview, BackupReason};
 use crate::app::repository::backup_repository;
@@ -16,7 +17,6 @@ const KEEP: usize = 10;
 const PREFIX: &str = "psi-fatture-";
 const EXTENSION: &str = ".db";
 const STAMP: &str = "%Y%m%d-%H%M%S";
-const DISPLAY: &str = "%Y-%m-%d %H:%M:%S";
 
 /// Owns the backups folder. `writing` keeps a click on "Backup ora" and the
 /// daily copy from writing at once; `last_failure` is shown until a copy succeeds.
@@ -72,7 +72,7 @@ impl RotatingBackups {
                 .filter_map(|stored| {
                     let name = parse_name(&stored.name)?;
                     let file = BackupFile {
-                        created_at: name.created_at.format(DISPLAY).to_string(),
+                        created_at: name.created_at.format(timestamp::FORMAT).to_string(),
                         reason: name.reason,
                         name: stored.name,
                         path: stored.path.to_string_lossy().into_owned(),
@@ -115,7 +115,9 @@ impl RotatingBackups {
             .inspect_err(|error| self.record_failure(error))?;
         let taken_today = newest
             .first()
-            .and_then(|file| NaiveDateTime::parse_from_str(&file.created_at, DISPLAY).ok())
+            .and_then(|file| {
+                NaiveDateTime::parse_from_str(&file.created_at, timestamp::FORMAT).ok()
+            })
             .is_some_and(|created| created.date() == now.date());
         if taken_today {
             return Ok(None);

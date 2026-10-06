@@ -4,6 +4,7 @@
 
 use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::ts_submission::ActiveModel;
 use crate::app::model::ts::{
@@ -226,7 +227,7 @@ fn new_submission(
     target_submission_id: Option<i64>,
     environment: TsEnvironment,
 ) -> ActiveModel {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = timestamp::now();
     ActiveModel {
         invoice_id: Set(invoice_id),
         operation: Set(operation.as_str().to_owned()),

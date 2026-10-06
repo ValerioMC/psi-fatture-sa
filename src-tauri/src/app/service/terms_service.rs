@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::terms_acceptance::{self, ActiveModel};
 use crate::app::model::terms::{AcceptTermsInput, TermsAcceptance};
@@ -40,7 +41,7 @@ pub async fn accept(
     let active = ActiveModel {
         version: Set(version.to_string()),
         clauses_approved: Set(true),
-        accepted_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
+        accepted_at: Set(timestamp::now()),
         ..Default::default()
     };
     Ok(into_domain(

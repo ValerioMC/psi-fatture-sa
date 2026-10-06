@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::service::{self, ActiveModel};
 use crate::app::model::service::{CreateServiceInput, Service, UpdateServiceInput};
@@ -42,7 +43,7 @@ pub async fn update(
     db: &DatabaseConnection,
     input: UpdateServiceInput,
 ) -> Result<Service, AppError> {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = timestamp::now();
     let active = ActiveModel {
         id: Set(input.id),
         name: Set(input.name),

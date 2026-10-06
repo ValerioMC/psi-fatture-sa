@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::appointment as appointments;
 use crate::app::model::appointment::{
@@ -80,7 +81,7 @@ pub async fn update(
         &input.end_time,
     )?;
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = timestamp::now();
     let active = appointments::ActiveModel {
         id: Set(input.id),
         client_id: Set(input.client_id),

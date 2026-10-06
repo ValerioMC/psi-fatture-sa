@@ -5,6 +5,7 @@
 use chrono::{Duration, NaiveDateTime};
 use sea_orm::{ActiveValue::Set, ConnectionTrait, IntoActiveModel, TransactionTrait};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::ts_submission;
 use crate::app::model::ts::{
@@ -12,7 +13,6 @@ use crate::app::model::ts::{
 };
 use crate::app::repository::ts::ts_submission_repository;
 
-pub(crate) const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 const RETRY_BASE_SECONDS: i64 = 60;
 const RETRY_MAX_SECONDS: i64 = 6 * 60 * 60;
 
@@ -21,7 +21,7 @@ pub async fn due(
     db: &impl ConnectionTrait,
     now: NaiveDateTime,
 ) -> Result<Vec<TsSubmission>, AppError> {
-    ts_submission_repository::find_due(db, &format_timestamp(now)).await
+    ts_submission_repository::find_due(db, &timestamp::format(now)).await
 }
 
 /// Marks the submission as in flight under `document`; false when another
@@ -33,7 +33,7 @@ pub async fn claim(
     fingerprint: Option<String>,
     now: NaiveDateTime,
 ) -> Result<bool, AppError> {
-    ts_submission_repository::claim(db, id, document, fingerprint, &format_timestamp(now)).await
+    ts_submission_repository::claim(db, id, document, fingerprint, &timestamp::format(now)).await
 }
 
 /// Puts an in-flight submission back in the queue after a failure that never
@@ -48,11 +48,11 @@ pub async fn release_for_retry(
     transition_guard(&row, TsSubmissionStatus::NonInviata)?;
 
     let attempts = row.attempt_count;
-    let stamp = format_timestamp(now);
+    let stamp = timestamp::format(now);
     let mut active = row.into_active_model();
     active.status = Set(TsSubmissionStatus::NonInviata.as_str().to_owned());
     active.last_error = Set(Some(error.to_owned()));
-    active.next_attempt_at = Set(format_timestamp(now + retry_delay(attempts)));
+    active.next_attempt_at = Set(timestamp::format(now + retry_delay(attempts)));
     active.updated_at = Set(stamp);
     ts_submission_repository::update(db, active).await?;
     ts_submission_repository::load(db, id).await
@@ -69,7 +69,7 @@ pub async fn reject_locally(
     let row = ts_submission_repository::find_row(db, id).await?;
     transition_guard(&row, TsSubmissionStatus::Scartata)?;
 
-    let stamp = format_timestamp(now);
+    let stamp = timestamp::format(now);
     let mut active = row.into_active_model();
     active.status = Set(TsSubmissionStatus::Scartata.as_str().to_owned());
     active.outcome_code = Set(Some("LOCALE".to_owned()));
@@ -96,7 +96,7 @@ where
     } else {
         TsSubmissionStatus::Scartata
     };
-    let stamp = format_timestamp(now);
+    let stamp = timestamp::format(now);
     let tx = db.begin().await?;
 
     let row = ts_submission_repository::find_row(&tx, id).await?;
@@ -116,7 +116,7 @@ pub async fn requeue_interrupted(
     db: &impl ConnectionTrait,
     now: NaiveDateTime,
 ) -> Result<u64, AppError> {
-    ts_submission_repository::requeue_in_flight(db, &format_timestamp(now)).await
+    ts_submission_repository::requeue_in_flight(db, &timestamp::format(now)).await
 }
 
 /// The submission an accepted replacement or cancellation supersedes, with the status it moves to.
@@ -175,10 +175,6 @@ fn retry_delay(attempt_count: i64) -> Duration {
     let exponent = attempt_count.saturating_sub(1).clamp(0, 20) as u32;
     let seconds = RETRY_BASE_SECONDS.saturating_mul(1_i64 << exponent);
     Duration::seconds(seconds.min(RETRY_MAX_SECONDS))
-}
-
-pub fn format_timestamp(moment: NaiveDateTime) -> String {
-    moment.format(TIMESTAMP_FORMAT).to_string()
 }
 
 fn transition_guard(row: &ts_submission::Model, next: TsSubmissionStatus) -> Result<(), AppError> {

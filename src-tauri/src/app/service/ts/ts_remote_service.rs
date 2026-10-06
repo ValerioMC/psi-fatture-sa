@@ -4,6 +4,7 @@
 
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::model::ts::{
     TsConnectionCheck, TsDocumentId, TsMessage, TsOperation, TsQueryResult, TsReportBasis,
@@ -84,7 +85,7 @@ pub async fn check_connection(
     };
     let probe = TsDocumentId {
         vat_number: settings.vat_number.clone(),
-        issue_date: chrono::Local::now().format("%Y-%m-%d").to_string(),
+        issue_date: timestamp::today(),
         number: PROBE_DOCUMENT_NUMBER.to_string(),
     };
     Ok(match gateway.query(&session, &probe).await {

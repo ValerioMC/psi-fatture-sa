@@ -1,6 +1,7 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
 use super::{email_account_service, email_credential_service, email_template_service, EmailValues};
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::invoice_email::{self, ActiveModel};
 use crate::app::model::email::{
@@ -223,7 +224,7 @@ async fn record(
         attachment_name: Set(attachment_name.to_string()),
         status: Set(status.as_str().to_string()),
         error: Set(error),
-        sent_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
+        sent_at: Set(timestamp::now()),
         ..Default::default()
     };
     into_domain(invoice_email_repository::insert(db, active).await?)

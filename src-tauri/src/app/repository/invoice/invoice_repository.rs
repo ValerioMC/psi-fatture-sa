@@ -6,6 +6,7 @@ use sea_orm::{
 };
 
 use super::{InvoiceRow, NumberedDate};
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::{invoice as invoices, invoice_line};
 use crate::app::model::config::TaxRegime;
@@ -332,7 +333,7 @@ pub async fn bulk_update_status(
 
     let placeholders: Vec<String> = ids.iter().map(|_| "?".to_string()).collect();
     let in_clause = placeholders.join(", ");
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = timestamp::now();
 
     let sql = format!(
         "UPDATE invoices SET status = ?, paid_date = ?, updated_at = ? WHERE id IN ({in_clause})"

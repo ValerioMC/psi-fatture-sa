@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::ts_setting::ActiveModel;
 use crate::app::model::ts::{TsEnvironment, TsSettings, UpdateTsSettingsInput};
@@ -68,7 +69,7 @@ async fn update_within(
         environment: Set(input.environment.as_str().to_owned()),
         username: Set(username),
         vat_number: Set(vat_number),
-        updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
+        updated_at: Set(timestamp::now()),
     };
     ts_settings_repository::save(db, active).await?;
     get_within(db, available).await

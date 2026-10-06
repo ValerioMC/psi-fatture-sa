@@ -1,5 +1,6 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection};
 
+use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::client::{self, ActiveModel};
 use crate::app::model::client::{Client, ClientType, CreateClientInput, UpdateClientInput};
@@ -64,7 +65,7 @@ pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result
         input.vat_number.as_deref(),
     )?;
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = timestamp::now();
     let active = ActiveModel {
         id: Set(input.id),
         client_type: Set(input.client_type.as_str().to_owned()),

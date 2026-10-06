@@ -3,6 +3,7 @@ use sea_orm::{
     EntityTrait, QueryFilter, QueryOrder,
 };
 
+use crate::app::common::timestamp;
 use crate::app::entity::client::{self, ActiveModel, Column};
 use crate::app::entity::invoice::{Column as InvCol, Entity as InvoiceEntity};
 
@@ -62,7 +63,7 @@ pub async fn update_email(
     let active = ActiveModel {
         id: Set(id),
         email: Set(Some(email.to_string())),
-        updated_at: Set(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
+        updated_at: Set(timestamp::now()),
         ..Default::default()
     };
     active.update(db).await?;
