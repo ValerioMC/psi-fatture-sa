@@ -7,8 +7,8 @@ use sea_orm::{ConnectionTrait, DatabaseConnection};
 use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::model::ts::{
-    TsConnectionCheck, TsDocumentId, TsMessage, TsOperation, TsQueryResult, TsReportBasis,
-    TsReportRow, TsSettings, TsSubmissionFilters, TsSubmissionStatus,
+    TsConnectionCheck, TsDocumentId, TsEnvironment, TsMessage, TsOperation, TsQueryResult,
+    TsReportBasis, TsReportRow, TsSettings, TsSubmissionFilters, TsSubmissionStatus,
 };
 use crate::app::repository::invoice::invoice_repository;
 use crate::app::repository::secret::SecretStore;
@@ -54,21 +54,25 @@ pub async fn monthly_report(
     let session = ts_credential_service::session(store, &settings)?;
 
     let outcome = gateway.monthly_report(&session, year, month, basis).await?;
-    let mut rows = match outcome {
-        ReportOutcome::Rows(rows) => rows,
-        ReportOutcome::Refused(messages) => {
-            let errors = messages.iter().filter(|m| m.is_error());
-            return Err(AppError::Invalid(format!(
-                "Report non disponibile: {}",
-                TsMessage::joined(errors)
-            )));
-        }
-    };
+    let mut rows = rows_of(outcome)?;
     for row in &mut rows {
         row.invoice_id =
             invoice_repository::find_id_by_issue(db, &row.issue_date, &row.document_number).await?;
     }
     Ok(rows)
+}
+
+fn rows_of(outcome: ReportOutcome) -> Result<Vec<TsReportRow>, AppError> {
+    match outcome {
+        ReportOutcome::Rows(rows) => Ok(rows),
+        ReportOutcome::Refused(messages) => {
+            let errors = messages.iter().filter(|m| m.is_error());
+            Err(AppError::Invalid(format!(
+                "Report non disponibile: {}",
+                TsMessage::joined(errors)
+            )))
+        }
+    }
 }
 
 /// Checks username, password and PINCODE with a query for a document that
@@ -88,12 +92,20 @@ pub async fn check_connection(
         issue_date: timestamp::today(),
         number: PROBE_DOCUMENT_NUMBER.to_string(),
     };
-    Ok(match gateway.query(&session, &probe).await {
+    let answer = gateway.query(&session, &probe).await;
+    Ok(connection_check_of(answer, settings.environment))
+}
+
+fn connection_check_of(
+    answer: Result<TsQueryResult, TsGatewayError>,
+    environment: TsEnvironment,
+) -> TsConnectionCheck {
+    match answer {
         Ok(TsQueryResult::NotFound | TsQueryResult::Found { .. }) => TsConnectionCheck {
             ok: true,
             message: format!(
                 "Credenziali accettate dal Sistema TS ({})",
-                settings.environment.as_str()
+                environment.as_str()
             ),
         },
         Ok(TsQueryResult::Refused { messages }) => failed(TsMessage::joined(&messages)),
@@ -104,7 +116,7 @@ pub async fn check_connection(
             "Nessuna risposta dal Sistema TS ({detail}). Controlla la connessione: con una password errata il servizio a volte non risponde affatto"
         )),
         Err(error) => failed(error.to_string()),
-    })
+    }
 }
 
 async fn last_sent_id(

@@ -11,7 +11,8 @@ use tokio::sync::Mutex;
 use super::{TsDispatchAttempt, TsDispatchRequest};
 use crate::app::common::AppError;
 use crate::app::model::ts::{
-    TsCallResponse, TsDispatchSummary, TsOperation, TsOutcome, TsSettings, TsSubmission,
+    TsCallResponse, TsDispatchSummary, TsDocumentId, TsOperation, TsOutcome, TsSettings,
+    TsSubmission,
 };
 use crate::app::repository::secret::SecretStore;
 use crate::app::repository::ts::sistema_ts::{SistemaTsGateway, TsGatewayError, TsSession};
@@ -118,12 +119,20 @@ async fn dispatch_one(
         return Ok(TsDispatchAttempt::Skipped);
     }
 
-    let result = match &request {
+    let result = send(gateway, session, &request).await;
+    settle(db, submission, result, now).await
+}
+
+async fn send(
+    gateway: &dyn SistemaTsGateway,
+    session: &TsSession,
+    request: &TsDispatchRequest,
+) -> Result<TsCallResponse, TsGatewayError> {
+    match request {
         TsDispatchRequest::Insert(document) => gateway.insert(session, document).await,
         TsDispatchRequest::Update(document) => gateway.update(session, document).await,
         TsDispatchRequest::Cancel(id) => gateway.cancel(session, id).await,
-    };
-    settle(db, submission, result, now).await
+    }
 }
 
 /// Builds the call from the invoice as it is now; follow-ups reuse the id
@@ -133,13 +142,7 @@ async fn prepare(
     settings: &TsSettings,
     submission: &TsSubmission,
 ) -> Result<TsDispatchRequest, AppError> {
-    let target_id = match submission.target_submission_id {
-        Some(target) => {
-            let row = ts_submission_repository::find_row(db, target).await?;
-            Some(require_document_id(&row)?)
-        }
-        None => None,
-    };
+    let target_id = target_document_id(db, submission).await?;
     match submission.operation {
         TsOperation::Invio => {
             ts_document_service::build(db, submission.invoice_id, &settings.vat_number, None)
@@ -159,6 +162,17 @@ async fn prepare(
             AppError::Conflict("Annullamento senza trasmissione originale".to_string())
         }),
     }
+}
+
+async fn target_document_id(
+    db: &DatabaseConnection,
+    submission: &TsSubmission,
+) -> Result<Option<TsDocumentId>, AppError> {
+    let Some(target) = submission.target_submission_id else {
+        return Ok(None);
+    };
+    let row = ts_submission_repository::find_row(db, target).await?;
+    require_document_id(&row).map(Some)
 }
 
 async fn settle(

@@ -33,20 +33,26 @@ pub(super) struct TsSubmissionRow {
     updated_at: String,
 }
 
+/// The id exists only once all three parts were stored, when the submission was claimed.
+fn sent_document_id(
+    vat_number: Option<String>,
+    issue_date: Option<String>,
+    number: Option<String>,
+) -> Option<TsDocumentId> {
+    Some(TsDocumentId {
+        vat_number: vat_number?,
+        issue_date: issue_date?,
+        number: number?,
+    })
+}
+
 impl TsSubmissionRow {
     pub(super) fn into_submission(self) -> Result<TsSubmission, AppError> {
-        let document = match (
+        let document = sent_document_id(
             self.document_vat_number,
             self.document_issue_date,
             self.document_number,
-        ) {
-            (Some(vat_number), Some(issue_date), Some(number)) => Some(TsDocumentId {
-                vat_number,
-                issue_date,
-                number,
-            }),
-            _ => None,
-        };
+        );
         Ok(TsSubmission {
             id: self.id,
             invoice_id: self.invoice_id,

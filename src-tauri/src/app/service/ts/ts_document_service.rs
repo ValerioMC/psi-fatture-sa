@@ -129,30 +129,18 @@ fn document_number_of(invoice: &Invoice) -> Result<String, AppError> {
 /// the last group absorbs rounding so the items add up to `total_gross`.
 fn items_of(invoice: &Invoice, regime: &TaxRegime) -> Result<Vec<TsExpenseItem>, AppError> {
     let total = round2(invoice.total_gross);
-    if total <= 0.0 {
-        return Err(AppError::Invalid(
-            "La fattura ha importo nullo: niente da trasmettere".to_string(),
-        ));
-    }
-    if total > MAX_AMOUNT {
-        return Err(AppError::Invalid(
-            "Importo oltre il massimo accettato dal Sistema TS (99.999,99 €)".to_string(),
-        ));
-    }
+    ensure_amount_in_range(total)?;
 
-    let mut net_by_rate: BTreeMap<i64, f64> = BTreeMap::new();
-    for line in &invoice.lines {
-        *net_by_rate.entry(rate_key(line.vat_rate)).or_default() += line.line_total;
-    }
+    let net_by_rate = net_by_vat_rate(invoice);
     let net_total: f64 = net_by_rate.values().sum();
     if net_by_rate.len() <= 1 || net_total <= 0.0 {
         let rate = net_by_rate.keys().next().copied().unwrap_or(0);
         return Ok(vec![item(total, rate, regime)]);
     }
 
+    let last = net_by_rate.len() - 1;
     let mut items = Vec::with_capacity(net_by_rate.len());
     let mut allotted = 0.0;
-    let last = net_by_rate.len() - 1;
     for (index, (rate, net)) in net_by_rate.into_iter().enumerate() {
         let amount = if index == last {
             round2(total - allotted)
@@ -164,6 +152,28 @@ fn items_of(invoice: &Invoice, regime: &TaxRegime) -> Result<Vec<TsExpenseItem>,
         items.push(item(amount, rate, regime));
     }
     Ok(items)
+}
+
+fn ensure_amount_in_range(total: f64) -> Result<(), AppError> {
+    if total <= 0.0 {
+        return Err(AppError::Invalid(
+            "La fattura ha importo nullo: niente da trasmettere".to_string(),
+        ));
+    }
+    if total > MAX_AMOUNT {
+        return Err(AppError::Invalid(
+            "Importo oltre il massimo accettato dal Sistema TS (99.999,99 €)".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn net_by_vat_rate(invoice: &Invoice) -> BTreeMap<i64, f64> {
+    let mut net_by_rate: BTreeMap<i64, f64> = BTreeMap::new();
+    for line in &invoice.lines {
+        *net_by_rate.entry(rate_key(line.vat_rate)).or_default() += line.line_total;
+    }
+    net_by_rate
 }
 
 fn item(amount: f64, rate_key: i64, regime: &TaxRegime) -> TsExpenseItem {
