@@ -80,6 +80,20 @@ async fn follow_ups_target_only_accepted_submissions() {
 }
 
 #[tokio::test]
+async fn a_cancelled_invoice_can_be_sent_again() {
+    let db = setup().await;
+    let original = enqueue_invio(&db, 1).await.unwrap();
+    force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
+    let cancellation = enqueue_cancellation(&db, original.id).await.unwrap();
+    force_status(&db, cancellation.id, TsSubmissionStatus::Accettata).await;
+    force_status(&db, original.id, TsSubmissionStatus::Annullata).await;
+
+    let resent = enqueue_invio(&db, 1).await.unwrap();
+    assert_eq!(resent.operation, TsOperation::Invio);
+    assert_eq!(resent.status, TsSubmissionStatus::NonInviata);
+}
+
+#[tokio::test]
 async fn a_follow_up_on_a_retired_submission_says_where_it_stands() {
     let db = setup().await;
     let original = enqueue_invio(&db, 1).await.unwrap();

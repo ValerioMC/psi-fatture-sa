@@ -328,7 +328,15 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
 - **Annullamento**: è una trasmissione a sé, con il proprio protocollo. Accettata, porta
   l'invio originale ad `annullata` e nell'elenco compare come *Cancellata dal TS* sotto
   il filtro *Annullate*, non tra le *Accettate*. "Annulla" si offre solo quando per
-  quella fattura non c'è già un'altra trasmissione in coda.
+  quella fattura non c'è già un'altra trasmissione in coda. Una fattura annullata si
+  può trasmettere di nuovo: conta come già sul Sistema TS solo un invio o una
+  sostituzione accettati (`invoice_holds_ts_data`).
+- **Operazioni Sogei**: il web service prevede Inserimento, Variazione (la nostra
+  *sostituzione*: stesso identificativo, dati nuovi), Cancellazione e Rimborso
+  (documento che rettifica gli importi di uno già inviato, es. nota di credito). Il
+  Rimborso non è implementato: l'app non emette note di credito. Numero e data di
+  emissione formano l'identificativo e la Variazione non li cambia: per correggerli
+  si annulla e si ritrasmette.
 - **Numero del documento**: al Sistema TS va il numero della fattura così com'è
   (`numDocumento`) con la data di emissione; il `/anno` che l'app mostra accanto al
   numero è solo un'etichetta locale.

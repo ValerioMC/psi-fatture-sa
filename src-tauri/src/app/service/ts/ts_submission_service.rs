@@ -122,19 +122,13 @@ fn ensure_vat_number_is_set(settings: &TsSettings) -> Result<(), AppError> {
     Ok(())
 }
 
+/// An accepted cancellation removed the data, so it does not count: a cancelled invoice can be sent again.
 async fn ensure_not_accepted_yet(
     db: &impl ConnectionTrait,
     invoice_id: i64,
     environment: TsEnvironment,
 ) -> Result<(), AppError> {
-    let accepted = ts_submission_repository::invoice_has_status(
-        db,
-        invoice_id,
-        &[TsSubmissionStatus::Accettata],
-        Some(environment),
-    )
-    .await?;
-    if accepted {
+    if ts_submission_repository::invoice_holds_ts_data(db, invoice_id, environment).await? {
         return Err(AppError::Conflict(
             "Fattura già accettata dal Sistema TS: per correggerla usa la sostituzione".to_string(),
         ));
