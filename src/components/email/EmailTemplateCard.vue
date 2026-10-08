@@ -246,6 +246,6 @@ const sender = computed(() => {
 /* The preview sits a step below the card, like a message open in a mail client. */
 .mail-sheet {
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 2px rgb(40 34 20 / 0.04);
+  box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 2px rgb(var(--shade) / 0.04);
 }
 </style>

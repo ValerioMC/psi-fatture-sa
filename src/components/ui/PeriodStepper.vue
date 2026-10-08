@@ -17,7 +17,7 @@ defineEmits<{ previous: []; next: [] }>()
 </script>
 
 <template>
-  <div class="inline-flex h-control items-center rounded-control border border-border-strong bg-surface-raised shadow-[0_1px_1px_rgb(40_34_20/0.04)]">
+  <div class="inline-flex h-control items-center rounded-control border border-border-strong bg-surface-raised shadow-[0_1px_1px_rgb(var(--shade)/0.04)]">
     <button
       type="button"
       class="grid h-full w-8 place-items-center rounded-l-control text-text-subtle transition-colors hover:bg-surface-hover hover:text-text focus-ring"

@@ -220,11 +220,11 @@
   }
   const sendDelay = () => new Promise((r) => setTimeout(r, window.__MOCK_SEND_DELAY ?? 1400))
 
-  // ─── Terms of use: accepted, unless a test asks for the first launch ───
-  let termsAcceptance = window.__MOCK_TERMS_PENDING ? null : { version: '2026-10-01', clauses_approved: true, accepted_at: '2026-10-01 09:00:00' }
+  // ─── Terms of use: whatever version the app asks for is accepted, unless a test asks for the first launch ───
+  let termsAcceptance = window.__MOCK_TERMS_PENDING ? null : { clauses_approved: true, accepted_at: '2026-10-01 09:00:00' }
 
   const handlers = {
-    get_terms_acceptance: ({ version }) => (termsAcceptance?.version === version ? termsAcceptance : null),
+    get_terms_acceptance: ({ version }) => (termsAcceptance ? { ...termsAcceptance, version } : null),
     accept_terms: ({ input }) => {
       if (!input.terms_accepted) throw new Error("Per usare l'app accetta le condizioni d'uso")
       if (!input.clauses_approved) throw new Error("Per usare l'app approva le clausole indicate (artt. 1341 e 1342 c.c.)")

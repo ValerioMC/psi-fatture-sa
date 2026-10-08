@@ -67,7 +67,7 @@ defineProps<{
   border-radius: 9px;
   color: var(--accent-ink);
   background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 78%, white), var(--accent) 55%, var(--accent-strong));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(20 18 60 / 0.2), 0 6px 14px -7px color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(var(--shade) / 0.2), 0 6px 14px -7px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 :root[data-theme='dark'] .page-icon {
   background: linear-gradient(160deg, var(--accent-strong), var(--accent) 60%, color-mix(in srgb, var(--accent) 70%, black));

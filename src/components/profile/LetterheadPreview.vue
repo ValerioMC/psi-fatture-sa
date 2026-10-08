@@ -47,6 +47,6 @@ const letterhead = computed(() => {
 /* The letterhead is paper in both themes: it previews a printed page. */
 .letterhead {
   background: #ffffff;
-  box-shadow: 0 0 0 1px rgb(40 34 20 / 0.08), 0 6px 16px -8px rgb(40 34 20 / 0.25);
+  box-shadow: 0 0 0 1px rgb(var(--shade) / 0.08), 0 6px 16px -8px rgb(var(--shade) / 0.25);
 }
 </style>

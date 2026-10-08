@@ -211,8 +211,11 @@ Il caricamento è rapido (~2 s) perché scrive direttamente nel SQLite bypassand
 
 ## Interfaccia
 
-Il sistema visivo si chiama "Carta e inchiostro": fondo carta caldo, testo inchiostro
-e un solo colore d'accento (indaco inchiostro) per selezione, azione primaria e focus.
+Il sistema visivo si chiama "Indaco e lavanda": ogni colore viene dall'icona dell'app.
+L'indaco della piastra (`#4540b8`, `#2c238c` in pressione) è l'unico accento per selezione,
+azione primaria e focus; il bianco-lavanda del Ψ dà le superfici chiare; testo, bordi e
+ombre portano una traccia dello stesso indaco. Il tema scuro parte dall'indaco più profondo
+e usa la lavanda come accento. Tutti i testi stanno sopra 4,5:1 di contrasto.
 
 - **Token**: `src/style.css` definisce una volta sola colori, tipografia, due raggi,
   tre ombre, la scala z-index e le transizioni. La palette standard di Tailwind è

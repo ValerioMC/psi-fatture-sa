@@ -49,7 +49,7 @@ const THEMES: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
   height: 5rem;
   overflow: hidden;
   border-radius: 6px;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(var(--shade) / 0.1);
 }
 .theme-swatch-side { width: 30%; }
 .theme-swatch-main { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 10px 8px; }
@@ -58,19 +58,19 @@ const THEMES: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
 .theme-swatch-main > span:nth-child(2) { width: 90%; }
 .theme-swatch-main > span:nth-child(3) { width: 45%; }
 
-[data-swatch='light'] .theme-swatch-side { background: #fbfaf7; box-shadow: inset -1px 0 0 #e4e0d7; }
-[data-swatch='light'] .theme-swatch-main { background: #f5f3ee; }
-[data-swatch='light'] .theme-swatch-main > span { background: #cfc9bc; }
-[data-swatch='light'] .theme-swatch-main > span:first-child { background: #3d35b0; }
+[data-swatch='light'] .theme-swatch-side { background: #f8f7fd; box-shadow: inset -1px 0 0 #e0ddf0; }
+[data-swatch='light'] .theme-swatch-main { background: #f3f2fa; }
+[data-swatch='light'] .theme-swatch-main > span { background: #c7c3e3; }
+[data-swatch='light'] .theme-swatch-main > span:first-child { background: #4540b8; }
 
-[data-swatch='dark'] .theme-swatch-side { background: #17161d; box-shadow: inset -1px 0 0 #2a2834; }
-[data-swatch='dark'] .theme-swatch-main { background: #121117; }
-[data-swatch='dark'] .theme-swatch-main > span { background: #3b3947; }
-[data-swatch='dark'] .theme-swatch-main > span:first-child { background: #aaa4ff; }
+[data-swatch='dark'] .theme-swatch-side { background: #151426; box-shadow: inset -1px 0 0 #2a2843; }
+[data-swatch='dark'] .theme-swatch-main { background: #100f1c; }
+[data-swatch='dark'] .theme-swatch-main > span { background: #3a3757; }
+[data-swatch='dark'] .theme-swatch-main > span:first-child { background: #aeaaff; }
 
 /* "Come il sistema" is literally half of each. */
-[data-swatch='system'] { background: linear-gradient(135deg, #f5f3ee 50%, #121117 50%); }
-[data-swatch='system'] .theme-swatch-side { background: linear-gradient(135deg, #fbfaf7 50%, #17161d 50%); }
-[data-swatch='system'] .theme-swatch-main > span { background: #8b8799; }
-[data-swatch='system'] .theme-swatch-main > span:first-child { background: #736bd8; }
+[data-swatch='system'] { background: linear-gradient(135deg, #f3f2fa 50%, #100f1c 50%); }
+[data-swatch='system'] .theme-swatch-side { background: linear-gradient(135deg, #f8f7fd 50%, #151426 50%); }
+[data-swatch='system'] .theme-swatch-main > span { background: #8d89ad; }
+[data-swatch='system'] .theme-swatch-main > span:first-child { background: #7a75e0; }
 </style>

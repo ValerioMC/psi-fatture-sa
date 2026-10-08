@@ -278,6 +278,6 @@ const historyTotal = computed(() => totalOf(history.value))
 .record-avatar {
   padding: 3px;
   background: var(--surface-raised);
-  box-shadow: 0 0 0 1px var(--border), 0 4px 10px -4px rgb(40 34 20 / 0.2);
+  box-shadow: 0 0 0 1px var(--border), 0 4px 10px -4px rgb(var(--shade) / 0.2);
 }
 </style>

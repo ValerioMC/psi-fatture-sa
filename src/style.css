@@ -1,11 +1,12 @@
 /*
- * PSI Fatture — design system: "Carta e inchiostro".
+ * PSI Fatture — design system: "Indaco e lavanda".
  *
- * The app is where a psychologist writes the one official document of their
- * practice, so the interface borrows from paper and ink: a warm paper canvas,
- * near-black ink for text, and a single deep ink-indigo for everything that
- * means "you are here / this is the action". Every colour, radius, shadow and
- * z-index is named once below; components reference the name, never a hex.
+ * Every colour comes from the app icon: its indigo plate (#4a47c2 at the top,
+ * #2c238c at the foot) is the ink for "you are here / this is the action", and
+ * its lavender-white Ψ is the light the surfaces are cut from. Neutrals carry a
+ * trace of that indigo, so text, borders and shadows belong to the same family.
+ * Every colour, radius, shadow and z-index is named once below; components
+ * reference the name, never a hex.
  *
  * Self-hosted fonts: the app must render identically offline.
  */
@@ -20,54 +21,57 @@
 :root {
   color-scheme: light;
 
-  /* Surfaces, back to front. */
-  --canvas: #f5f3ee;          /* the desk: warm paper behind everything */
-  --surface: #fbfaf7;         /* a pane: sidebar, sticky header */
+  /* Surfaces, back to front: the Ψ's lavender-white, deepening towards the plate. */
+  --canvas: #f3f2fa;          /* the desk: lavender mist behind everything */
+  --surface: #f8f7fd;         /* a pane: sidebar, sticky header */
   --surface-raised: #ffffff;  /* a sheet: card, row group, dialog */
-  --surface-sunken: #edeae3;  /* a well: segmented track, table head, code */
-  --surface-hover: #f3f1ec;   /* a row or control under the pointer */
-  --border: #e4e0d7;          /* hairline between things of equal rank */
-  --border-strong: #cfc9bc;   /* a control's edge, a divider that must be seen */
+  --surface-sunken: #e9e7f6;  /* a well: segmented track, table head, code */
+  --surface-hover: #efeefa;   /* a row or control under the pointer */
+  --border: #e0ddf0;          /* hairline between things of equal rank */
+  --border-strong: #c7c3e3;   /* a control's edge, a divider that must be seen */
 
-  /* Text: three tiers, each with a job. Ratios measured on --canvas. */
-  --text: #1d1b24;            /* 15.3:1 — headings, values, anything read first */
-  --text-muted: #56525e;      /* 6.9:1 — body copy and labels live here */
-  --text-subtle: #6e6a77;     /* 4.8:1 — chrome only: counts, hints, timestamps */
+  /* Text: three tiers of indigo ink, each with a job. Ratios measured on --canvas. */
+  --text: #1a1735;            /* 15.5:1 — headings, values, anything read first */
+  --text-muted: #4a4669;      /* 8.0:1 — body copy and labels live here */
+  --text-subtle: #625e84;     /* 5.5:1 — chrome only: counts, hints, timestamps */
 
   /* Ink: the ONE colour for selection, primary action and focus. */
-  --accent: #3d35b0;          /* 8.1:1 on canvas; the app icon's indigo */
-  --accent-strong: #2e2690;   /* pressed / hover of a filled accent surface */
-  --accent-ink: #ffffff;      /* text on a filled accent surface, 9.0:1 */
+  --accent: #4540b8;          /* 7.1:1 on canvas; the icon's plate */
+  --accent-strong: #2c238c;   /* pressed / hover: the icon's deepest indigo */
+  --accent-ink: #ffffff;      /* text on a filled accent surface, 7.8:1 */
 
-  /* Status: used for state only, never as decoration. */
-  --safe: #2a7550;            /* paid, completed */
-  --warn: #9a5d0c;            /* issued and waiting for money */
-  --danger: #b03a2b;          /* overdue, destructive */
+  /* Status: used for state only, never as decoration. All ≥ 4.5:1 on --surface-sunken. */
+  --safe: #1f7350;            /* paid, completed */
+  --warn: #9e5708;            /* issued and waiting for money */
+  --danger: #b4372a;          /* overdue, destructive */
 
-  /* Monogram tints for patient avatars: muted, never louder than the accent. */
-  --tint-1: #6b5b95;
-  --tint-2: #3f7a73;
-  --tint-3: #8a5a44;
-  --tint-4: #5b6f8f;
-  --tint-5: #7a6a3a;
-  --tint-6: #8f4f6b;
+  /* Monogram tints for patient avatars: cool and muted, never louder than the accent. */
+  --tint-1: #5b4fb0;
+  --tint-2: #2f7a78;
+  --tint-3: #8a4f86;
+  --tint-4: #4f6aa8;
+  --tint-5: #3f7a58;
+  --tint-6: #a04c6a;
+
+  /* Shadows are cast in the icon's indigo, not in grey: one channel triple for every shade. */
+  --shade: 34 28 110;
 
   /* Elevation: the only three shadows in the app. */
-  --shadow-lift: 0 1px 2px rgb(40 34 20 / 0.06), 0 8px 24px -12px rgb(40 34 20 / 0.16);
-  --shadow-modal: 0 2px 6px rgb(40 34 20 / 0.08), 0 32px 72px -20px rgb(40 34 20 / 0.32);
+  --shadow-lift: 0 1px 2px rgb(var(--shade) / 0.07), 0 8px 24px -12px rgb(var(--shade) / 0.2);
+  --shadow-modal: 0 2px 6px rgb(var(--shade) / 0.08), 0 32px 72px -20px rgb(var(--shade) / 0.36);
   --shadow-glow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
     0 6px 20px -6px color-mix(in srgb, var(--accent) 45%, transparent);
-  /* A sheet at rest: barely off the desk, with a lit top edge like paper under a lamp. */
-  --shadow-rest: 0 1px 1px rgb(40 34 20 / 0.03), 0 2px 6px -2px rgb(40 34 20 / 0.06);
+  /* A sheet at rest: barely off the desk, with a lit top edge. */
+  --shadow-rest: 0 1px 1px rgb(var(--shade) / 0.04), 0 2px 8px -2px rgb(var(--shade) / 0.08);
   --sheet-highlight: inset 0 1px 0 rgb(255 255 255 / 0.9);
-  /* Paper grain: multiplied over the canvas so it reads as fibre, not noise. */
-  --grain-opacity: 0.035;
+  /* Grain: multiplied over the canvas so large surfaces read as stock, not flat screen. */
+  --grain-opacity: 0.03;
   --grain-blend: multiply;
 
-  /* The room: two very large, very faint lights so the canvas is not a flat plane. */
-  --ambient-warm: rgb(214 170 110 / 0.10);
-  --ambient-cool: rgb(86 74 210 / 0.06);
-  --backdrop: rgb(29 27 36 / 0.32);
+  /* The room: two very large, very faint lights, the Ψ's lavender and the plate's indigo. */
+  --ambient-glow: rgb(160 154 245 / 0.16);
+  --ambient-ink: rgb(74 69 192 / 0.07);
+  --backdrop: rgb(26 23 53 / 0.34);
 
   /* The entire z-index scale. Used as z-(--z-modal); nothing else stacks. */
   --z-sticky: 20;
@@ -77,50 +81,51 @@
 }
 
 /*
- * Dark is "the studio at night": the same room with the lamp on. Surfaces get
- * lighter as they come forward, the ink turns to a pale periwinkle so it keeps
- * its 8:1 contrast, and status colours lift in value by the same amount.
+ * Dark is the icon turned down: surfaces are cut from the plate's deepest
+ * indigo and get lighter as they come forward, the ink becomes the Ψ's
+ * lavender so it keeps an 8:1 contrast, and status colours lift by as much.
  */
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --canvas: #121117;
-  --surface: #17161d;
-  --surface-raised: #1e1d26;
-  --surface-sunken: #0e0d12;
-  --surface-hover: #24232e;
-  --border: #2a2834;
-  --border-strong: #3b3947;
+  --canvas: #100f1c;
+  --surface: #151426;
+  --surface-raised: #1c1a30;
+  --surface-sunken: #0b0a15;
+  --surface-hover: #23213a;
+  --border: #2a2843;
+  --border-strong: #3a3757;
 
-  --text: #eeecf3;            /* 16.0:1 */
-  --text-muted: #b3afbf;      /* 8.8:1 */
-  --text-subtle: #8b8799;     /* 5.4:1 */
+  --text: #eeedf8;            /* 16.4:1 */
+  --text-muted: #b4b1cf;      /* 9.2:1 */
+  --text-subtle: #8d89ad;     /* 5.7:1 */
 
-  --accent: #aaa4ff;          /* 8.5:1 */
-  --accent-strong: #c8c3ff;
-  --accent-ink: #17133f;      /* 7.9:1 on accent */
+  --accent: #aeaaff;          /* 9.0:1 */
+  --accent-strong: #cbc8ff;
+  --accent-ink: #17133f;      /* 8.3:1 on accent */
 
   --safe: #5fc795;
-  --warn: #e1a54c;
+  --warn: #e6a94f;
   --danger: #f0826f;
 
-  --tint-1: #a898d6;
-  --tint-2: #7cc2b8;
-  --tint-3: #d39a80;
-  --tint-4: #93a8cc;
-  --tint-5: #c9b577;
-  --tint-6: #d78fae;
+  --tint-1: #aaa2f0;
+  --tint-2: #7cc2c0;
+  --tint-3: #d29ccd;
+  --tint-4: #98aee0;
+  --tint-5: #8fcaa4;
+  --tint-6: #e29ab4;
 
-  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.6);
-  --shadow-modal: 0 2px 6px rgb(0 0 0 / 0.6), 0 40px 80px -24px rgb(0 0 0 / 0.85);
-  --shadow-rest: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px -4px rgb(0 0 0 / 0.35);
+  --shade: 4 3 14;
+  --shadow-lift: 0 1px 2px rgb(var(--shade) / 0.5), 0 12px 32px -12px rgb(var(--shade) / 0.6);
+  --shadow-modal: 0 2px 6px rgb(var(--shade) / 0.6), 0 40px 80px -24px rgb(var(--shade) / 0.85);
+  --shadow-rest: 0 1px 2px rgb(var(--shade) / 0.35), 0 4px 12px -4px rgb(var(--shade) / 0.35);
   --sheet-highlight: inset 0 1px 0 rgb(255 255 255 / 0.045);
-  --grain-opacity: 0.05;
+  --grain-opacity: 0.045;
   --grain-blend: screen;
 
-  --ambient-warm: rgb(214 160 90 / 0.05);
-  --ambient-cool: rgb(126 114 255 / 0.07);
-  --backdrop: rgb(4 4 8 / 0.6);
+  --ambient-glow: rgb(126 114 255 / 0.08);
+  --ambient-ink: rgb(74 69 192 / 0.1);
+  --backdrop: rgb(4 3 14 / 0.62);
 }
 
 /* ── Tailwind theme: utilities resolve to the raw tokens above ──────────────── */
@@ -215,8 +220,8 @@ body {
   color: var(--text);
   background-color: var(--canvas);
   background-image:
-    radial-gradient(1200px 800px at 100% -10%, var(--ambient-warm), transparent 60%),
-    radial-gradient(1000px 700px at -10% 110%, var(--ambient-cool), transparent 60%);
+    radial-gradient(1200px 800px at 100% -10%, var(--ambient-glow), transparent 60%),
+    radial-gradient(1000px 700px at -10% 110%, var(--ambient-ink), transparent 60%);
   background-attachment: fixed;
   font-feature-settings: 'ss01', 'cv11';
   -webkit-font-smoothing: antialiased;
@@ -310,7 +315,7 @@ summary:focus-visible {
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
-  box-shadow: inset 0 1px 2px rgb(40 34 20 / 0.06);
+  box-shadow: inset 0 1px 2px rgb(var(--shade) / 0.06);
   transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
   outline: none;
 }
@@ -318,7 +323,7 @@ summary:focus-visible {
 .field:hover:not(:disabled):not(:focus) { border-color: color-mix(in srgb, var(--text-subtle) 55%, var(--border-strong)); }
 .field:focus {
   border-color: color-mix(in srgb, var(--field-tint) 62%, transparent);
-  box-shadow: inset 0 1px 2px rgb(40 34 20 / 0.06),
+  box-shadow: inset 0 1px 2px rgb(var(--shade) / 0.06),
     0 0 0 3px color-mix(in srgb, var(--field-tint) 16%, transparent);
 }
 .field[aria-invalid='true'] { --field-tint: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
@@ -333,7 +338,7 @@ select.field {
   padding-right: 2.25rem;
   cursor: pointer;
   /* Neutral mid-grey chevron: legible on both themes, a token cannot enter a data URI. */
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%238b8799' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.6' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%238d89ad' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.6' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 0.6rem center;
   background-repeat: no-repeat;
   background-size: 1.1rem;
@@ -344,12 +349,44 @@ input[type='number'].field::-webkit-inner-spin-button,
 input[type='number'].field::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type='number'].field { -moz-appearance: textfield; }
 
+/*
+ * Checkbox drawn in the palette: a recessed box like a field, filled with ink
+ * when checked. Centred on the text line, so it sits level with a table row.
+ */
 input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
   width: 1rem;
   height: 1rem;
-  accent-color: var(--accent);
+  margin: 0;
+  vertical-align: middle;
+  background: var(--surface-raised);
+  /* Darker than a hairline: an empty box must still reach 3:1 against its row. */
+  border: 1px solid color-mix(in srgb, var(--text-subtle) 55%, var(--border-strong));
+  border-radius: 4px;
+  box-shadow: inset 0 1px 1px rgb(var(--shade) / 0.06);
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
 }
+input[type='checkbox']::before {
+  content: '';
+  width: 0.625rem;
+  height: 0.625rem;
+  background: var(--accent-ink);
+  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 26%, 86% 12%, 37% 71%);
+  transform: scale(0);
+  transition: transform 120ms var(--ease-out-expo);
+}
+input[type='checkbox']:hover:not(:disabled) { border-color: var(--accent); }
+input[type='checkbox']:checked,
+input[type='checkbox']:indeterminate { background: var(--accent); border-color: var(--accent); }
+input[type='checkbox']:checked::before { transform: scale(1); }
+input[type='checkbox']:indeterminate::before { clip-path: inset(40% 8% 40% 8% round 1px); transform: scale(1); }
+input[type='checkbox']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type='checkbox']:disabled { opacity: 0.45; cursor: not-allowed; }
 
 }
 

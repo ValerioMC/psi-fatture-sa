@@ -78,7 +78,7 @@ watch([model, () => props.options], () => nextTick(measure), { deep: true })
   >
     <span
       v-if="thumb"
-      class="absolute top-0.5 bottom-0.5 rounded-[7px] bg-surface-raised shadow-[0_1px_2px_rgb(40_34_20/0.12),0_0_0_1px_var(--border)] transition-[left,width] duration-200 ease-out-expo"
+      class="absolute top-0.5 bottom-0.5 rounded-[7px] bg-surface-raised shadow-[0_1px_2px_rgb(var(--shade)/0.12),0_0_0_1px_var(--border)] transition-[left,width] duration-200 ease-out-expo"
       :style="{ left: `${thumb.left}px`, width: `${thumb.width}px` }"
       aria-hidden="true"
     />

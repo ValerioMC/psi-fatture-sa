@@ -9,9 +9,9 @@ export const BUTTON_BASE =
 
 export const BUTTON_VARIANT: Readonly<Record<ButtonVariant, string>> = {
   primary:
-    'bg-accent text-accent-ink hover:bg-accent-strong shadow-[inset_0_1px_0_rgb(255_255_255/0.16),0_1px_2px_rgb(20_18_60/0.18)]',
+    'bg-accent bg-linear-to-b from-white/12 to-transparent text-accent-ink hover:bg-accent-strong shadow-[inset_0_1px_0_rgb(255_255_255/0.16),0_1px_2px_rgb(var(--shade)/0.18)]',
   secondary:
-    'bg-surface-raised text-text border border-border-strong hover:bg-surface-hover shadow-[0_1px_1px_rgb(40_34_20/0.04)]',
+    'bg-surface-raised text-text border border-border-strong hover:bg-surface-hover shadow-[0_1px_1px_rgb(var(--shade)/0.04)]',
   ghost: 'text-text-muted hover:text-text hover:bg-surface-hover',
   danger: 'bg-danger text-white hover:brightness-110',
   'danger-quiet': 'text-text-subtle hover:text-danger hover:bg-danger-soft',

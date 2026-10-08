@@ -294,11 +294,11 @@ const CEILING_FILL = {
   box-shadow: inset -1px 0 0 var(--border);
 }
 
-.search-trigger { box-shadow: var(--sheet-highlight), 0 1px 1px rgb(40 34 20 / 0.03); }
+.search-trigger { box-shadow: var(--sheet-highlight), 0 1px 1px rgb(var(--shade) / 0.03); }
 
 .nav-marker {
   background: var(--surface-raised);
-  box-shadow: 0 0 0 1px var(--border), var(--sheet-highlight), 0 1px 2px rgb(40 34 20 / 0.06);
+  box-shadow: 0 0 0 1px var(--border), var(--sheet-highlight), 0 1px 2px rgb(var(--shade) / 0.06);
 }
 
 .ceiling-card {

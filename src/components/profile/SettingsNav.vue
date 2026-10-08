@@ -96,6 +96,6 @@ const DOT: Record<Tone, string> = {
 <style scoped>
 .settings-marker {
   background: var(--surface-raised);
-  box-shadow: 0 0 0 1px var(--border), var(--sheet-highlight), 0 1px 2px rgb(40 34 20 / 0.06);
+  box-shadow: 0 0 0 1px var(--border), var(--sheet-highlight), 0 1px 2px rgb(var(--shade) / 0.06);
 }
 </style>
