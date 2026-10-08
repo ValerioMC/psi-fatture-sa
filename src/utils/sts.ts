@@ -148,68 +148,6 @@ export function outcomeLabel(outcome: DispatchOutcome, count: number): string {
   }
 }
 
-export interface DispatchSegment {
-  outcome: DispatchOutcome
-  /** Width on the bar, 0–100. */
-  share: number
-}
-
-/** The bar's filled part split by outcome, in reading order, so it shows how the pass is going as well as how far. */
-export function dispatchSegments(progress: TsDispatchProgress): DispatchSegment[] {
-  if (progress.total <= 0) return []
-  return DISPATCH_OUTCOMES.map((outcome) => ({ outcome, share: Math.min(100, (progress.summary[outcome] / progress.total) * 100) }))
-}
-
-/** The outcome one report added over the previous one, or null when nothing was counted (a skipped call). */
-export function answeredOutcome(previous: TsDispatchSummary, next: TsDispatchSummary): DispatchOutcome | null {
-  return DISPATCH_OUTCOMES.find((outcome) => next[outcome] > previous[outcome]) ?? null
-}
-
-/** Outcomes already counted when a view first sees a pass, grouped since their order is unknown. */
-export function seedOutcomes(summary: TsDispatchSummary): DispatchOutcome[] {
-  return DISPATCH_OUTCOMES.flatMap((outcome) => Array<DispatchOutcome>(summary[outcome]).fill(outcome))
-}
-
-/**
- *   sending      calls still going out
- *   done         every submission got its answer
- *   attention    finished, but some were refused or wait for a retry
- *   interrupted  stopped early: the rest would fail the same way
- */
-export type DispatchPhase = 'sending' | 'done' | 'attention' | 'interrupted'
-
-export function dispatchPhase(progress: TsDispatchProgress): DispatchPhase {
-  if (!progress.finished) return 'sending'
-  if (progress.summary.blocked !== null) return 'interrupted'
-  return progress.summary.rejected > 0 || progress.summary.retrying > 0 ? 'attention' : 'done'
-}
-
-export interface DispatchHeadline {
-  title: string
-  sentence: string
-}
-
-/** What the progress card says about a pass: a title for the phase and one sentence of where it stands. */
-export function dispatchHeadline(progress: TsDispatchProgress): DispatchHeadline {
-  const { total, processed, summary } = progress
-  const sentSoFar = `${processed} di ${total} ${total === 1 ? 'trasmissione inviata' : 'trasmissioni inviate'}`
-  switch (dispatchPhase(progress)) {
-    case 'sending':
-      return { title: 'Invio al Sistema TS', sentence: `${sentSoFar}.` }
-    case 'done':
-      return {
-        title: 'Invio completato',
-        sentence: summary.accepted === total
-          ? total === 1 ? 'La trasmissione è stata accettata.' : `Tutte le ${total} trasmissioni sono state accettate.`
-          : `${sentSoFar}.`,
-      }
-    case 'attention':
-      return { title: 'Invio completato, alcune da rivedere', sentence: `${sentSoFar}: le scartate sono nella scheda Trasmissioni.` }
-    case 'interrupted':
-      return { title: 'Invio interrotto', sentence: `${summary.blocked ?? ''} ${sentSoFar}, le altre restano in coda.`.trim() }
-  }
-}
-
 /** Groups transmissions by invoice, for list views. */
 export function groupByInvoice(submissions: readonly TsSubmission[]): Map<number, TsSubmission[]> {
   const groups = new Map<number, TsSubmission[]>()

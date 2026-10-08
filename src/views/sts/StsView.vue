@@ -3,7 +3,7 @@
  * The Sistema Tessera Sanitaria page: what is still to send for the year,
  * every transmission with its outcome, and what the Sistema TS actually
  * holds month by month. Sending runs in the background every minute; the
- * header button sends now. Any pass in progress shows above the tabs.
+ * header button sends now. A send the user starts shows its progress in a dialog.
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -22,10 +22,10 @@ import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import StatTile from '@/components/ui/StatTile.vue'
 import type { SegmentOption } from '@/components/ui/types'
-import StsDispatchProgress from '@/components/sts/StsDispatchProgress.vue'
 import StsHistoryTable from '@/components/sts/StsHistoryTable.vue'
 import StsPendingTable from '@/components/sts/StsPendingTable.vue'
 import StsRemoteReport from '@/components/sts/StsRemoteReport.vue'
+import StsSendDialog from '@/components/sts/StsSendDialog.vue'
 import { formatCurrency, formatDateLong, todayIso } from '@/utils/format'
 import { plural } from '@/utils/labels'
 import { datePhrase, stsDeadlinePhase, stsDeadlines } from '@/utils/sts'
@@ -47,6 +47,7 @@ const loading = ref(true)
 const sending = ref(false)
 const busyId = ref<number | null>(null)
 const toCancel = ref<TsSubmission | null>(null)
+const sendDialogClosed = ref(false)
 
 async function loadYear(): Promise<void> {
   paidInvoices.value = await listInvoices({ year: year.value, status: 'paid' })
@@ -64,6 +65,10 @@ onMounted(async () => {
 })
 
 watch(year, () => { void loadYear() })
+watch(() => sts.dispatching, (running) => { if (running) sendDialogClosed.value = false })
+
+/** Only a send of several invoices gets the dialog: a single one already turns its row button. */
+const sendDialogOpen = computed(() => sts.dispatching && !sendDialogClosed.value && (sts.progress?.total ?? 0) > 1)
 
 const pending = computed(() =>
   paidInvoices.value.filter((invoice) => ['none', 'rejected', 'cancelled'].includes(sts.stateOf(invoice.id).kind)),
@@ -201,10 +206,6 @@ async function confirmCancel(): Promise<void> {
         </StatTile>
       </div>
 
-      <Transition name="rise">
-        <StsDispatchProgress v-if="sts.progress" class="mb-5" :progress="sts.progress" @dismiss="sts.dismissProgress" />
-      </Transition>
-
       <div class="settle mb-3 flex flex-wrap items-center gap-3" style="--settle: 1">
         <select v-model.number="year" class="field field-sm w-auto pr-8" aria-label="Anno delle spese">
           <option v-for="option in YEAR_OPTIONS" :key="option" :value="option">Spese {{ option }}</option>
@@ -227,6 +228,8 @@ async function confirmCancel(): Promise<void> {
         </Transition>
       </AppCard>
     </div>
+
+    <StsSendDialog v-if="sts.progress" :open="sendDialogOpen" :progress="sts.progress" @close="sendDialogClosed = true" />
 
     <ConfirmDialog
       :open="toCancel !== null"

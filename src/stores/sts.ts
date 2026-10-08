@@ -31,7 +31,7 @@ export const useStsStore = defineStore('sts', () => {
   const credentials = ref<TsCredentialsStatus | null>(null)
   const loaded = ref(false)
   const dispatching = ref(false)
-  /** The pass in progress, or the last one until a view dismisses it. */
+  /** The latest report of the pass in progress, or of the last one. */
   const progress = ref<TsDispatchProgress | null>(null)
   let progressSubscription: Promise<void> | null = null
 
@@ -106,9 +106,6 @@ export const useStsStore = defineStore('sts', () => {
     if (report.finished) void resync()
   }
 
-  function dismissProgress(): void {
-    progress.value = null
-  }
 
   async function saveSettings(input: TsSettings): Promise<TsSettings> {
     settings.value = await updateTsSettings(input)
@@ -117,6 +114,7 @@ export const useStsStore = defineStore('sts', () => {
 
   /** Sends what is due now; the background worker does the same every minute. */
   async function dispatch(): Promise<TsDispatchSummary> {
+    progress.value = null
     dispatching.value = true
     try {
       return await dispatchTsQueue()
@@ -177,6 +175,5 @@ export const useStsStore = defineStore('sts', () => {
     replace,
     cancel,
     withdraw,
-    dismissProgress,
   }
 })

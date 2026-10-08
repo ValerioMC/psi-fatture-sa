@@ -321,10 +321,11 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   servizio irraggiungibile fermano il giro senza scartare nulla.
 - **Avanzamento**: ogni giro, manuale ("Invia ora", "Trasmetti al Sistema TS") o del
   worker, emette l'evento Tauri `ts-dispatch-progress` (`TsDispatchProgress`: totale,
-  risposte ricevute, esiti, `finished` sull'ultimo) dopo ogni risposta. La pagina
-  *Sistema TS* lo mostra con `StsDispatchProgress` (percentuale, una tacca per
-  trasmissione colorata con l'esito) e alla fine ricarica l'elenco, così non mostra
-  mai uno stato già superato dalla coda.
+  risposte ricevute, esiti, `finished` sull'ultimo) dopo ogni risposta. Un invio di più
+  fatture avviato dall'utente apre `StsSendDialog` (anello che si riempie, "N di M"
+  fatture inviate, esiti); chiuderla non ferma l'invio, e alla fine l'esito arriva in un
+  avviso. I giri del worker non aprono nulla: a fine giro la pagina ricarica l'elenco,
+  così non mostra mai uno stato già superato dalla coda.
 - **Annullamento**: è una trasmissione a sé, con il proprio protocollo. Accettata, porta
   l'invio originale ad `annullata` e nell'elenco compare come *Cancellata dal TS* sotto
   il filtro *Annullate*, non tra le *Accettate*. "Annulla" si offre solo quando per
