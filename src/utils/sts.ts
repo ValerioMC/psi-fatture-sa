@@ -148,6 +148,52 @@ export function outcomeLabel(outcome: DispatchOutcome, count: number): string {
   }
 }
 
+/**
+ * How a finished pass went:
+ *
+ *   done         every answer was an acceptance
+ *   attention    some were refused or wait for a retry
+ *   interrupted  it stopped early: the rest would fail the same way
+ */
+export type DispatchVerdict = 'done' | 'attention' | 'interrupted'
+
+export function dispatchVerdict(summary: TsDispatchSummary): DispatchVerdict {
+  if (summary.blocked !== null) return 'interrupted'
+  return summary.rejected > 0 || summary.retrying > 0 ? 'attention' : 'done'
+}
+
+export interface DispatchReport {
+  title: string
+  sentence: string
+}
+
+/** What the send dialog says once the pass is over: how it went and what to do next. */
+export function finishedDispatchReport(progress: TsDispatchProgress): DispatchReport {
+  const { summary, total } = progress
+  switch (dispatchVerdict(summary)) {
+    case 'done':
+      return { title: 'Invio completato', sentence: `Tutte le ${total} fatture sono state accettate dal Sistema TS.` }
+    case 'attention':
+      return {
+        title: 'Invio completato, alcune da rivedere',
+        sentence: summary.rejected > 0
+          ? 'Trovi le scartate nella scheda Trasmissioni, con il motivo: correggile e ritrasmettile.'
+          : 'Quelle da ritentare restano in coda e ripartono da sole.',
+      }
+    case 'interrupted':
+      return { title: 'Invio interrotto', sentence: `${summary.blocked ?? ''} Le fatture non inviate restano in coda.`.trim() }
+  }
+}
+
+/**
+ * Closes a pass with the summary its command returned, in case its last event has
+ * not arrived yet: every counted answer is a processed transmission.
+ */
+export function settleProgress(progress: TsDispatchProgress, summary: TsDispatchSummary): TsDispatchProgress {
+  const answered = DISPATCH_OUTCOMES.reduce((sum, outcome) => sum + summary[outcome], 0)
+  return { ...progress, finished: true, summary, processed: Math.max(progress.processed, Math.min(progress.total, answered)) }
+}
+
 /** Groups transmissions by invoice, for list views. */
 export function groupByInvoice(submissions: readonly TsSubmission[]): Map<number, TsSubmission[]> {
   const groups = new Map<number, TsSubmission[]>()

@@ -4,6 +4,8 @@ import {
   cancellableSubmissionIds,
   datePhrase,
   dispatchPercent,
+  dispatchVerdict,
+  finishedDispatchReport,
   describeDispatch,
   describeSendKind,
   formatStsTimestamp,
@@ -13,6 +15,7 @@ import {
   invoiceDeadlineNotice,
   invoiceStsState,
   outcomeLabel,
+  settleProgress,
   stsActions,
   stsDeadlinePhase,
   stsDeadlines,
@@ -327,5 +330,41 @@ describe('outcomeLabel', () => {
     expect(outcomeLabel('accepted', 1)).toBe('1 accettata')
     expect(outcomeLabel('rejected', 3)).toBe('3 scartate')
     expect(outcomeLabel('retrying', 2)).toBe('2 da ritentare')
+  })
+})
+
+describe('finished pass', () => {
+  it('judges the pass from its summary', () => {
+    expect(dispatchVerdict(progress({}, { accepted: 4 }).summary)).toBe('done')
+    expect(dispatchVerdict(progress({}, { accepted: 3, rejected: 1 }).summary)).toBe('attention')
+    expect(dispatchVerdict(progress({}, { retrying: 1, blocked: 'Credenziali rifiutate.' }).summary)).toBe('interrupted')
+  })
+
+  it('reports a clean pass', () => {
+    expect(finishedDispatchReport(progress({ processed: 4, finished: true }, { accepted: 4 }))).toEqual({
+      title: 'Invio completato',
+      sentence: 'Tutte le 4 fatture sono state accettate dal Sistema TS.',
+    })
+  })
+
+  it('points to the rejected ones', () => {
+    expect(finishedDispatchReport(progress({ processed: 4, finished: true }, { accepted: 3, rejected: 1 })).sentence).toContain('scheda Trasmissioni')
+  })
+
+  it('gives the reason of an interrupted pass', () => {
+    expect(finishedDispatchReport(progress({ processed: 1, finished: true }, { retrying: 1, blocked: 'Sistema TS non raggiungibile.' }))).toEqual({
+      title: 'Invio interrotto',
+      sentence: 'Sistema TS non raggiungibile. Le fatture non inviate restano in coda.',
+    })
+  })
+
+  it('settles a pass whose last event is late from the returned summary', () => {
+    const settled = settleProgress(progress({ processed: 2 }), { ...progress({}).summary, accepted: 3, rejected: 1 })
+    expect(settled).toMatchObject({ processed: 4, finished: true })
+    expect(settled.summary.rejected).toBe(1)
+  })
+
+  it('never moves a settled pass backwards', () => {
+    expect(settleProgress(progress({ processed: 3 }), { ...progress({}).summary, accepted: 1 }).processed).toBe(3)
   })
 })

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * A send the user started, while it runs: a ring that fills as the Sistema TS
- * answers, with the count at its centre. An arc keeps orbiting between answers,
- * since one call can take seconds. Closing it leaves the send running.
+ * A send the user started: a ring that fills as the Sistema TS answers, the count
+ * at its centre, an arc orbiting between answers since a call can take seconds.
+ * At the end it holds the result, coloured by verdict, until the user closes it.
  */
 import { computed } from 'vue'
 import type { TsDispatchProgress } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppDialog from '@/components/ui/AppDialog.vue'
-import { DISPATCH_OUTCOMES, dispatchPercent, outcomeLabel } from '@/utils/sts'
+import { DISPATCH_OUTCOMES, dispatchPercent, dispatchVerdict, finishedDispatchReport, outcomeLabel } from '@/utils/sts'
 
 const props = defineProps<{ open: boolean; progress: TsDispatchProgress }>()
 const emit = defineEmits<{ close: [] }>()
@@ -19,6 +19,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 const ORBIT_LENGTH = CIRCUMFERENCE * 0.07
 
 const percent = computed(() => dispatchPercent(props.progress))
+const report = computed(() => (props.progress.finished ? finishedDispatchReport(props.progress) : null))
+const verdict = computed(() => (props.progress.finished ? dispatchVerdict(props.progress.summary) : undefined))
 const filledOffset = computed(() => CIRCUMFERENCE * (1 - percent.value / 100))
 
 const outcomes = computed(() =>
@@ -30,10 +32,18 @@ const outcomes = computed(() =>
 </script>
 
 <template>
-  <AppDialog :open="open" size="sm" title="Invio al Sistema TS" description="Le fatture partono una alla volta." @close="emit('close')">
+  <AppDialog
+    :open="open"
+    size="sm"
+    :title="report?.title ?? 'Invio al Sistema TS'"
+    :description="report?.sentence ?? 'Le fatture partono una alla volta.'"
+    @close="emit('close')"
+  >
+    <p class="sr-only" aria-live="polite">{{ report ? `${report.title}. ${report.sentence}` : '' }}</p>
     <div class="flex flex-col items-center">
       <div
         class="progress-ring relative"
+        :data-verdict="verdict"
         role="progressbar"
         aria-label="Fatture inviate al Sistema TS"
         :aria-valuemin="0"
@@ -60,9 +70,12 @@ const outcomes = computed(() =>
       </ul>
     </div>
 
+    <!-- One button for both states, so keyboard focus stays on it when the send ends. -->
     <template #footer>
-      <p class="mr-auto text-xs text-text-subtle">L’invio prosegue anche chiudendo.</p>
-      <AppButton variant="secondary" size="sm" data-autofocus @click="emit('close')">Continua in background</AppButton>
+      <p v-if="!progress.finished" class="text-xs text-text-subtle">L’invio prosegue anche chiudendo.</p>
+      <AppButton :variant="progress.finished ? 'primary' : 'secondary'" size="sm" class="ml-auto min-w-20" data-autofocus @click="emit('close')">
+        {{ progress.finished ? 'OK' : 'Continua in background' }}
+      </AppButton>
     </template>
   </AppDialog>
 </template>
@@ -78,8 +91,11 @@ const outcomes = computed(() =>
 .track { stroke: var(--surface-sunken); }
 .filled {
   stroke: var(--accent);
-  transition: stroke-dashoffset 700ms var(--ease-out-expo);
+  transition: stroke-dashoffset 700ms var(--ease-out-expo), stroke 400ms ease;
 }
+.progress-ring[data-verdict='done'] .filled { stroke: var(--safe); }
+.progress-ring[data-verdict='attention'] .filled { stroke: var(--warn); }
+.progress-ring[data-verdict='interrupted'] .filled { stroke: var(--danger); }
 /* Rides the track ahead of the fill, so the ring is visibly working while it waits for Sogei. */
 .orbit {
   stroke: color-mix(in srgb, var(--accent) 45%, transparent);

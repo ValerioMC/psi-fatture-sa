@@ -12,7 +12,7 @@ import { listClients, listInvoices } from '@/api'
 import { useDispatchAnnouncement } from '@/composables/useDispatchAnnouncement'
 import { useStsStore } from '@/stores/sts'
 import { useToastStore } from '@/stores/toast'
-import type { Client, Invoice, TsSubmission } from '@/types'
+import type { Client, Invoice, TsDispatchSummary, TsSubmission } from '@/types'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -47,7 +47,7 @@ const loading = ref(true)
 const sending = ref(false)
 const busyId = ref<number | null>(null)
 const toCancel = ref<TsSubmission | null>(null)
-const sendDialogClosed = ref(false)
+const sendDialogOpen = ref(false)
 
 async function loadYear(): Promise<void> {
   paidInvoices.value = await listInvoices({ year: year.value, status: 'paid' })
@@ -65,10 +65,23 @@ onMounted(async () => {
 })
 
 watch(year, () => { void loadYear() })
-watch(() => sts.dispatching, (running) => { if (running) sendDialogClosed.value = false })
 
-/** Only a send of several invoices gets the dialog: a single one already turns its row button. */
-const sendDialogOpen = computed(() => sts.dispatching && !sendDialogClosed.value && (sts.progress?.total ?? 0) > 1)
+/**
+ * A user send of several invoices opens the dialog on its first report; it stays open on
+ * the result until closed. A single send already turns its own row button.
+ */
+watch(
+  () => sts.progress,
+  (progress) => {
+    const starting = progress !== null && !progress.finished && progress.processed === 0
+    if (sts.dispatching && starting && progress.total > 1) sendDialogOpen.value = true
+  },
+)
+
+/** The open dialog already shows how the send ended; otherwise a toast says it. */
+function announceUnlessShown(summary: TsDispatchSummary): void {
+  if (!sendDialogOpen.value) announce(summary)
+}
 
 const pending = computed(() =>
   paidInvoices.value.filter((invoice) => ['none', 'rejected', 'cancelled'].includes(sts.stateOf(invoice.id).kind)),
@@ -95,7 +108,7 @@ const tabs = computed<SegmentOption<Tab>[]>(() => [
 async function sendNow(): Promise<void> {
   sending.value = true
   try {
-    announce(await sts.dispatch())
+    announceUnlessShown(await sts.dispatch())
   } catch (error) {
     toast.notifyError(error, 'Invio non riuscito')
   } finally {
@@ -111,7 +124,7 @@ async function send(invoiceIds: number[]): Promise<void> {
       const invoice = paidInvoices.value.find((i) => i.id === invoiceId)
       toast.notifyError(reason, invoice ? `Fattura N. ${invoice.invoice_number}` : 'Fattura')
     }
-    announce(summary)
+    announceUnlessShown(summary)
   } catch (error) {
     toast.notifyError(error, 'Invio non riuscito')
   } finally {
@@ -229,7 +242,7 @@ async function confirmCancel(): Promise<void> {
       </AppCard>
     </div>
 
-    <StsSendDialog v-if="sts.progress" :open="sendDialogOpen" :progress="sts.progress" @close="sendDialogClosed = true" />
+    <StsSendDialog v-if="sts.progress" :open="sendDialogOpen" :progress="sts.progress" @close="sendDialogOpen = false" />
 
     <ConfirmDialog
       :open="toCancel !== null"

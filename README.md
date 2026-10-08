@@ -323,9 +323,10 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   worker, emette l'evento Tauri `ts-dispatch-progress` (`TsDispatchProgress`: totale,
   risposte ricevute, esiti, `finished` sull'ultimo) dopo ogni risposta. Un invio di più
   fatture avviato dall'utente apre `StsSendDialog` (anello che si riempie, "N di M"
-  fatture inviate, esiti); chiuderla non ferma l'invio, e alla fine l'esito arriva in un
-  avviso. I giri del worker non aprono nulla: a fine giro la pagina ricarica l'elenco,
-  così non mostra mai uno stato già superato dalla coda.
+  fatture inviate, esiti); chiuderla non ferma l'invio. A fine invio resta aperta
+  sull'esito (anello verde, ambra o rosso, cosa fare) finché l'utente preme OK; se era
+  stata chiusa prima, l'esito arriva in un avviso. I giri del worker non aprono nulla: a
+  fine giro la pagina ricarica l'elenco, così non mostra mai uno stato già superato.
 - **Annullamento**: è una trasmissione a sé, con il proprio protocollo. Accettata, porta
   l'invio originale ad `annullata` e nell'elenco compare come *Cancellata dal TS* sotto
   il filtro *Annullate*, non tra le *Accettate*. "Annulla" si offre solo quando per

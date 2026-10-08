@@ -21,7 +21,7 @@ import {
 } from '@/api'
 import type { TsCredentialsStatus, TsDispatchProgress, TsDispatchSummary, TsEnvironment, TsSettings, TsSubmission } from '@/types'
 import { useToastStore } from '@/stores/toast'
-import { cancellableSubmissionIds, groupByInvoice, invoiceStsState, type InvoiceStsState } from '@/utils/sts'
+import { cancellableSubmissionIds, groupByInvoice, invoiceStsState, settleProgress, type InvoiceStsState } from '@/utils/sts'
 
 export const useStsStore = defineStore('sts', () => {
   const toast = useToastStore()
@@ -112,12 +112,19 @@ export const useStsStore = defineStore('sts', () => {
     return settings.value
   }
 
+  /** The command's summary is final: it closes a pass whose last event has not arrived yet. */
+  function settleProgressWith(summary: TsDispatchSummary): void {
+    if (progress.value !== null && !progress.value.finished) progress.value = settleProgress(progress.value, summary)
+  }
+
   /** Sends what is due now; the background worker does the same every minute. */
   async function dispatch(): Promise<TsDispatchSummary> {
     progress.value = null
     dispatching.value = true
     try {
-      return await dispatchTsQueue()
+      const summary = await dispatchTsQueue()
+      settleProgressWith(summary)
+      return summary
     } finally {
       await refresh()
       dispatching.value = false
