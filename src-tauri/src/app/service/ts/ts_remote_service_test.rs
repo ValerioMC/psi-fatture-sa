@@ -50,7 +50,7 @@ async fn sent_invoice_is_looked_up_by_the_id_it_was_accepted_with() {
     let db = setup().await;
     let gateway = FakeGateway::default();
     let sent = queue::enqueue_invio(&db, 1).await.unwrap();
-    ts_dispatch_service::dispatch_due(&db, &store(), &gateway, at("2099-01-01 10:00:00"))
+    ts_dispatch_service::dispatch_due(&db, &store(), &gateway, &|_| {}, at("2099-01-01 10:00:00"))
         .await
         .unwrap();
     let sent_id = ts_submission_repository::load(&db, sent.id)

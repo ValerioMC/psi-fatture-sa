@@ -1,7 +1,9 @@
 /**
  * The Sistema TS as the app knows it: every local transmission, the
  * settings, and the actions that queue work and then send it right away.
- * Views read one invoice's state through `stateOf`.
+ * Views read one invoice's state through `stateOf`. The progress of each pass,
+ * the background worker's included, arrives as events and refreshes the list
+ * when the pass ends, so what is shown never lags behind the queue.
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -14,19 +16,25 @@ import {
   getTsEnvironments,
   getTsSettings,
   listTsSubmissions,
+  onTsDispatchProgress,
   updateTsSettings,
   withdrawTsSubmission,
 } from '@/api'
-import type { TsCredentialsStatus, TsDispatchSummary, TsEnvironment, TsSettings, TsSubmission } from '@/types'
-import { groupByInvoice, invoiceStsState, type InvoiceStsState } from '@/utils/sts'
+import type { TsCredentialsStatus, TsDispatchProgress, TsDispatchSummary, TsEnvironment, TsSettings, TsSubmission } from '@/types'
+import { useToastStore } from '@/stores/toast'
+import { cancellableSubmissionIds, groupByInvoice, invoiceStsState, type InvoiceStsState } from '@/utils/sts'
 
 export const useStsStore = defineStore('sts', () => {
+  const toast = useToastStore()
   const submissions = ref<TsSubmission[]>([])
   const settings = ref<TsSettings | null>(null)
   const environments = ref<TsEnvironment[]>(['produzione'])
   const credentials = ref<TsCredentialsStatus | null>(null)
   const loaded = ref(false)
   const dispatching = ref(false)
+  /** The pass in progress, or the last one until a view dismisses it. */
+  const progress = ref<TsDispatchProgress | null>(null)
+  let progressSubscription: Promise<void> | null = null
 
   const environment = computed<TsEnvironment>(() => settings.value?.environment ?? 'produzione')
   /** Only a developer build offers the Sogei test environment. */
@@ -34,6 +42,7 @@ export const useStsStore = defineStore('sts', () => {
   /** Both secrets stored: nothing stops a transmission on this side. */
   const connected = computed(() => credentials.value !== null && credentials.value.password_configured && credentials.value.pincode_configured)
   const byInvoice = computed(() => groupByInvoice(submissions.value))
+  const cancellableIds = computed(() => cancellableSubmissionIds(byInvoice.value, environment.value))
 
   function stateOf(invoiceId: number): InvoiceStsState {
     return invoiceStsState(byInvoice.value.get(invoiceId) ?? [], environment.value)
@@ -54,7 +63,13 @@ export const useStsStore = defineStore('sts', () => {
   })
 
   async function load(): Promise<void> {
-    const [list, current, secrets, offered] = await Promise.all([listTsSubmissions(), getTsSettings(), getTsCredentialsStatus(), getTsEnvironments()])
+    const [list, current, secrets, offered] = await Promise.all([
+      listTsSubmissions(),
+      getTsSettings(),
+      getTsCredentialsStatus(),
+      getTsEnvironments(),
+      subscribeToProgress(),
+    ])
     submissions.value = list
     environments.value = offered
     settings.value = current
@@ -64,6 +79,28 @@ export const useStsStore = defineStore('sts', () => {
 
   async function refresh(): Promise<void> {
     submissions.value = await listTsSubmissions()
+  }
+
+  /** Subscribes once for the whole session; a failed attempt is forgotten so the next load retries it. */
+  function subscribeToProgress(): Promise<void> {
+    progressSubscription ??= onTsDispatchProgress(receiveProgress).then(
+      () => undefined,
+      (error: unknown) => {
+        progressSubscription = null
+        throw error
+      },
+    )
+    return progressSubscription
+  }
+
+  function receiveProgress(report: TsDispatchProgress): void {
+    progress.value = report
+    if (!report.finished) return
+    refresh().catch((error: unknown) => toast.notifyError(error, 'Elenco del Sistema TS non aggiornato'))
+  }
+
+  function dismissProgress(): void {
+    progress.value = null
   }
 
   async function saveSettings(input: TsSettings): Promise<TsSettings> {
@@ -118,6 +155,8 @@ export const useStsStore = defineStore('sts', () => {
     connected,
     loaded,
     dispatching,
+    progress,
+    cancellableIds,
     environment,
     testAvailable,
     counts,
@@ -130,5 +169,6 @@ export const useStsStore = defineStore('sts', () => {
     replace,
     cancel,
     withdraw,
+    dismissProgress,
   }
 })

@@ -1,13 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import type { TsSubmission } from '@/types'
+import type { TsDispatchProgress, TsSubmission } from '@/types'
 import {
+  answeredOutcome,
+  cancellableSubmissionIds,
   datePhrase,
+  dispatchHeadline,
+  dispatchPercent,
+  dispatchPhase,
+  dispatchSegments,
   describeDispatch,
   describeSendKind,
   formatStsTimestamp,
   groupByInvoice,
+  historyBadge,
+  historyGroup,
   invoiceDeadlineNotice,
   invoiceStsState,
+  seedOutcomes,
   stsActions,
   stsDeadlinePhase,
   stsDeadlines,
@@ -247,5 +256,122 @@ describe('invoiceDeadlineNotice', () => {
     expect(invoiceDeadlineNotice(paid, true, inWindow)?.tone).not.toBe('danger')
     expect(invoiceDeadlineNotice(paid, false, '2028-01-01')?.tone).toBe('danger')
     expect(invoiceDeadlineNotice(paid, true, '2028-01-01')).toBeNull()
+  })
+})
+
+function progress(overrides: Partial<TsDispatchProgress>, summary: Partial<TsDispatchProgress['summary']> = {}): TsDispatchProgress {
+  return {
+    total: 4,
+    processed: 0,
+    finished: false,
+    ...overrides,
+    summary: { accepted: 0, rejected: 0, retrying: 0, waiting_other_environment: 0, blocked: null, ...summary },
+  }
+}
+
+describe('cancellableSubmissionIds', () => {
+  it('offers the live send of an accepted invoice', () => {
+    const sent = submission({ id: 1, status: 'accettata' })
+    expect([...cancellableSubmissionIds(groupByInvoice([sent]), 'produzione')]).toEqual([1])
+  })
+
+  it('withholds it while a cancellation waits in the queue', () => {
+    const sent = submission({ id: 1, status: 'accettata' })
+    const cancelling = submission({ id: 2, operation: 'annullamento', status: 'non_inviata', target_submission_id: 1 })
+    expect(cancellableSubmissionIds(groupByInvoice([sent, cancelling]), 'produzione').size).toBe(0)
+  })
+
+  it('withholds it once the cancellation is accepted', () => {
+    const sent = submission({ id: 1, status: 'annullata' })
+    const cancelled = submission({ id: 2, operation: 'annullamento', status: 'accettata', target_submission_id: 1 })
+    expect(cancellableSubmissionIds(groupByInvoice([sent, cancelled]), 'produzione').size).toBe(0)
+  })
+
+  it('ignores the other environment', () => {
+    const sent = submission({ id: 1, status: 'accettata', environment: 'test' })
+    expect(cancellableSubmissionIds(groupByInvoice([sent]), 'produzione').size).toBe(0)
+  })
+})
+
+describe('historyGroup and historyBadge', () => {
+  it('files an accepted cancellation with the cancelled, not with the accepted', () => {
+    const cancellation = { operation: 'annullamento', status: 'accettata' } as const
+    expect(historyGroup(cancellation)).toBe('cancelled')
+    expect(historyBadge(cancellation)).toEqual({ label: 'Cancellata dal TS', tone: 'neutral' })
+  })
+
+  it('keeps accepted sends and replacements under accepted', () => {
+    expect(historyGroup({ operation: 'invio', status: 'accettata' })).toBe('accepted')
+    expect(historyGroup({ operation: 'sostituzione', status: 'accettata' })).toBe('accepted')
+    expect(historyBadge({ operation: 'invio', status: 'accettata' }).label).toBe('Accettata')
+  })
+
+  it('sorts the remaining statuses', () => {
+    expect(historyGroup({ operation: 'invio', status: 'annullata' })).toBe('cancelled')
+    expect(historyGroup({ operation: 'invio', status: 'inviata' })).toBe('queue')
+    expect(historyGroup({ operation: 'invio', status: 'scartata' })).toBe('rejected')
+    expect(historyGroup({ operation: 'invio', status: 'sostituita' })).toBe('retired')
+  })
+})
+
+describe('dispatch progress', () => {
+  it('measures the share answered so far', () => {
+    expect(dispatchPercent(progress({ processed: 1, total: 3 }))).toBe(33)
+    expect(dispatchPercent(progress({ processed: 3, total: 3 }))).toBe(100)
+    expect(dispatchPercent(progress({ processed: 0, total: 0 }))).toBe(0)
+  })
+
+  it('leaves a stopped pass where it stopped', () => {
+    expect(dispatchPercent(progress({ processed: 1, total: 4, finished: true }, { blocked: 'Servizio non raggiungibile' }))).toBe(25)
+  })
+
+  it('names the phase from the final summary', () => {
+    expect(dispatchPhase(progress({ processed: 2 }))).toBe('sending')
+    expect(dispatchPhase(progress({ processed: 4, finished: true }, { accepted: 4 }))).toBe('done')
+    expect(dispatchPhase(progress({ processed: 4, finished: true }, { accepted: 3, rejected: 1 }))).toBe('attention')
+    expect(dispatchPhase(progress({ processed: 1, finished: true }, { retrying: 1, blocked: 'Credenziali rifiutate' }))).toBe('interrupted')
+  })
+
+  it('splits the filled bar by outcome', () => {
+    expect(dispatchSegments(progress({ processed: 3 }, { accepted: 2, rejected: 1 }))).toEqual([
+      { outcome: 'accepted', share: 50 },
+      { outcome: 'rejected', share: 25 },
+      { outcome: 'retrying', share: 0 },
+    ])
+    expect(dispatchSegments(progress({ total: 0 }))).toEqual([])
+  })
+})
+
+describe('answer sequence', () => {
+  const zero = progress({}).summary
+
+  it('names the outcome a report added', () => {
+    expect(answeredOutcome(zero, { ...zero, rejected: 1 })).toBe('rejected')
+    expect(answeredOutcome({ ...zero, accepted: 1 }, { ...zero, accepted: 2 })).toBe('accepted')
+    expect(answeredOutcome(zero, zero)).toBeNull()
+  })
+
+  it('seeds a pass seen halfway through, grouped by outcome', () => {
+    expect(seedOutcomes({ ...zero, accepted: 2, retrying: 1 })).toEqual(['accepted', 'accepted', 'retrying'])
+  })
+})
+
+describe('dispatchHeadline', () => {
+  it('counts what went out while sending', () => {
+    expect(dispatchHeadline(progress({ processed: 1, total: 4 }))).toEqual({ title: 'Invio al Sistema TS', sentence: '1 di 4 trasmissioni inviate.' })
+  })
+
+  it('says so when every transmission was accepted', () => {
+    expect(dispatchHeadline(progress({ processed: 4, finished: true }, { accepted: 4 })).sentence).toBe('Tutte le 4 trasmissioni sono state accettate.')
+    expect(dispatchHeadline(progress({ total: 1, processed: 1, finished: true }, { accepted: 1 })).sentence).toBe('La trasmissione è stata accettata.')
+  })
+
+  it('points to the rejected ones', () => {
+    expect(dispatchHeadline(progress({ processed: 4, finished: true }, { accepted: 3, rejected: 1 })).title).toBe('Invio completato, alcune da rivedere')
+  })
+
+  it('gives the reason of an interrupted pass and what stays queued', () => {
+    const headline = dispatchHeadline(progress({ processed: 1, finished: true }, { retrying: 1, blocked: 'Sistema TS non raggiungibile.' }))
+    expect(headline).toEqual({ title: 'Invio interrotto', sentence: 'Sistema TS non raggiungibile. 1 di 4 trasmissioni inviate, le altre restano in coda.' })
   })
 })

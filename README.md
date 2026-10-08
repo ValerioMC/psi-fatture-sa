@@ -319,6 +319,19 @@ nella risposta. Tutto gira nel binario Rust: nessun servizio di terze parti.
   `annullata` / `sostituita`). Un worker la svuota ogni minuto; errori di rete e
   `WS99` si ritentano con backoff da 1 minuto a 6 ore; credenziali rifiutate o
   servizio irraggiungibile fermano il giro senza scartare nulla.
+- **Avanzamento**: ogni giro, manuale ("Invia ora", "Trasmetti al Sistema TS") o del
+  worker, emette l'evento Tauri `ts-dispatch-progress` (`TsDispatchProgress`: totale,
+  risposte ricevute, esiti, `finished` sull'ultimo) dopo ogni risposta. La pagina
+  *Sistema TS* lo mostra con `StsDispatchProgress` (percentuale, una tacca per
+  trasmissione colorata con l'esito) e alla fine ricarica l'elenco, così non mostra
+  mai uno stato già superato dalla coda.
+- **Annullamento**: è una trasmissione a sé, con il proprio protocollo. Accettata, porta
+  l'invio originale ad `annullata` e nell'elenco compare come *Cancellata dal TS* sotto
+  il filtro *Annullate*, non tra le *Accettate*. "Annulla" si offre solo quando per
+  quella fattura non c'è già un'altra trasmissione in coda.
+- **Numero del documento**: al Sistema TS va il numero della fattura così com'è
+  (`numDocumento`) con la data di emissione; il `/anno` che l'app mostra accanto al
+  numero è solo un'etichetta locale.
 - **Lista e verifica**: report mensile (`ReportMensile730`, per data di invio o di
   pagamento) e interrogazione puntuale del singolo documento.
 - **Scadenze**: invio entro il 31 gennaio dell'anno dopo il pagamento, correzioni

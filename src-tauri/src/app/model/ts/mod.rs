@@ -1,6 +1,7 @@
 pub mod ts_call_response;
 pub mod ts_connection_check;
 pub mod ts_credentials_status;
+pub mod ts_dispatch_progress;
 pub mod ts_dispatch_summary;
 pub mod ts_document_id;
 pub mod ts_environment;
@@ -25,6 +26,7 @@ pub mod update_ts_settings_input;
 pub use ts_call_response::TsCallResponse;
 pub use ts_connection_check::TsConnectionCheck;
 pub use ts_credentials_status::TsCredentialsStatus;
+pub use ts_dispatch_progress::TsDispatchProgress;
 pub use ts_dispatch_summary::TsDispatchSummary;
 pub use ts_document_id::TsDocumentId;
 pub use ts_environment::TsEnvironment;

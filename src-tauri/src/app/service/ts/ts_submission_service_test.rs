@@ -80,6 +80,20 @@ async fn follow_ups_target_only_accepted_submissions() {
 }
 
 #[tokio::test]
+async fn a_follow_up_on_a_retired_submission_says_where_it_stands() {
+    let db = setup().await;
+    let original = enqueue_invio(&db, 1).await.unwrap();
+    force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
+    force_status(&db, original.id, TsSubmissionStatus::Annullata).await;
+
+    let reason = enqueue_cancellation(&db, original.id)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(reason.contains("già stata annullata"));
+}
+
+#[tokio::test]
 async fn replacement_requires_the_invoice_to_still_be_paid() {
     let db = setup().await;
     let original = enqueue_invio(&db, 1).await.unwrap();

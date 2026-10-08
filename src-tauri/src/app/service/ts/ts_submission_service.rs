@@ -180,13 +180,25 @@ fn ensure_accepted(
     target: &crate::app::entity::ts_submission::Model,
     operation: TsOperation,
 ) -> Result<(), AppError> {
-    if TsSubmissionStatus::parse(&target.status)? != TsSubmissionStatus::Accettata {
+    let status = TsSubmissionStatus::parse(&target.status)?;
+    if status != TsSubmissionStatus::Accettata {
         return Err(AppError::Conflict(format!(
-            "Si può chiedere {} solo di una trasmissione accettata",
+            "{}: si può chiedere {} solo di una trasmissione accettata",
+            where_it_stands(status),
             follow_up_label(operation)
         )));
     }
     Ok(())
+}
+
+/// Why a follow-up has nothing to act on, said from the target's current status.
+fn where_it_stands(status: TsSubmissionStatus) -> &'static str {
+    match status {
+        TsSubmissionStatus::Annullata => "Questa trasmissione è già stata annullata",
+        TsSubmissionStatus::Sostituita => "Questa trasmissione è già stata sostituita",
+        TsSubmissionStatus::Scartata => "Questa trasmissione è stata scartata",
+        _ => "Questa trasmissione non ha ancora un esito",
+    }
 }
 
 /// A replacement must still be buildable from the invoice's current data.

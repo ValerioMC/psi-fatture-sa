@@ -1,5 +1,6 @@
 /** Thin wrapper around Tauri invoke for all backend commands. */
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
   AcceptTermsInput,
   Appointment,
@@ -34,6 +35,7 @@ import type {
   TermsAcceptance,
   TsConnectionCheck,
   TsCredentialsStatus,
+  TsDispatchProgress,
   TsDispatchSummary,
   TsEnvironment,
   TsQueryResult,
@@ -178,6 +180,10 @@ export const enqueueTsCancellation = (submissionId: number) =>
 export const withdrawTsSubmission = (submissionId: number) =>
   invoke<void>('withdraw_ts_submission', { submissionId })
 export const dispatchTsQueue = () => invoke<TsDispatchSummary>('dispatch_ts_queue')
+
+/** Every pass over the queue, manual or from the background worker, reports here as it goes. */
+export const onTsDispatchProgress = (handler: (progress: TsDispatchProgress) => void): Promise<UnlistenFn> =>
+  listen<TsDispatchProgress>('ts-dispatch-progress', (event) => handler(event.payload))
 
 export const queryTsInvoice = (invoiceId: number) =>
   invoke<TsQueryResult>('query_ts_invoice', { invoiceId })

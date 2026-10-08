@@ -3,7 +3,7 @@
  * The Sistema Tessera Sanitaria page: what is still to send for the year,
  * every transmission with its outcome, and what the Sistema TS actually
  * holds month by month. Sending runs in the background every minute; the
- * header button sends now.
+ * header button sends now. Any pass in progress shows above the tabs.
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -22,6 +22,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import StatTile from '@/components/ui/StatTile.vue'
 import type { SegmentOption } from '@/components/ui/types'
+import StsDispatchProgress from '@/components/sts/StsDispatchProgress.vue'
 import StsHistoryTable from '@/components/sts/StsHistoryTable.vue'
 import StsPendingTable from '@/components/sts/StsPendingTable.vue'
 import StsRemoteReport from '@/components/sts/StsRemoteReport.vue'
@@ -73,15 +74,6 @@ const registeredTotal = computed(() => registered.value.reduce((sum, invoice) =>
 
 const yearSubmissions = computed(() => sts.submissions.filter((s) => s.invoice_year === year.value))
 
-const liveIds = computed(() => {
-  const ids = new Set<number>()
-  for (const invoiceId of new Set(sts.submissions.map((s) => s.invoice_id))) {
-    const live = sts.stateOf(invoiceId).live
-    if (live) ids.add(live.id)
-  }
-  return ids
-})
-
 const deadline = computed(() => {
   const dates = stsDeadlines(year.value)
   const phase = stsDeadlinePhase(`${year.value}-12-31`, todayIso())
@@ -122,12 +114,14 @@ async function send(invoiceIds: number[]): Promise<void> {
   }
 }
 
+/** A refused action means the list was behind the queue: reload it so the row shows where it stands. */
 async function withRow(submission: TsSubmission, action: () => Promise<void>): Promise<void> {
   busyId.value = submission.id
   try {
     await action()
   } catch (error) {
     toast.notifyError(error, 'Sistema TS')
+    await sts.refresh().catch((reloadError: unknown) => toast.notifyError(reloadError, 'Elenco del Sistema TS non aggiornato'))
   } finally {
     busyId.value = null
   }
@@ -207,6 +201,10 @@ async function confirmCancel(): Promise<void> {
         </StatTile>
       </div>
 
+      <Transition name="rise">
+        <StsDispatchProgress v-if="sts.progress" class="mb-5" :progress="sts.progress" @dismiss="sts.dismissProgress" />
+      </Transition>
+
       <div class="settle mb-3 flex flex-wrap items-center gap-3" style="--settle: 1">
         <select v-model.number="year" class="field field-sm w-auto pr-8" aria-label="Anno delle spese">
           <option v-for="option in YEAR_OPTIONS" :key="option" :value="option">Spese {{ option }}</option>
@@ -221,7 +219,7 @@ async function confirmCancel(): Promise<void> {
             <StsPendingTable :invoices="pending" :clients="clients" :sending="sending" @send="send" />
           </div>
           <div v-else-if="tab === 'history'" key="history">
-            <StsHistoryTable :submissions="yearSubmissions" :live-ids="liveIds" :busy-id="busyId" @withdraw="withdraw" @cancel="toCancel = $event" @resend="resend" />
+            <StsHistoryTable :submissions="yearSubmissions" :cancellable-ids="sts.cancellableIds" :busy-id="busyId" @withdraw="withdraw" @cancel="toCancel = $event" @resend="resend" />
           </div>
           <div v-else key="remote">
             <StsRemoteReport />

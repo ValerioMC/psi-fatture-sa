@@ -7,6 +7,7 @@ use crate::test_support::ts_call_responses::{accepted, rejected};
 use crate::test_support::ts_database::setup;
 use crate::test_support::{FakeGateway, InMemorySecretStore, RecordedCall};
 use sea_orm::ConnectionTrait;
+use std::sync::Mutex;
 
 fn store() -> InMemorySecretStore {
     let store = InMemorySecretStore::default();
@@ -16,7 +17,32 @@ fn store() -> InMemorySecretStore {
 }
 
 async fn run(db: &DatabaseConnection, gateway: &FakeGateway, now: &str) -> TsDispatchSummary {
-    dispatch_due(db, &store(), gateway, at(now)).await.unwrap()
+    dispatch_due(db, &store(), gateway, &|_| {}, at(now))
+        .await
+        .unwrap()
+}
+
+/// Runs a pass and returns every progress report it made, in order.
+async fn run_watched(
+    db: &DatabaseConnection,
+    gateway: &FakeGateway,
+) -> (TsDispatchSummary, Vec<TsDispatchProgress>) {
+    let reports = Mutex::new(Vec::new());
+    let listener = |progress: &TsDispatchProgress| reports.lock().unwrap().push(progress.clone());
+    let summary = dispatch_due(db, &store(), gateway, &listener, at("2099-01-01 10:00:00"))
+        .await
+        .unwrap();
+    (summary, reports.into_inner().unwrap())
+}
+
+async fn queue_two_paid_invoices(db: &DatabaseConnection) {
+    db.execute_unprepared(
+        "UPDATE invoices SET status = 'paid', paid_date = '2026-03-07' WHERE id = 3",
+    )
+    .await
+    .unwrap();
+    queue::enqueue_invio(db, 1).await.unwrap();
+    queue::enqueue_invio(db, 3).await.unwrap();
 }
 
 async fn load(db: &DatabaseConnection, id: i64) -> TsSubmission {
@@ -62,6 +88,7 @@ async fn missing_credentials_block_the_pass_without_touching_the_queue() {
         &db,
         &InMemorySecretStore::default(),
         &gateway,
+        &|_| {},
         at("2099-01-01 10:00:00"),
     )
     .await
@@ -77,20 +104,59 @@ async fn missing_credentials_block_the_pass_without_touching_the_queue() {
 #[tokio::test]
 async fn unreachable_service_stops_the_pass() {
     let db = setup().await;
-    db.execute_unprepared(
-        "UPDATE invoices SET status = 'paid', paid_date = '2026-03-07' WHERE id = 3",
-    )
-    .await
-    .unwrap();
-    queue::enqueue_invio(&db, 1).await.unwrap();
-    let second = queue::enqueue_invio(&db, 3).await.unwrap();
+    queue_two_paid_invoices(&db).await;
     let gateway = FakeGateway::default();
     gateway.script(Err(TsGatewayError::Network("timed out".to_string())));
 
     let summary = run(&db, &gateway, "2099-01-01 10:00:00").await;
     assert!(summary.blocked.unwrap().contains("non raggiungibile"));
     assert_eq!(gateway.recorded().len(), 1);
-    assert_eq!(load(&db, second.id).await.attempt_count, 0);
+    let second = queue::list(&db, Default::default()).await.unwrap();
+    assert!(second
+        .iter()
+        .any(|s| s.invoice_id == 3 && s.attempt_count == 0));
+}
+
+#[tokio::test]
+async fn reports_each_answer_then_the_end_of_the_pass() {
+    let db = setup().await;
+    queue_two_paid_invoices(&db).await;
+    let gateway = FakeGateway::default();
+    gateway.script(Ok(accepted("1")));
+    gateway.script(Ok(rejected("S002")));
+
+    let (summary, reports) = run_watched(&db, &gateway).await;
+    let steps: Vec<(u32, u32, bool)> = reports
+        .iter()
+        .map(|p| (p.processed, p.total, p.finished))
+        .collect();
+    assert_eq!(
+        steps,
+        [(0, 2, false), (1, 2, false), (2, 2, false), (2, 2, true)]
+    );
+    assert_eq!(reports[1].summary.accepted, 1);
+    assert_eq!(reports.last().unwrap().summary, summary);
+}
+
+#[tokio::test]
+async fn a_stopped_pass_still_reports_its_end() {
+    let db = setup().await;
+    queue_two_paid_invoices(&db).await;
+    let gateway = FakeGateway::default();
+    gateway.script(Err(TsGatewayError::Network("timed out".to_string())));
+
+    let (_, reports) = run_watched(&db, &gateway).await;
+    let last = reports.last().unwrap();
+    assert!(last.finished);
+    assert_eq!((last.processed, last.total), (1, 2));
+    assert!(last.summary.blocked.is_some());
+}
+
+#[tokio::test]
+async fn an_empty_queue_reports_nothing() {
+    let db = setup().await;
+    let (_, reports) = run_watched(&db, &FakeGateway::default()).await;
+    assert!(reports.is_empty());
 }
 
 #[tokio::test]

@@ -1,12 +1,15 @@
 //! Background sender for the Sistema TS queue. It requeues calls a previous
 //! run left in flight, then passes over the queue every minute, so a
-//! submission goes out as soon as the connection comes back.
+//! submission goes out as soon as the connection comes back. Its progress
+//! reaches the window like a manual send's, so open views stay current.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use sea_orm::DatabaseConnection;
+use tauri::AppHandle;
 
+use crate::app::controller::ts::ts_progress_event;
 use crate::app::repository::secret::SecretStore;
 use crate::app::repository::ts::sistema_ts::SistemaTsGateway;
 use crate::app::service::ts::{ts_dispatch_service, ts_transition_service};
@@ -14,19 +17,27 @@ use crate::app::service::ts::{ts_dispatch_service, ts_transition_service};
 const PASS_INTERVAL: Duration = Duration::from_secs(60);
 
 pub fn spawn(
+    app: AppHandle,
     db: DatabaseConnection,
     secrets: Arc<dyn SecretStore>,
     gateway: Arc<dyn SistemaTsGateway>,
 ) {
     tauri::async_runtime::spawn(async move {
+        let report = ts_progress_event::emitter(app);
         let started = chrono::Utc::now().naive_utc();
         if let Err(error) = ts_transition_service::requeue_interrupted(&db, started).await {
             log::warn!(target: "sistema_ts", error:% = error; "requeue of interrupted calls failed");
         }
         loop {
             let now = chrono::Utc::now().naive_utc();
-            match ts_dispatch_service::dispatch_due(&db, secrets.as_ref(), gateway.as_ref(), now)
-                .await
+            match ts_dispatch_service::dispatch_due(
+                &db,
+                secrets.as_ref(),
+                gateway.as_ref(),
+                &report,
+                now,
+            )
+            .await
             {
                 Ok(summary) if summary.blocked.is_some() => {
                     log::info!(target: "sistema_ts", blocked:? = summary.blocked; "queue pass blocked");

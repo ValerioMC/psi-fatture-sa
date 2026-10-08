@@ -73,6 +73,14 @@ export interface TsDispatchSummary {
   blocked: string | null
 }
 
+/** Where a pass over the queue stands; `finished` is its last report, also when it stopped early. */
+export interface TsDispatchProgress {
+  total: number
+  processed: number
+  finished: boolean
+  summary: TsDispatchSummary
+}
+
 export interface TsMessage {
   code: string
   description: string

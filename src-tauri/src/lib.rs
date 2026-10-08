@@ -7,6 +7,8 @@ mod test_support;
 
 use std::sync::Arc;
 
+use tauri::Manager;
+
 use app::app_state::AppState;
 use app::controller::{
     appointment_controller::*, backup_controller::*, client_controller::*, config_controller::*,
@@ -23,10 +25,13 @@ use app::service::backup::RotatingBackups;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let state = build_app_state();
-    spawn_workers(&state);
 
     tauri::Builder::default()
         .manage(state)
+        .setup(|app| {
+            spawn_workers(app.handle());
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -141,8 +146,10 @@ fn build_app_state() -> AppState {
 }
 
 /// The background work: the Sistema TS queue and the daily backup.
-fn spawn_workers(state: &AppState) {
+fn spawn_workers(handle: &tauri::AppHandle) {
+    let state = handle.state::<AppState>();
     app::scheduler::ts_worker::spawn(
+        handle.clone(),
         state.db.clone(),
         state.secrets.clone(),
         state.ts_gateway.clone(),

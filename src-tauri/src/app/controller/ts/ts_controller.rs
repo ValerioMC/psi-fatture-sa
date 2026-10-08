@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::app::app_state::AppState;
 use crate::app::common::AppError;
@@ -11,6 +11,8 @@ use crate::app::service::ts::{
     ts_credential_service, ts_dispatch_service, ts_remote_service, ts_settings_service,
     ts_submission_service,
 };
+
+use super::ts_progress_event;
 
 /// Whether the invoice changed after the Sistema TS accepted it.
 #[tauri::command]
@@ -128,13 +130,17 @@ pub async fn withdraw_ts_submission(
     ts_submission_service::withdraw(&state.db, submission_id).await
 }
 
-/// Sends what is due now instead of waiting for the background worker.
+/// Sends what is due now instead of waiting for the background worker; progress arrives as events.
 #[tauri::command]
-pub async fn dispatch_ts_queue(state: State<'_, AppState>) -> Result<TsDispatchSummary, AppError> {
+pub async fn dispatch_ts_queue(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<TsDispatchSummary, AppError> {
     ts_dispatch_service::dispatch_due(
         &state.db,
         state.secrets.as_ref(),
         state.ts_gateway.as_ref(),
+        &ts_progress_event::emitter(app),
         chrono::Utc::now().naive_utc(),
     )
     .await

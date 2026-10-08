@@ -6,6 +6,7 @@
 import type {
   Invoice,
   InvoiceStatus,
+  TsDispatchProgress,
   TsDispatchSummary,
   TsEnvironment,
   TsOperation,
@@ -77,6 +78,133 @@ export function invoiceStsState(submissions: readonly TsSubmission[], environmen
   }
   if (latest.status === 'scartata') return { kind: 'rejected', current: latest, live: null, failedFollowUp: null }
   return { kind: 'cancelled', current: latest, live: null, failedFollowUp: null }
+}
+
+/**
+ * The accepted sends the user may cancel: one per invoice, and only while nothing
+ * else is queued for it, since the backend refuses a second follow-up in flight.
+ */
+export function cancellableSubmissionIds(groups: ReadonlyMap<number, readonly TsSubmission[]>, environment: TsEnvironment): Set<number> {
+  const ids = new Set<number>()
+  for (const submissions of groups.values()) {
+    const state = invoiceStsState(submissions, environment)
+    if (state.kind === 'accepted' && state.live !== null) ids.add(state.live.id)
+  }
+  return ids
+}
+
+/**
+ * Where a transmission belongs in the history filters.
+ *
+ *   queue      waiting or in flight
+ *   accepted   its data is on the Sistema TS now
+ *   cancelled  a document removed from the Sistema TS, or the accepted request that removed it
+ *   rejected   refused
+ *   retired    replaced by a newer send: listed under "all" only
+ */
+export type TsHistoryGroup = 'queue' | 'accepted' | 'cancelled' | 'rejected' | 'retired'
+
+export function historyGroup(submission: Pick<TsSubmission, 'operation' | 'status'>): TsHistoryGroup {
+  switch (submission.status) {
+    case 'non_inviata':
+    case 'inviata':
+      return 'queue'
+    case 'accettata':
+      return submission.operation === 'annullamento' ? 'cancelled' : 'accepted'
+    case 'annullata':
+      return 'cancelled'
+    case 'scartata':
+      return 'rejected'
+    case 'sostituita':
+      return 'retired'
+  }
+}
+
+/** An accepted cancellation reads as what it did, not as one more "Accettata". */
+export function historyBadge(submission: Pick<TsSubmission, 'operation' | 'status'>): StatusPresentation {
+  if (submission.operation === 'annullamento' && submission.status === 'accettata') {
+    return { label: 'Cancellata dal TS', tone: 'neutral' }
+  }
+  return TS_SUBMISSION_STATUS[submission.status]
+}
+
+/** Share of the pass already answered, 0–100. A pass that stopped early stays where it stopped. */
+export function dispatchPercent(progress: Pick<TsDispatchProgress, 'total' | 'processed'>): number {
+  if (progress.total <= 0) return 0
+  return Math.min(100, Math.round((progress.processed / progress.total) * 100))
+}
+
+export type DispatchOutcome = 'accepted' | 'rejected' | 'retrying'
+
+export interface DispatchSegment {
+  outcome: DispatchOutcome
+  /** Width on the bar, 0–100. */
+  share: number
+}
+
+/** The bar's filled part split by outcome, in reading order, so it shows how the pass is going as well as how far. */
+export function dispatchSegments(progress: TsDispatchProgress): DispatchSegment[] {
+  if (progress.total <= 0) return []
+  const { accepted, rejected, retrying } = progress.summary
+  const counts: [DispatchOutcome, number][] = [['accepted', accepted], ['rejected', rejected], ['retrying', retrying]]
+  return counts.map(([outcome, count]) => ({ outcome, share: Math.min(100, (count / progress.total) * 100) }))
+}
+
+/** The outcome one report added over the previous one, or null when nothing was counted (a skipped call). */
+export function answeredOutcome(previous: TsDispatchSummary, next: TsDispatchSummary): DispatchOutcome | null {
+  if (next.accepted > previous.accepted) return 'accepted'
+  if (next.rejected > previous.rejected) return 'rejected'
+  if (next.retrying > previous.retrying) return 'retrying'
+  return null
+}
+
+/** Outcomes already counted when a view first sees a pass, grouped since their order is unknown. */
+export function seedOutcomes(summary: TsDispatchSummary): DispatchOutcome[] {
+  return [
+    ...Array<DispatchOutcome>(summary.accepted).fill('accepted'),
+    ...Array<DispatchOutcome>(summary.rejected).fill('rejected'),
+    ...Array<DispatchOutcome>(summary.retrying).fill('retrying'),
+  ]
+}
+
+/**
+ *   sending      calls still going out
+ *   done         every submission got its answer
+ *   attention    finished, but some were refused or wait for a retry
+ *   interrupted  stopped early: the rest would fail the same way
+ */
+export type DispatchPhase = 'sending' | 'done' | 'attention' | 'interrupted'
+
+export function dispatchPhase(progress: TsDispatchProgress): DispatchPhase {
+  if (!progress.finished) return 'sending'
+  if (progress.summary.blocked !== null) return 'interrupted'
+  return progress.summary.rejected > 0 || progress.summary.retrying > 0 ? 'attention' : 'done'
+}
+
+export interface DispatchHeadline {
+  title: string
+  sentence: string
+}
+
+/** What the progress card says about a pass: a title for the phase and one sentence of where it stands. */
+export function dispatchHeadline(progress: TsDispatchProgress): DispatchHeadline {
+  const { total, processed, summary } = progress
+  const count = `${processed} di ${total} ${total === 1 ? 'trasmissione inviata' : 'trasmissioni inviate'}`
+  switch (dispatchPhase(progress)) {
+    case 'sending':
+      return { title: 'Invio al Sistema TS', sentence: `${count}.` }
+    case 'done':
+      return {
+        title: 'Invio completato',
+        sentence: summary.accepted === total
+          ? total === 1 ? 'La trasmissione è stata accettata.' : `Tutte le ${total} trasmissioni sono state accettate.`
+          : `${count}.`,
+      }
+    case 'attention':
+      return { title: 'Invio completato, alcune da rivedere', sentence: `${count}: le scartate sono nella scheda Trasmissioni.` }
+    case 'interrupted':
+      return { title: 'Invio interrotto', sentence: `${summary.blocked ?? ''} ${count}, le altre restano in coda.`.trim() }
+  }
 }
 
 /** Groups transmissions by invoice, for list views. */

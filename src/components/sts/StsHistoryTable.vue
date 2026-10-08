@@ -2,25 +2,26 @@
 /**
  * Every transmission, newest first: what went out, what the Sistema TS
  * answered, and the one action each row still allows. A filter narrows to
- * what needs attention.
+ * what needs attention. An accepted cancellation files with the cancelled:
+ * its own protocol proves the document left the Sistema TS.
  */
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Ban, History, RotateCcw, Undo2 } from 'lucide-vue-next'
-import type { TsSubmission, TsSubmissionStatus } from '@/types'
+import type { TsSubmission } from '@/types'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import type { SegmentOption } from '@/components/ui/types'
-import { TS_OPERATION_LABEL, TS_SUBMISSION_STATUS, formatStsTimestamp } from '@/utils/sts'
+import { TS_OPERATION_LABEL, formatStsTimestamp, historyBadge, historyGroup, type TsHistoryGroup } from '@/utils/sts'
 
-type Filter = 'all' | 'queue' | 'accepted' | 'rejected'
+type Filter = 'all' | Exclude<TsHistoryGroup, 'retired'>
 
 const props = defineProps<{
   submissions: readonly TsSubmission[]
-  /** Accepted sends that are still the live data of their invoice. */
-  liveIds: ReadonlySet<number>
+  /** Accepted sends the user may cancel now. */
+  cancellableIds: ReadonlySet<number>
   busyId: number | null
 }>()
 
@@ -32,25 +33,20 @@ const emit = defineEmits<{
 
 const filter = ref<Filter>('all')
 
-const GROUP: Record<Exclude<Filter, 'all'>, readonly TsSubmissionStatus[]> = {
-  queue: ['non_inviata', 'inviata'],
-  accepted: ['accettata'],
-  rejected: ['scartata'],
-}
-
 const options = computed<SegmentOption<Filter>[]>(() => {
-  const count = (group: Exclude<Filter, 'all'>) => props.submissions.filter((s) => GROUP[group].includes(s.status)).length
+  const count = (group: TsHistoryGroup) => props.submissions.filter((s) => historyGroup(s) === group).length
   return [
     { value: 'all', label: 'Tutte', count: props.submissions.length },
     { value: 'queue', label: 'In coda', count: count('queue'), tone: 'neutral' },
     { value: 'accepted', label: 'Accettate', count: count('accepted'), tone: 'safe' },
+    { value: 'cancelled', label: 'Annullate', count: count('cancelled'), tone: 'neutral' },
     { value: 'rejected', label: 'Scartate', count: count('rejected'), tone: 'danger' },
   ]
 })
 
 const visible = computed(() =>
   [...props.submissions]
-    .filter((s) => filter.value === 'all' || GROUP[filter.value].includes(s.status))
+    .filter((s) => filter.value === 'all' || historyGroup(s) === filter.value)
     .sort((a, b) => b.id - a.id),
 )
 
@@ -78,7 +74,7 @@ function canResend(submission: TsSubmission): boolean {
   <table v-else class="data-table text-base">
     <thead>
       <tr>
-        <th class="w-32 pl-5 font-medium">Esito</th>
+        <th class="w-40 pl-5 font-medium">Esito</th>
         <th class="w-32 font-medium">Operazione</th>
         <th class="w-28 font-medium">Fattura</th>
         <th class="font-medium">Paziente</th>
@@ -90,7 +86,7 @@ function canResend(submission: TsSubmission): boolean {
     <tbody>
       <tr v-for="submission in visible" :key="submission.id" class="group h-row align-middle">
         <td class="pl-5">
-          <AppBadge :tone="TS_SUBMISSION_STATUS[submission.status].tone" dot>{{ TS_SUBMISSION_STATUS[submission.status].label }}</AppBadge>
+          <AppBadge :tone="historyBadge(submission).tone" dot>{{ historyBadge(submission).label }}</AppBadge>
         </td>
         <td class="text-sm text-text-muted">
           {{ TS_OPERATION_LABEL[submission.operation] }}
@@ -127,7 +123,7 @@ function canResend(submission: TsSubmission): boolean {
               Ritira
             </AppButton>
             <AppButton
-              v-else-if="liveIds.has(submission.id)"
+              v-else-if="cancellableIds.has(submission.id)"
               variant="danger-quiet"
               size="sm"
               :icon="Ban"

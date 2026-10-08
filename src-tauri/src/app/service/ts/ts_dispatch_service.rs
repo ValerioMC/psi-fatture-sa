@@ -1,6 +1,7 @@
 //! Sends what is due in the queue, one call at a time. A verdict ends a
 //! submission; anything else leaves it queued. An unreachable service or a
-//! refused login stops the pass: the rest would fail the same way.
+//! refused login stops the pass: the rest would fail the same way. Each
+//! answered submission is reported to the caller's progress listener.
 
 use std::sync::LazyLock;
 
@@ -11,8 +12,8 @@ use tokio::sync::Mutex;
 use super::{TsDispatchAttempt, TsDispatchRequest};
 use crate::app::common::AppError;
 use crate::app::model::ts::{
-    TsCallResponse, TsDispatchSummary, TsDocumentId, TsOperation, TsOutcome, TsSettings,
-    TsSubmission,
+    TsCallResponse, TsDispatchProgress, TsDispatchSummary, TsDocumentId, TsOperation, TsOutcome,
+    TsSettings, TsSubmission,
 };
 use crate::app::repository::secret::SecretStore;
 use crate::app::repository::ts::sistema_ts::{SistemaTsGateway, TsGatewayError, TsSession};
@@ -30,11 +31,16 @@ static DISPATCH_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 const ALREADY_INSERTED: &str = "S017";
 const ALREADY_CANCELLED: &str = "S022";
 
-/// Sends every submission due at `now` in the configured environment.
+/// Receives the progress of a pass; the caller decides where it goes.
+pub type TsProgressListener<'a> = dyn Fn(&TsDispatchProgress) + Send + Sync + 'a;
+
+/// Sends every submission due at `now` in the configured environment. A pass
+/// with nothing due reports no progress.
 pub async fn dispatch_due(
     db: &DatabaseConnection,
     store: &dyn SecretStore,
     gateway: &dyn SistemaTsGateway,
+    listener: &TsProgressListener<'_>,
     now: NaiveDateTime,
 ) -> Result<TsDispatchSummary, AppError> {
     let _pass = DISPATCH_LOCK.lock().await;
@@ -54,13 +60,80 @@ pub async fn dispatch_due(
             return Ok(summary);
         }
     };
-    for submission in due {
-        let attempt = dispatch_one(db, gateway, &session, &settings, &submission, now).await?;
-        if !tally(&mut summary, attempt) {
-            break;
-        }
+    let pass = TsPass {
+        db,
+        gateway,
+        session: &session,
+        settings: &settings,
+        now,
+    };
+    pass.run(&due, summary, listener).await
+}
+
+/// What every call of one pass shares.
+struct TsPass<'a> {
+    db: &'a DatabaseConnection,
+    gateway: &'a dyn SistemaTsGateway,
+    session: &'a TsSession,
+    settings: &'a TsSettings,
+    now: NaiveDateTime,
+}
+
+impl TsPass<'_> {
+    /// The final report goes out even when a submission fails, so a listener never waits forever.
+    async fn run(
+        &self,
+        due: &[TsSubmission],
+        mut summary: TsDispatchSummary,
+        listener: &TsProgressListener<'_>,
+    ) -> Result<TsDispatchSummary, AppError> {
+        let mut progress = TsDispatchProgress::started(due.len(), &summary);
+        listener(&progress);
+        let sent = self
+            .send_each(due, &mut summary, &mut progress, listener)
+            .await;
+        progress.finish(&summary);
+        listener(&progress);
+        sent.map(|()| summary)
     }
-    Ok(summary)
+
+    /// Sends the due submissions in order, reporting each answer, until one stops the pass.
+    async fn send_each(
+        &self,
+        due: &[TsSubmission],
+        summary: &mut TsDispatchSummary,
+        progress: &mut TsDispatchProgress,
+        listener: &TsProgressListener<'_>,
+    ) -> Result<(), AppError> {
+        for submission in due {
+            let attempt = self.dispatch_one(submission).await?;
+            let goes_on = tally(summary, attempt);
+            progress.advance(summary);
+            listener(progress);
+            if !goes_on {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    async fn dispatch_one(&self, submission: &TsSubmission) -> Result<TsDispatchAttempt, AppError> {
+        let (db, now) = (self.db, self.now);
+        let request = match prepare(db, self.settings, submission).await {
+            Ok(request) => request,
+            Err(reason) => {
+                transition::reject_locally(db, submission.id, &reason.to_string(), now).await?;
+                return Ok(TsDispatchAttempt::Rejected);
+            }
+        };
+        let fingerprint = request.fingerprint();
+        if !transition::claim(db, submission.id, request.document_id(), fingerprint, now).await? {
+            return Ok(TsDispatchAttempt::Skipped);
+        }
+
+        let result = send(self.gateway, self.session, &request).await;
+        settle(db, submission, result, now).await
+    }
 }
 
 /// What is due in the selected environment, and how many due submissions wait for the other one.
@@ -90,37 +163,6 @@ fn tally(summary: &mut TsDispatchSummary, attempt: TsDispatchAttempt) -> bool {
         }
     }
     true
-}
-
-async fn dispatch_one(
-    db: &DatabaseConnection,
-    gateway: &dyn SistemaTsGateway,
-    session: &TsSession,
-    settings: &TsSettings,
-    submission: &TsSubmission,
-    now: NaiveDateTime,
-) -> Result<TsDispatchAttempt, AppError> {
-    let request = match prepare(db, settings, submission).await {
-        Ok(request) => request,
-        Err(reason) => {
-            transition::reject_locally(db, submission.id, &reason.to_string(), now).await?;
-            return Ok(TsDispatchAttempt::Rejected);
-        }
-    };
-    if !transition::claim(
-        db,
-        submission.id,
-        request.document_id(),
-        request.fingerprint(),
-        now,
-    )
-    .await?
-    {
-        return Ok(TsDispatchAttempt::Skipped);
-    }
-
-    let result = send(gateway, session, &request).await;
-    settle(db, submission, result, now).await
 }
 
 async fn send(

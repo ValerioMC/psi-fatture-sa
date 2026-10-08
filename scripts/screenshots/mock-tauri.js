@@ -298,17 +298,30 @@
     enqueue_ts_replacement: ({ submissionId }) => { const t = tsSubs.find((s) => s.id === submissionId); return tsNew(invoices.find((i) => i.id === t.invoice_id), 'sostituzione', 'non_inviata', { target_submission_id: t.id, document: t.document }) },
     enqueue_ts_cancellation: ({ submissionId }) => { const t = tsSubs.find((s) => s.id === submissionId); return tsNew(invoices.find((i) => i.id === t.invoice_id), 'annullamento', 'non_inviata', { target_submission_id: t.id, document: t.document }) },
     withdraw_ts_submission: ({ submissionId }) => { tsSubs.splice(tsSubs.findIndex((s) => s.id === submissionId), 1) },
-    dispatch_ts_queue: () => {
+    dispatch_ts_queue: async () => {
       const summary = { accepted: 0, rejected: 0, retrying: 0, waiting_other_environment: 0, blocked: null }
       if (!tsCreds.password_configured || !tsCreds.pincode_configured) return { ...summary, blocked: 'Manca la password del Sistema TS: inseriscila nelle Impostazioni' }
-      for (const sub of tsSubs.filter((s) => s.status === 'non_inviata')) {
-        if (sub.environment !== tsSettings.environment) { summary.waiting_other_environment++; continue }
-        tsAccept(sub, todayIso)
-        sub.last_error = null
-        const target = tsSubs.find((s) => s.id === sub.target_submission_id)
-        if (target) target.status = sub.operation === 'annullamento' ? 'annullata' : 'sostituita'
-        summary.accepted++
+      const queued = tsSubs.filter((s) => s.status === 'non_inviata')
+      const due = queued.filter((s) => s.environment === tsSettings.environment)
+      summary.waiting_other_environment = queued.length - due.length
+      if (due.length === 0) return summary
+      const report = (processed, finished) => emitEvent('ts-dispatch-progress', { total: due.length, processed, finished, summary: { ...summary } })
+      report(0, false)
+      for (const [index, sub] of due.entries()) {
+        await new Promise((r) => setTimeout(r, window.__MOCK_TS_CALL_MS ?? 0))
+        if (window.__MOCK_TS_REJECT_EVERY && (index + 1) % window.__MOCK_TS_REJECT_EVERY === 0) {
+          Object.assign(sub, { status: 'scartata', outcome_code: 'S002', outcome_message: 'S002 DATA EMISSIONE NON VALIDA' })
+          summary.rejected++
+        } else {
+          tsAccept(sub, todayIso)
+          sub.last_error = null
+          const target = tsSubs.find((s) => s.id === sub.target_submission_id)
+          if (target) target.status = sub.operation === 'annullamento' ? 'annullata' : 'sostituita'
+          summary.accepted++
+        }
+        report(index + 1, false)
       }
+      report(due.length, true)
       return summary
     },
     query_ts_invoice: ({ invoiceId }) => {
@@ -403,6 +416,21 @@
     'plugin:opener|open_url': ({ url }) => { window.__MOCK_OPENED_URL = url },
   }
 
+  const callbacks = new Map()
+  const listeners = new Map()
+  let nextCallback = 1
+  /** Delivers an event the way Tauri does: to every handler registered for its name. */
+  function emitEvent(event, payload) {
+    for (const handlerId of listeners.get(event) ?? []) callbacks.get(handlerId)?.({ event, id: handlerId, payload })
+  }
+  handlers['plugin:event|listen'] = ({ event, handler }) => {
+    listeners.set(event, [...(listeners.get(event) ?? []), handler])
+    return handler
+  }
+  handlers['plugin:event|unlisten'] = ({ event, eventId }) => {
+    listeners.set(event, (listeners.get(event) ?? []).filter((id) => id !== eventId))
+  }
+
   window.__TAURI_INTERNALS__ = {
     invoke: async (cmd, args = {}) => {
       const handler = handlers[cmd]
@@ -410,7 +438,11 @@
       await new Promise((r) => setTimeout(r, 30))
       return clone((await handler(args)) ?? null)
     },
-    transformCallback: () => 0,
+    transformCallback: (callback) => {
+      const id = nextCallback++
+      callbacks.set(id, callback)
+      return id
+    },
     metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
   }
 })()
