@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * A pass over the Sistema TS queue as it happens. Up to 60 transmissions the
- * bar is a register, one tick per transmission, each filling with its outcome
- * in the order the answers arrive; beyond that, one bar split by outcome. A
- * clean pass leaves by itself; one that needs attention waits to be closed.
+ * A pass over the Sistema TS queue as it happens: up to 60 transmissions, one
+ * tick each, filled with its outcome as answers arrive; beyond that, one bar
+ * split by outcome. A clean pass leaves by itself, otherwise it waits to be closed.
  */
 import { computed, onBeforeUnmount, ref, watch, type Component } from 'vue'
 import { CircleAlert, CircleCheck, TriangleAlert, X } from 'lucide-vue-next'
@@ -11,13 +10,14 @@ import type { TsDispatchProgress } from '@/types'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import { useTweenedNumber } from '@/composables/useTweenedNumber'
-import { plural } from '@/utils/labels'
 import {
+  DISPATCH_OUTCOMES,
   answeredOutcome,
   dispatchHeadline,
   dispatchPercent,
   dispatchPhase,
   dispatchSegments,
+  outcomeLabel,
   seedOutcomes,
   type DispatchOutcome,
   type DispatchPhase,
@@ -64,14 +64,12 @@ watch(
   { immediate: true },
 )
 
-const legend = computed(() => {
-  const { accepted, rejected, retrying } = props.progress.summary
-  return [
-    { outcome: 'accepted' as const, count: accepted, label: plural(accepted, 'accettata', 'accettate') },
-    { outcome: 'rejected' as const, count: rejected, label: plural(rejected, 'scartata', 'scartate') },
-    { outcome: 'retrying' as const, count: retrying, label: `${retrying} da ritentare` },
-  ].filter((entry) => entry.count > 0)
-})
+const legend = computed(() =>
+  DISPATCH_OUTCOMES.filter((outcome) => props.progress.summary[outcome] > 0).map((outcome) => ({
+    outcome,
+    label: outcomeLabel(outcome, props.progress.summary[outcome]),
+  })),
+)
 
 let lingerTimer: ReturnType<typeof setTimeout> | undefined
 watch(

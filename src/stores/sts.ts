@@ -1,9 +1,8 @@
 /**
- * The Sistema TS as the app knows it: every local transmission, the
- * settings, and the actions that queue work and then send it right away.
- * Views read one invoice's state through `stateOf`. The progress of each pass,
- * the background worker's included, arrives as events and refreshes the list
- * when the pass ends, so what is shown never lags behind the queue.
+ * The Sistema TS as the app knows it: every local transmission, the settings,
+ * and the actions that queue work and send it. Views read an invoice's state
+ * through `stateOf`. Every pass reports progress as events and reloads the
+ * list when it ends.
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -93,10 +92,18 @@ export const useStsStore = defineStore('sts', () => {
     return progressSubscription
   }
 
+  /** Reloads the list where nothing awaits the reload; a failure is reported, the list keeps its last state. */
+  async function resync(): Promise<void> {
+    try {
+      await refresh()
+    } catch (error) {
+      toast.notifyError(error, 'Elenco del Sistema TS non aggiornato')
+    }
+  }
+
   function receiveProgress(report: TsDispatchProgress): void {
     progress.value = report
-    if (!report.finished) return
-    refresh().catch((error: unknown) => toast.notifyError(error, 'Elenco del Sistema TS non aggiornato'))
+    if (report.finished) void resync()
   }
 
   function dismissProgress(): void {
@@ -163,6 +170,7 @@ export const useStsStore = defineStore('sts', () => {
     stateOf,
     load,
     refresh,
+    resync,
     saveSettings,
     dispatch,
     send,

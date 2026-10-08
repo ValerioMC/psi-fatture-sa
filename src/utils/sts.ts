@@ -88,7 +88,7 @@ export function cancellableSubmissionIds(groups: ReadonlyMap<number, readonly Ts
   const ids = new Set<number>()
   for (const submissions of groups.values()) {
     const state = invoiceStsState(submissions, environment)
-    if (state.kind === 'accepted' && state.live !== null) ids.add(state.live.id)
+    if (canCancel(state) && state.live !== null) ids.add(state.live.id)
   }
   return ids
 }
@@ -134,7 +134,19 @@ export function dispatchPercent(progress: Pick<TsDispatchProgress, 'total' | 'pr
   return Math.min(100, Math.round((progress.processed / progress.total) * 100))
 }
 
+/** How a transmission of a pass ended; each name is also its counter in `TsDispatchSummary`. */
 export type DispatchOutcome = 'accepted' | 'rejected' | 'retrying'
+
+export const DISPATCH_OUTCOMES: readonly DispatchOutcome[] = ['accepted', 'rejected', 'retrying']
+
+/** "3 accettate", "1 scartata", "2 da ritentare": how a count of one outcome is said. */
+export function outcomeLabel(outcome: DispatchOutcome, count: number): string {
+  switch (outcome) {
+    case 'accepted': return plural(count, 'accettata', 'accettate')
+    case 'rejected': return plural(count, 'scartata', 'scartate')
+    case 'retrying': return `${count} da ritentare`
+  }
+}
 
 export interface DispatchSegment {
   outcome: DispatchOutcome
@@ -145,26 +157,17 @@ export interface DispatchSegment {
 /** The bar's filled part split by outcome, in reading order, so it shows how the pass is going as well as how far. */
 export function dispatchSegments(progress: TsDispatchProgress): DispatchSegment[] {
   if (progress.total <= 0) return []
-  const { accepted, rejected, retrying } = progress.summary
-  const counts: [DispatchOutcome, number][] = [['accepted', accepted], ['rejected', rejected], ['retrying', retrying]]
-  return counts.map(([outcome, count]) => ({ outcome, share: Math.min(100, (count / progress.total) * 100) }))
+  return DISPATCH_OUTCOMES.map((outcome) => ({ outcome, share: Math.min(100, (progress.summary[outcome] / progress.total) * 100) }))
 }
 
 /** The outcome one report added over the previous one, or null when nothing was counted (a skipped call). */
 export function answeredOutcome(previous: TsDispatchSummary, next: TsDispatchSummary): DispatchOutcome | null {
-  if (next.accepted > previous.accepted) return 'accepted'
-  if (next.rejected > previous.rejected) return 'rejected'
-  if (next.retrying > previous.retrying) return 'retrying'
-  return null
+  return DISPATCH_OUTCOMES.find((outcome) => next[outcome] > previous[outcome]) ?? null
 }
 
 /** Outcomes already counted when a view first sees a pass, grouped since their order is unknown. */
 export function seedOutcomes(summary: TsDispatchSummary): DispatchOutcome[] {
-  return [
-    ...Array<DispatchOutcome>(summary.accepted).fill('accepted'),
-    ...Array<DispatchOutcome>(summary.rejected).fill('rejected'),
-    ...Array<DispatchOutcome>(summary.retrying).fill('retrying'),
-  ]
+  return DISPATCH_OUTCOMES.flatMap((outcome) => Array<DispatchOutcome>(summary[outcome]).fill(outcome))
 }
 
 /**
@@ -189,21 +192,21 @@ export interface DispatchHeadline {
 /** What the progress card says about a pass: a title for the phase and one sentence of where it stands. */
 export function dispatchHeadline(progress: TsDispatchProgress): DispatchHeadline {
   const { total, processed, summary } = progress
-  const count = `${processed} di ${total} ${total === 1 ? 'trasmissione inviata' : 'trasmissioni inviate'}`
+  const sentSoFar = `${processed} di ${total} ${total === 1 ? 'trasmissione inviata' : 'trasmissioni inviate'}`
   switch (dispatchPhase(progress)) {
     case 'sending':
-      return { title: 'Invio al Sistema TS', sentence: `${count}.` }
+      return { title: 'Invio al Sistema TS', sentence: `${sentSoFar}.` }
     case 'done':
       return {
         title: 'Invio completato',
         sentence: summary.accepted === total
           ? total === 1 ? 'La trasmissione è stata accettata.' : `Tutte le ${total} trasmissioni sono state accettate.`
-          : `${count}.`,
+          : `${sentSoFar}.`,
       }
     case 'attention':
-      return { title: 'Invio completato, alcune da rivedere', sentence: `${count}: le scartate sono nella scheda Trasmissioni.` }
+      return { title: 'Invio completato, alcune da rivedere', sentence: `${sentSoFar}: le scartate sono nella scheda Trasmissioni.` }
     case 'interrupted':
-      return { title: 'Invio interrotto', sentence: `${summary.blocked ?? ''} ${count}, le altre restano in coda.`.trim() }
+      return { title: 'Invio interrotto', sentence: `${summary.blocked ?? ''} ${sentSoFar}, le altre restano in coda.`.trim() }
   }
 }
 
@@ -225,13 +228,18 @@ export interface StsActions {
   withdraw: boolean
 }
 
+/** Only accepted data can be cancelled, and not while another transmission for the invoice is queued. */
+export function canCancel(state: InvoiceStsState): boolean {
+  return state.kind === 'accepted'
+}
+
 /** What the user may do next. Only paid invoices carry a health expense. */
 export function stsActions(state: InvoiceStsState, invoiceStatus: InvoiceStatus): StsActions {
   const paid = invoiceStatus === 'paid'
   return {
     send: paid && (state.kind === 'none' || state.kind === 'rejected' || state.kind === 'cancelled'),
     replace: paid && state.kind === 'accepted',
-    cancel: state.kind === 'accepted',
+    cancel: canCancel(state),
     withdraw: state.kind === 'queued' && state.current?.status === 'non_inviata',
   }
 }
@@ -307,10 +315,7 @@ export interface SummaryLine {
 
 /** One sentence for what a pass over the queue did, or why it could not. */
 export function describeDispatch(summary: TsDispatchSummary): SummaryLine {
-  const parts: string[] = []
-  if (summary.accepted > 0) parts.push(plural(summary.accepted, 'accettata', 'accettate'))
-  if (summary.rejected > 0) parts.push(plural(summary.rejected, 'scartata', 'scartate'))
-  if (summary.retrying > 0) parts.push(`${summary.retrying} da ritentare`)
+  const parts = DISPATCH_OUTCOMES.filter((outcome) => summary[outcome] > 0).map((outcome) => outcomeLabel(outcome, summary[outcome]))
 
   if (summary.blocked !== null) {
     return { message: parts.length > 0 ? `${parts.join(', ')}. ${summary.blocked}` : summary.blocked, tone: 'error' }

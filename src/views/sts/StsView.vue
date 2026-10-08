@@ -114,14 +114,14 @@ async function send(invoiceIds: number[]): Promise<void> {
   }
 }
 
-/** A refused action means the list was behind the queue: reload it so the row shows where it stands. */
+/** A refusal usually means the list was behind the queue, so the list is reloaded to show where each row stands. */
 async function withRow(submission: TsSubmission, action: () => Promise<void>): Promise<void> {
   busyId.value = submission.id
   try {
     await action()
   } catch (error) {
     toast.notifyError(error, 'Sistema TS')
-    await sts.refresh().catch((reloadError: unknown) => toast.notifyError(reloadError, 'Elenco del Sistema TS non aggiornato'))
+    await sts.resync()
   } finally {
     busyId.value = null
   }

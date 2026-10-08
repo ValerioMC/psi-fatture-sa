@@ -89,12 +89,12 @@ impl TsPass<'_> {
     ) -> Result<TsDispatchSummary, AppError> {
         let mut progress = TsDispatchProgress::started(due.len(), &summary);
         listener(&progress);
-        let sent = self
+        let send_outcome = self
             .send_each(due, &mut summary, &mut progress, listener)
             .await;
         progress.finish(&summary);
         listener(&progress);
-        sent.map(|()| summary)
+        send_outcome.map(|()| summary)
     }
 
     /// Sends the due submissions in order, reporting each answer, until one stops the pass.

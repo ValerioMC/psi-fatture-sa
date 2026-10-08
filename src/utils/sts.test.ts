@@ -16,6 +16,7 @@ import {
   historyGroup,
   invoiceDeadlineNotice,
   invoiceStsState,
+  outcomeLabel,
   seedOutcomes,
   stsActions,
   stsDeadlinePhase,
@@ -373,5 +374,13 @@ describe('dispatchHeadline', () => {
   it('gives the reason of an interrupted pass and what stays queued', () => {
     const headline = dispatchHeadline(progress({ processed: 1, finished: true }, { retrying: 1, blocked: 'Sistema TS non raggiungibile.' }))
     expect(headline).toEqual({ title: 'Invio interrotto', sentence: 'Sistema TS non raggiungibile. 1 di 4 trasmissioni inviate, le altre restano in coda.' })
+  })
+})
+
+describe('outcomeLabel', () => {
+  it('agrees the noun with the count', () => {
+    expect(outcomeLabel('accepted', 1)).toBe('1 accettata')
+    expect(outcomeLabel('rejected', 3)).toBe('3 scartate')
+    expect(outcomeLabel('retrying', 2)).toBe('2 da ritentare')
   })
 })
