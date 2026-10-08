@@ -229,7 +229,7 @@ export interface StsActions {
 }
 
 /** Only accepted data can be cancelled, and not while another transmission for the invoice is queued. */
-export function canCancel(state: InvoiceStsState): boolean {
+function canCancel(state: InvoiceStsState): boolean {
   return state.kind === 'accepted'
 }
 
