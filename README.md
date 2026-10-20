@@ -393,7 +393,8 @@ SMTP diretto verso il provider della casella, nessun servizio di terze parti.
   (`MailMark.vue`): tratteggiata se non inviata, inchiostrata con il sigillo se inviata,
   rossa se l'unico tentativo è fallito.
 - **PDF**: generato nel backend (`service/pdf/`, libreria `krilla`) con la stessa
-  impaginazione della vista di stampa: A4, piè di pagina su ogni pagina, numerazione
+  impaginazione della vista di stampa (`InvoicePrintView.vue`, una sezione per componente in
+  `features/invoice/components/print/`, come i moduli di `layout/`): A4, piè di pagina su ogni pagina, numerazione
   delle pagine quando sono più d'una, righe che continuano sulla pagina seguente con
   l'intestazione della tabella. I caratteri (Geist e Newsreader, licenza OFL) sono in
   `src-tauri/resources/fonts/`, inclusi nel binario e ridotti ai soli glifi usati. Dalla

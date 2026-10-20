@@ -1,6 +1,6 @@
-//! The invoice page, section by section as `InvoicePrintView.vue` draws it: letterhead
-//! and number, recipient and payment, the lines, the totals, then the fiscal notes,
-//! the Sistema TS authorisation and the footer. CSS pixels become points at 0.75.
+//! The invoice page, section by section as `InvoicePrintView.vue` and its `components/print/`
+//! draw it: letterhead and number, recipient and payment, the lines, the totals, then the
+//! fiscal notes, the Sistema TS authorisation and the footer. CSS pixels become points at 0.75.
 
 use super::boxes::{legal_notes_box, notes_box, sts_box};
 use super::footer::bottom_bar;

@@ -11,6 +11,17 @@ import { computed, nextTick, ref } from 'vue'
 import type { MonthlyRevenue } from '@/features/dashboard/model/dashboard'
 import type { MonthPending } from '@/features/invoice/lib/monthlyPending'
 import { niceCeiling } from '@/features/dashboard/lib/dashboard'
+import {
+  bestMonth,
+  heightShare,
+  isEmptySlot,
+  isFutureMonth,
+  issuedAverage,
+  monthColumns,
+  segmentShare,
+  yearSplit,
+  type MonthColumn,
+} from '@/features/dashboard/lib/monthlyChart'
 import { formatCurrency, formatCurrencyCompact } from '@/common/lib/format'
 import { plural } from '@/common/lib/labels'
 import { placeTooltip, visibleTopOf, type TooltipPlacement } from '@/common/lib/tooltipPlacement'
@@ -29,86 +40,21 @@ const hovered = ref<number | null>(null)
 /** Per month, so a tooltip fading out keeps its place while the next one opens. */
 const placements = ref<Record<number, TooltipPlacement>>({})
 
-interface Column {
-  month: number
-  name: string
-  paid: number
-  paidCount: number
-  pending: number
-  pendingCount: number
-  draft: number
-  draftCount: number
-  /** Paid, pending and draft together: the height of the column. */
-  total: number
-  /** Paid and pending only: what is really invoiced, the basis for the average and the best month. */
-  issued: number
-}
-
-const columns = computed<Column[]>(() =>
-  props.months.map((month) => {
-    const pending = props.pending[month.month - 1] ?? { amount: 0, count: 0 }
-    const draft = props.drafts[month.month - 1] ?? { amount: 0, count: 0 }
-    return {
-      month: month.month,
-      name: month.month_name,
-      paid: month.revenue,
-      paidCount: month.invoice_count,
-      pending: pending.amount,
-      pendingCount: pending.count,
-      draft: draft.amount,
-      draftCount: draft.count,
-      total: month.revenue + pending.amount + draft.amount,
-      issued: month.revenue + pending.amount,
-    }
-  }),
-)
-
+const columns = computed(() => monthColumns(props.months, props.pending, props.drafts))
 const axisMax = computed(() => niceCeiling(Math.max(...columns.value.map((column) => column.total), 0)))
 const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map((share) => axisMax.value * share))
+/** The line the columns are read against. */
+const average = computed(() => issuedAverage(columns.value, props.currentMonth))
+const best = computed(() => bestMonth(columns.value, props.currentMonth))
+const split = computed(() => yearSplit(columns.value))
 
-const lived = computed(() => columns.value.filter((column) => !isFuture(column.month) && column.issued > 0))
-
-/** Average invoiced over the months already lived that had any: the line the columns are read against. */
-const average = computed(() => {
-  if (lived.value.length < 2) return null
-  return lived.value.reduce((sum, column) => sum + column.issued, 0) / lived.value.length
-})
-
-const bestMonth = computed(() => lived.value.reduce<Column | null>((best, column) => (best === null || column.issued > best.issued ? column : best), null)?.month ?? null)
-
-const paidTotal = computed(() => columns.value.reduce((sum, column) => sum + column.paid, 0))
-const pendingTotal = computed(() => columns.value.reduce((sum, column) => sum + column.pending, 0))
-const draftTotal = computed(() => columns.value.reduce((sum, column) => sum + column.draft, 0))
-
-function isFuture(month: number): boolean {
-  return props.currentMonth !== null && month > props.currentMonth
-}
-
-/** A month ahead with nothing booked is an empty slot; with invoices in it, it is a column like any other. */
-function isEmptySlot(column: Column): boolean {
-  return isFuture(column.month) && column.total === 0
-}
-
-function share(value: number): number {
-  return (value / axisMax.value) * 100
-}
-
-/** A non-zero column never collapses below a sliver, so a small month is still visible. */
-function heightShare(column: Column): number {
-  return column.total > 0 ? Math.max(share(column.total), 1.5) : 0
-}
-
-function heightOf(column: Column): string {
-  return `${heightShare(column)}%`
+function heightOf(column: MonthColumn): string {
+  return `${heightShare(column, axisMax.value)}%`
 }
 
 /** The column's height in the plot area, which excludes the 1.5rem month label row. */
-function plotHeightOf(column: Column): string {
-  return `(100% - 1.5rem) * ${heightShare(column) / 100}`
-}
-
-function segmentShare(column: Column, amount: number): string {
-  return column.total > 0 ? `${(amount / column.total) * 100}%` : '0%'
+function plotHeightOf(column: MonthColumn): string {
+  return `(100% - 1.5rem) * ${heightShare(column, axisMax.value) / 100}`
 }
 
 /** Room between a column and the tooltip above it, clear of the value label on the column. */
@@ -120,7 +66,7 @@ function remToPixels(rem: number): number {
 }
 
 /** Renders the tooltip above, then measures it before paint and moves it beside the column if the page header would cover it. */
-async function showTooltip(column: Column, event: MouseEvent): Promise<void> {
+async function showTooltip(column: MonthColumn, event: MouseEvent): Promise<void> {
   const columnElement = event.currentTarget
   if (!(columnElement instanceof HTMLElement)) return
   hovered.value = column.month
@@ -146,7 +92,7 @@ async function showTooltip(column: Column, event: MouseEvent): Promise<void> {
   }
 }
 
-function tooltipStyle(column: Column): Record<string, string> {
+function tooltipStyle(column: MonthColumn): Record<string, string> {
   const placement = placements.value[column.month] ?? { kind: 'above' }
   if (placement.kind === 'above') return { bottom: `calc(1.5rem + ${plotHeightOf(column)} + ${TOOLTIP_GAP_REM}rem)` }
   const offset = 'calc(100% + 0.25rem)'
@@ -192,7 +138,7 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
                 aria-hidden="true"
               />
               <div
-                v-if="isEmptySlot(column)"
+                v-if="isEmptySlot(column, currentMonth)"
                 class="relative h-1 w-[min(30px,60%)] rounded-full bg-surface-sunken"
                 aria-hidden="true"
               />
@@ -207,7 +153,7 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
                 <span
                   v-if="column.total > 0"
                   class="tabular absolute bottom-full left-1/2 z-[2] mb-1 hidden rounded-[4px] bg-surface-raised px-1 py-0.5 -translate-x-1/2 whitespace-nowrap text-2xs leading-none @min-[34rem]/chart:block"
-                  :class="column.month === bestMonth ? 'font-semibold text-text' : 'text-text-subtle'"
+                  :class="column.month === best ? 'font-semibold text-text' : 'text-text-subtle'"
                 >{{ formatCurrencyCompact(column.total) }}</span>
                 <div
                   v-if="column.draft > 0"
@@ -240,7 +186,7 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
             <!-- Tooltip: the month's total, then what is in and what is still out. Above the column, or beside it when the header is in the way. -->
             <Transition name="popover">
               <div
-                v-if="hovered === column.month && !isEmptySlot(column)"
+                v-if="hovered === column.month && !isEmptySlot(column, currentMonth)"
                 class="pointer-events-none absolute z-(--z-overlay) min-w-44 whitespace-nowrap rounded-control border border-border bg-surface-raised px-3 py-2.5 shadow-modal"
                 :style="tooltipStyle(column)"
                 data-tooltip
@@ -248,7 +194,7 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
               >
                 <p class="flex items-center gap-1.5 text-2xs capitalize text-text-subtle">
                   {{ column.name }}
-                  <span v-if="isFuture(column.month)" class="rounded-full bg-surface-sunken px-1.5 py-px normal-case">in programma</span>
+                  <span v-if="isFutureMonth(column.month, currentMonth)" class="rounded-full bg-surface-sunken px-1.5 py-px normal-case">in programma</span>
                 </p>
                 <p class="tabular text-base font-semibold text-text">{{ formatCurrency(column.total) }}</p>
                 <dl class="mt-2 space-y-1 border-t border-border pt-2 text-2xs">
@@ -291,17 +237,17 @@ const MONTH_ABBR = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set
       <div class="flex items-center gap-2">
         <span class="swatch-paid size-2.5 rounded-[3px]" aria-hidden="true" />
         <dt class="text-text-muted">Incassato</dt>
-        <dd class="tabular font-semibold text-text">{{ formatCurrencyCompact(paidTotal) }}</dd>
+        <dd class="tabular font-semibold text-text">{{ formatCurrencyCompact(split.paid) }}</dd>
       </div>
-      <div v-if="pendingTotal > 0" class="flex items-center gap-2">
+      <div v-if="split.pending > 0" class="flex items-center gap-2">
         <span class="pending size-2.5 rounded-[3px] text-warn ring-1 ring-warn/40 ring-inset" aria-hidden="true" />
         <dt class="text-text-muted">Da incassare</dt>
-        <dd class="tabular font-semibold text-text">{{ formatCurrencyCompact(pendingTotal) }}</dd>
+        <dd class="tabular font-semibold text-text">{{ formatCurrencyCompact(split.pending) }}</dd>
       </div>
-      <div v-if="draftTotal > 0" class="flex items-center gap-2">
+      <div v-if="split.draft > 0" class="flex items-center gap-2">
         <span class="draft size-2.5 rounded-[3px] text-text-muted" aria-hidden="true" />
         <dt class="text-text-muted">In bozza</dt>
-        <dd class="tabular font-semibold text-text">{{ formatCurrencyCompact(draftTotal) }}</dd>
+        <dd class="tabular font-semibold text-text">{{ formatCurrencyCompact(split.draft) }}</dd>
       </div>
       <div v-if="average !== null" class="flex items-center gap-2">
         <span class="w-3.5 border-t border-dashed border-accent" aria-hidden="true" />

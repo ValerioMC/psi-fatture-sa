@@ -1,4 +1,5 @@
-//! The page's palette and the edges every section aligns to, as in `InvoicePrintView.vue`.
+//! The page's palette and the edges every section aligns to, as in the print components
+//! (`src/features/invoice/components/print/`).
 
 use crate::app::service::pdf::page_flow::{CONTENT_WIDTH, MARGIN_SIDE};
 use crate::app::service::pdf::{Face, Rgb, TextStyle};
