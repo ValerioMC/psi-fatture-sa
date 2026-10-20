@@ -1,10 +1,9 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::terms_acceptance::{self, ActiveModel};
 use crate::app::model::terms::{AcceptTermsInput, TermsAcceptance};
-use crate::app::repository::terms_acceptance_repository;
+use crate::app::repository::terms::terms_acceptance_repository;
 
 const VERSION_MAX_LENGTH: usize = 40;
 
@@ -22,6 +21,7 @@ pub async fn find(
 /// Records the acceptance only with both boxes ticked; accepting a version twice keeps the first record.
 pub async fn accept(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     input: AcceptTermsInput,
 ) -> Result<TermsAcceptance, AppError> {
     let version = validate_version(&input.version)?;
@@ -41,7 +41,7 @@ pub async fn accept(
     let active = ActiveModel {
         version: Set(version.to_string()),
         clauses_approved: Set(true),
-        accepted_at: Set(timestamp::now()),
+        accepted_at: Set(clock.timestamp()),
         ..Default::default()
     };
     Ok(into_domain(

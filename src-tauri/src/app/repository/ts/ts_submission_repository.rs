@@ -57,7 +57,7 @@ pub async fn load(db: &impl ConnectionTrait, id: i64) -> Result<TsSubmission, Ap
         .await?
         .into_iter()
         .next()
-        .ok_or_else(|| AppError::NotFound(format!("Trasmissione STS {id} non trovata")))
+        .ok_or_else(|| not_found(id))
 }
 
 /// Returns queued submissions whose next attempt is due at `now`, oldest first.
@@ -70,14 +70,16 @@ pub async fn find_due(db: &impl ConnectionTrait, now: &str) -> Result<Vec<TsSubm
     query(db, &sql, values).await
 }
 
-pub async fn find_row(
-    db: &impl ConnectionTrait,
-    id: i64,
-) -> Result<ts_submission::Model, AppError> {
+/// The stored row, or `NotFound`: the one lookup that requires the submission to exist.
+pub async fn require(db: &impl ConnectionTrait, id: i64) -> Result<ts_submission::Model, AppError> {
     ts_submission::Entity::find_by_id(id)
         .one(db)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("Trasmissione STS {id} non trovata")))
+        .ok_or_else(|| not_found(id))
+}
+
+fn not_found(id: i64) -> AppError {
+    AppError::NotFound(format!("Trasmissione STS {id} non trovata"))
 }
 
 /// Whether the Sistema TS of `environment` holds, or may be about to hold,

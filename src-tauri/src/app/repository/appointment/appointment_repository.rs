@@ -1,5 +1,5 @@
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait, FromQueryResult, Statement,
+    ActiveModelTrait, ActiveValue::Set, ConnectionTrait, EntityTrait, FromQueryResult, Statement,
 };
 
 use super::AppointmentRow;
@@ -9,7 +9,7 @@ use crate::app::model::appointment::Appointment;
 
 /// Returns all appointments matching the given optional filters.
 pub async fn find_all(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     date_from: Option<String>,
     date_to: Option<String>,
     client_id: Option<i64>,
@@ -55,8 +55,8 @@ fn filter_clauses(
     (conditions, values)
 }
 
-/// Returns a single appointment by id.
-pub async fn find_by_id(db: &DatabaseConnection, id: i64) -> Result<Appointment, AppError> {
+/// The appointment, or `NotFound`: the one lookup that requires it to exist.
+pub async fn require(db: &impl ConnectionTrait, id: i64) -> Result<Appointment, AppError> {
     let sql = format!("{APPOINTMENT_SELECT} WHERE a.id = ?");
 
     let mut results = load_appointments_by_sql(db, &sql, vec![id.into()]).await?;
@@ -75,14 +75,14 @@ pub async fn insert(
 
 /// Updates an appointment record.
 pub async fn update(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     active: appointments::ActiveModel,
 ) -> Result<appointments::Model, sea_orm::DbErr> {
     active.update(db).await
 }
 
 /// Deletes an appointment by id.
-pub async fn delete(db: &DatabaseConnection, id: i64) -> Result<(), sea_orm::DbErr> {
+pub async fn delete(db: &impl ConnectionTrait, id: i64) -> Result<(), sea_orm::DbErr> {
     appointments::Entity::delete_by_id(id).exec(db).await?;
     Ok(())
 }
@@ -102,7 +102,7 @@ pub async fn insert_recurrence_group(
 
 /// Returns completed appointments for the given month that have not yet been invoiced.
 pub async fn find_unbilled_for_month(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     year: i64,
     month: i64,
 ) -> Result<Vec<Appointment>, AppError> {
@@ -157,7 +157,7 @@ pub async fn mark_as_invoiced(
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
 async fn load_appointments_by_sql(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     sql: &str,
     values: Vec<sea_orm::Value>,
 ) -> Result<Vec<Appointment>, AppError> {

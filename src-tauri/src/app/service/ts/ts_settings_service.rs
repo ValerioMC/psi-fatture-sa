@@ -1,7 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::ts_setting::ActiveModel;
 use crate::app::model::ts::{TsEnvironment, TsSettings, UpdateTsSettingsInput};
 use crate::app::repository::config_repository;
@@ -19,9 +18,10 @@ pub async fn get(db: &impl ConnectionTrait) -> Result<TsSettings, AppError> {
 /// never saves the test one.
 pub async fn update(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     input: UpdateTsSettingsInput,
 ) -> Result<TsSettings, AppError> {
-    update_within(db, input, TsEnvironment::available()).await
+    update_within(db, clock, input, TsEnvironment::available()).await
 }
 
 async fn get_within(
@@ -52,6 +52,7 @@ async fn get_within(
 
 async fn update_within(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     input: UpdateTsSettingsInput,
     available: &[TsEnvironment],
 ) -> Result<TsSettings, AppError> {
@@ -69,7 +70,7 @@ async fn update_within(
         environment: Set(input.environment.as_str().to_owned()),
         username: Set(username),
         vat_number: Set(vat_number),
-        updated_at: Set(timestamp::now()),
+        updated_at: Set(clock.timestamp()),
     };
     ts_settings_repository::save(db, active).await?;
     get_within(db, available).await

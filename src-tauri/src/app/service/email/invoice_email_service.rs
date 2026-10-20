@@ -1,8 +1,7 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
 use super::{email_account_service, email_credential_service, email_template_service, EmailValues};
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::invoice_email::{self, ActiveModel};
 use crate::app::model::email::{
     EmailAccount, EmailConnectionCheck, EmailDraft, InvoiceEmail, InvoiceEmailFilters,
@@ -45,6 +44,7 @@ pub async fn prepare(db: &impl ConnectionTrait, invoice_id: i64) -> Result<Email
 /// A failure comes back as the error, after being recorded.
 pub async fn send(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     secrets: &dyn SecretStore,
     gateway: &dyn MailGateway,
     input: SendInvoiceEmailInput,
@@ -63,6 +63,7 @@ pub async fn send(
     let mail = outgoing_mail(&account, &recipient, &subject, &input.body, pdf);
     let sent = deliver_and_record(
         db,
+        clock,
         gateway,
         &session,
         &mail,
@@ -71,13 +72,14 @@ pub async fn send(
     )
     .await?;
     if input.remember_recipient {
-        save_recipient_if_none_on_file(db, &document, &recipient).await?;
+        save_recipient_if_none_on_file(db, clock, &document, &recipient).await?;
     }
     Ok(sent)
 }
 
 async fn deliver_and_record(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     gateway: &dyn MailGateway,
     session: &SmtpSession,
     mail: &OutgoingMail,
@@ -89,7 +91,7 @@ async fn deliver_and_record(
         .await
         .err()
         .map(|e| e.to_string());
-    let sent = record(db, invoice_id, mail, attachment_name, error.clone()).await?;
+    let sent = record(db, invoice_id, mail, attachment_name, error.clone(), clock).await?;
     if let Some(error) = error {
         log::warn!(target: "email", invoice_id = invoice_id; "invoice email not sent");
         return Err(AppError::External(error));
@@ -100,6 +102,7 @@ async fn deliver_and_record(
 /// Sends the template as it is, for invoices emailed in bulk from the list.
 pub async fn send_prepared(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     secrets: &dyn SecretStore,
     gateway: &dyn MailGateway,
     invoice_id: i64,
@@ -112,6 +115,7 @@ pub async fn send_prepared(
     }
     send(
         db,
+        clock,
         secrets,
         gateway,
         SendInvoiceEmailInput {
@@ -209,12 +213,14 @@ fn outgoing_mail(
 /// An address typed by hand never overwrites the one in the patient's file.
 async fn save_recipient_if_none_on_file(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     document: &InvoiceDocument,
     recipient: &str,
 ) -> Result<(), AppError> {
     let on_file = document.client.email.as_deref().map(str::trim);
     if on_file.is_none_or(str::is_empty) {
-        client_repository::update_email(db, document.client.id, recipient).await?;
+        client_repository::update_email(db, document.client.id, recipient, &clock.timestamp())
+            .await?;
     }
     Ok(())
 }
@@ -231,6 +237,7 @@ async fn record(
     mail: &OutgoingMail,
     attachment_name: &str,
     error: Option<String>,
+    clock: &dyn Clock,
 ) -> Result<InvoiceEmail, AppError> {
     let status = if error.is_some() {
         InvoiceEmailStatus::Failed
@@ -244,7 +251,7 @@ async fn record(
         attachment_name: Set(attachment_name.to_string()),
         status: Set(status.as_str().to_string()),
         error: Set(error),
-        sent_at: Set(timestamp::now()),
+        sent_at: Set(clock.timestamp()),
         ..Default::default()
     };
     into_domain(invoice_email_repository::insert(db, active).await?)

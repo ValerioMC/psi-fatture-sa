@@ -7,7 +7,7 @@
  * as a set of distinct instruments rather than a strip of numbers.
  */
 import type { Component } from 'vue'
-import type { Tone } from '@/utils/labels'
+import type { Tone } from '@/common/lib/labels'
 
 withDefaults(
   defineProps<{

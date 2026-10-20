@@ -3,7 +3,7 @@
 
 use crate::app::common::AppError;
 use crate::app::model::update::{LatestRelease, Platform, ReleaseVersion, UpdateCheck};
-use crate::app::repository::release::ReleaseGateway;
+use crate::app::repository::update::ReleaseGateway;
 
 pub use super::update_install_service::{install, UpdateTarget};
 

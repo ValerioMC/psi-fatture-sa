@@ -213,7 +213,7 @@ async fn target_document_id(
     let Some(target) = submission.target_submission_id else {
         return Ok(None);
     };
-    let row = ts_submission_repository::find_row(db, target).await?;
+    let row = ts_submission_repository::require(db, target).await?;
     require_document_id(&row).map(Some)
 }
 

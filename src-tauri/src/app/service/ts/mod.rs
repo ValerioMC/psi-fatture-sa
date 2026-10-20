@@ -8,6 +8,7 @@ pub mod ts_transition_service;
 mod ts_dispatch_attempt;
 mod ts_dispatch_request;
 mod ts_document_service;
+mod ts_invoice_guard;
 
 use ts_dispatch_attempt::TsDispatchAttempt;
 use ts_dispatch_request::TsDispatchRequest;

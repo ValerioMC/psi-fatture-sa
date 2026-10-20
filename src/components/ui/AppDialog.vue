@@ -5,7 +5,7 @@
  */
 import { ref, toRef, useId } from 'vue'
 import { X } from 'lucide-vue-next'
-import { useFocusTrap } from '@/composables/useFocusTrap'
+import { useFocusTrap } from '@/common/composables/useFocusTrap'
 import AppButton from './AppButton.vue'
 
 const props = withDefaults(

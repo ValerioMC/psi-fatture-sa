@@ -2,11 +2,12 @@ use super::*;
 use crate::app::model::email::{EmailProvider, EmailSecurity, UpdateEmailAccountInput};
 use crate::app::repository::email::MailGatewayError;
 use crate::test_support::email_database::{self, CANCELLED, DRAFT, ISSUED, PAID};
-use crate::test_support::{FakeMailGateway, InMemorySecretStore};
+use crate::test_support::{FakeMailGateway, FixedClock, InMemorySecretStore};
 
 async fn configured(db: &sea_orm::DatabaseConnection, bcc_self: bool) -> InMemorySecretStore {
     email_account_service::update(
         db,
+        &FixedClock::default(),
         UpdateEmailAccountInput {
             provider: EmailProvider::Psypec,
             sender_address: "maria.demo@psypec.it".into(),
@@ -64,6 +65,7 @@ async fn drafts_and_cancelled_invoices_are_not_sent() {
     let gateway = FakeMailGateway::default();
     assert!(send(
         &db,
+        &FixedClock::default(),
         &store,
         &gateway,
         input(DRAFT, "anna@example.it", false)
@@ -80,6 +82,7 @@ async fn sends_the_pdf_from_the_saved_mailbox_and_records_it() {
     let gateway = FakeMailGateway::default();
     let record = send(
         &db,
+        &FixedClock::default(),
         &store,
         &gateway,
         input(PAID, " Anna@Example.it ", false),
@@ -123,6 +126,7 @@ async fn a_refused_send_is_recorded_and_reported() {
     let gateway = FakeMailGateway::failing(MailGatewayError::Authentication);
     let error = send(
         &db,
+        &FixedClock::default(),
         &store,
         &gateway,
         input(ISSUED, "anna@example.it", false),
@@ -146,6 +150,7 @@ async fn nothing_is_sent_without_a_saved_mailbox_or_its_password() {
     let empty = InMemorySecretStore::default();
     let error = send(
         &db,
+        &FixedClock::default(),
         &empty,
         &gateway,
         input(ISSUED, "anna@example.it", false),
@@ -156,6 +161,7 @@ async fn nothing_is_sent_without_a_saved_mailbox_or_its_password() {
     configured(&db, false).await;
     let error = send(
         &db,
+        &FixedClock::default(),
         &empty,
         &gateway,
         input(ISSUED, "anna@example.it", false),
@@ -177,15 +183,22 @@ async fn refuses_a_malformed_recipient_before_calling_the_server() {
     let gateway = FakeMailGateway::default();
     assert!(send(
         &db,
+        &FixedClock::default(),
         &store,
         &gateway,
         input(ISSUED, "anna.example.it", false)
     )
     .await
     .is_err());
-    assert!(send(&db, &store, &gateway, input(ISSUED, "", false))
-        .await
-        .is_err());
+    assert!(send(
+        &db,
+        &FixedClock::default(),
+        &store,
+        &gateway,
+        input(ISSUED, "", false)
+    )
+    .await
+    .is_err());
     assert!(gateway.sent().is_empty());
 }
 
@@ -196,6 +209,7 @@ async fn remembers_a_new_address_on_the_patient_only_after_a_send() {
     let failing = FakeMailGateway::failing(MailGatewayError::Timeout);
     assert!(send(
         &db,
+        &FixedClock::default(),
         &store,
         &failing,
         input(ISSUED, "anna@example.it", true)
@@ -206,6 +220,7 @@ async fn remembers_a_new_address_on_the_patient_only_after_a_send() {
 
     send(
         &db,
+        &FixedClock::default(),
         &store,
         &FakeMailGateway::default(),
         input(ISSUED, "anna@example.it", true),
@@ -221,7 +236,7 @@ async fn a_bulk_send_skips_patients_without_an_address() {
     let db = email_database::setup(None).await;
     let store = configured(&db, false).await;
     let gateway = FakeMailGateway::default();
-    let error = send_prepared(&db, &store, &gateway, ISSUED)
+    let error = send_prepared(&db, &FixedClock::default(), &store, &gateway, ISSUED)
         .await
         .unwrap_err();
     assert!(error.to_string().contains("indirizzo email"));

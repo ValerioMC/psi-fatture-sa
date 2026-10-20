@@ -1,11 +1,11 @@
 //! The user's side of the Sistema TS queue: queueing a first transmission,
 //! a replacement or a cancellation of an accepted one, and withdrawing
 //! whatever has not left the machine yet. Sending is the worker's job.
+//! It also answers what an accepted transmission forbids on its invoice.
 
 use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::ts_submission::ActiveModel;
 use crate::app::model::ts::{
     TsDocumentId, TsEnvironment, TsOperation, TsSettings, TsSubmission, TsSubmissionFilters,
@@ -14,6 +14,10 @@ use crate::app::model::ts::{
 use crate::app::repository::ts::ts_submission_repository;
 use crate::app::service::support::validation as validate;
 use crate::app::service::ts::{ts_document_service, ts_settings_service};
+
+pub use super::ts_invoice_guard::{
+    ensure_invoice_removable, ensure_invoice_status_allowed, ensure_invoice_update_allowed,
+};
 
 const IN_FLIGHT: [TsSubmissionStatus; 2] =
     [TsSubmissionStatus::NonInviata, TsSubmissionStatus::Inviata];
@@ -29,6 +33,7 @@ pub async fn list(
 /// environment, checking now that the document can be built.
 pub async fn enqueue_invio(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     invoice_id: i64,
 ) -> Result<TsSubmission, AppError> {
     validate::validate_id(invoice_id, "Fattura")?;
@@ -42,7 +47,13 @@ pub async fn enqueue_invio(
 
     let created = ts_submission_repository::insert(
         &tx,
-        new_submission(invoice_id, TsOperation::Invio, None, settings.environment),
+        new_submission(
+            invoice_id,
+            TsOperation::Invio,
+            None,
+            settings.environment,
+            clock,
+        ),
     )
     .await?;
     tx.commit().await?;
@@ -52,23 +63,25 @@ pub async fn enqueue_invio(
 /// Queues a replacement of an accepted submission with the invoice's current data.
 pub async fn enqueue_replacement(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     target_submission_id: i64,
 ) -> Result<TsSubmission, AppError> {
-    enqueue_follow_up(db, target_submission_id, TsOperation::Sostituzione).await
+    enqueue_follow_up(db, clock, target_submission_id, TsOperation::Sostituzione).await
 }
 
 /// Queues the cancellation of an accepted submission.
 pub async fn enqueue_cancellation(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     target_submission_id: i64,
 ) -> Result<TsSubmission, AppError> {
-    enqueue_follow_up(db, target_submission_id, TsOperation::Annullamento).await
+    enqueue_follow_up(db, clock, target_submission_id, TsOperation::Annullamento).await
 }
 
 /// Removes a submission that is still waiting in the queue.
 pub async fn withdraw(db: &DatabaseConnection, submission_id: i64) -> Result<(), AppError> {
     validate::validate_id(submission_id, "Trasmissione STS")?;
-    let row = ts_submission_repository::find_row(db, submission_id).await?;
+    let row = ts_submission_repository::require(db, submission_id).await?;
     if TsSubmissionStatus::parse(&row.status)? != TsSubmissionStatus::NonInviata {
         return Err(AppError::Invalid(
             "Solo le trasmissioni non ancora inviate possono essere ritirate dalla coda"
@@ -76,14 +89,6 @@ pub async fn withdraw(db: &DatabaseConnection, submission_id: i64) -> Result<(),
         ));
     }
     ts_submission_repository::delete(db, submission_id).await
-}
-
-/// Whether deleting the invoice would orphan data the production Sistema TS holds.
-pub async fn blocks_invoice_deletion(
-    db: &DatabaseConnection,
-    invoice_id: i64,
-) -> Result<bool, AppError> {
-    ts_submission_repository::invoice_holds_ts_data(db, invoice_id, TsEnvironment::Produzione).await
 }
 
 /// Whether the invoice changed since the Sistema TS accepted its data, so a
@@ -138,13 +143,14 @@ async fn ensure_not_accepted_yet(
 
 async fn enqueue_follow_up(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     target_submission_id: i64,
     operation: TsOperation,
 ) -> Result<TsSubmission, AppError> {
     validate::validate_id(target_submission_id, "Trasmissione STS")?;
     let tx = db.begin().await?;
 
-    let target = ts_submission_repository::find_row(&tx, target_submission_id).await?;
+    let target = ts_submission_repository::require(&tx, target_submission_id).await?;
     ensure_accepted(&target, operation)?;
     let environment = TsEnvironment::parse(&target.environment)?;
     if operation == TsOperation::Sostituzione {
@@ -154,7 +160,13 @@ async fn enqueue_follow_up(
 
     let created = ts_submission_repository::insert(
         &tx,
-        new_submission(target.invoice_id, operation, Some(target.id), environment),
+        new_submission(
+            target.invoice_id,
+            operation,
+            Some(target.id),
+            environment,
+            clock,
+        ),
     )
     .await?;
     tx.commit().await?;
@@ -223,8 +235,9 @@ fn new_submission(
     operation: TsOperation,
     target_submission_id: Option<i64>,
     environment: TsEnvironment,
+    clock: &dyn Clock,
 ) -> ActiveModel {
-    let now = timestamp::now();
+    let now = clock.timestamp();
     ActiveModel {
         invoice_id: Set(invoice_id),
         operation: Set(operation.as_str().to_owned()),

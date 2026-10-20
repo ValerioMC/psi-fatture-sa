@@ -2,8 +2,7 @@ use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
 use super::email_template_renderer;
 use super::EmailValues;
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::email_template::ActiveModel;
 use crate::app::model::email::{
     EmailPlaceholder, EmailPlaceholderInfo, EmailPreview, EmailTemplate,
@@ -52,6 +51,7 @@ pub async fn get(db: &impl ConnectionTrait) -> Result<EmailTemplate, AppError> {
 
 pub async fn update(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     template: EmailTemplate,
 ) -> Result<EmailTemplate, AppError> {
     let template = EmailTemplate {
@@ -63,7 +63,7 @@ pub async fn update(
         id: Set(1),
         subject: Set(template.subject.clone()),
         body: Set(template.body.clone()),
-        updated_at: Set(timestamp::now()),
+        updated_at: Set(clock.timestamp()),
     };
     email_template_repository::save(db, active).await?;
     Ok(template)
@@ -78,10 +78,11 @@ pub async fn reset(db: &impl ConnectionTrait) -> Result<EmailTemplate, AppError>
 /// The template filled with an example patient and the professional's own name.
 pub async fn preview(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     template: EmailTemplate,
 ) -> Result<EmailPreview, AppError> {
     let profile = config_repository::find(db).await?;
-    let today = chrono::Local::now().date_naive();
+    let today = clock.local_now().date();
     let due = today + chrono::Duration::days(30);
     let professional = profile
         .map(|p| format!("{} {} {}", p.title, p.first_name, p.last_name))

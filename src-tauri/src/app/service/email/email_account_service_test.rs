@@ -1,5 +1,6 @@
 use super::*;
 use crate::test_support::email_database;
+use crate::test_support::FixedClock;
 
 fn input(provider: EmailProvider, address: &str) -> UpdateEmailAccountInput {
     UpdateEmailAccountInput {
@@ -38,9 +39,13 @@ async fn proposes_the_profile_pec_on_psypec_before_the_first_save() {
 #[tokio::test]
 async fn a_preset_provider_keeps_the_preset_server_whatever_is_typed() {
     let db = email_database::setup(None).await;
-    let account = update(&db, input(EmailProvider::Psypec, " Maria.Demo@Psypec.it "))
-        .await
-        .unwrap();
+    let account = update(
+        &db,
+        &FixedClock::default(),
+        input(EmailProvider::Psypec, " Maria.Demo@Psypec.it "),
+    )
+    .await
+    .unwrap();
     assert!(account.saved);
     assert_eq!(account.sender_address, "maria.demo@psypec.it");
     assert_eq!(
@@ -62,7 +67,7 @@ async fn a_custom_provider_stores_the_server_as_typed() {
     let db = email_database::setup(None).await;
     let mut custom = input(EmailProvider::Custom, "studio@example.it");
     custom.username = "studio".to_string();
-    let account = update(&db, custom).await.unwrap();
+    let account = update(&db, &FixedClock::default(), custom).await.unwrap();
     assert_eq!(account.smtp_host, "mail.example.it");
     assert_eq!(
         (account.smtp_port, account.security),
@@ -74,16 +79,26 @@ async fn a_custom_provider_stores_the_server_as_typed() {
 #[tokio::test]
 async fn refuses_malformed_accounts() {
     let db = email_database::setup(None).await;
-    assert!(update(&db, input(EmailProvider::Psypec, "")).await.is_err());
-    assert!(update(&db, input(EmailProvider::Psypec, "maria.psypec.it"))
-        .await
-        .is_err());
+    assert!(update(
+        &db,
+        &FixedClock::default(),
+        input(EmailProvider::Psypec, "")
+    )
+    .await
+    .is_err());
+    assert!(update(
+        &db,
+        &FixedClock::default(),
+        input(EmailProvider::Psypec, "maria.psypec.it")
+    )
+    .await
+    .is_err());
     let mut host = input(EmailProvider::Custom, "studio@example.it");
     host.smtp_host = "mail example".to_string();
-    assert!(update(&db, host).await.is_err());
+    assert!(update(&db, &FixedClock::default(), host).await.is_err());
     let mut port = input(EmailProvider::Custom, "studio@example.it");
     port.smtp_port = 0;
-    assert!(update(&db, port).await.is_err());
+    assert!(update(&db, &FixedClock::default(), port).await.is_err());
     assert!(!get(&db).await.unwrap().saved);
 }
 

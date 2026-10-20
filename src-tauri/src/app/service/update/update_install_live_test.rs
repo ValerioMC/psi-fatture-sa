@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::*;
-use crate::app::repository::release::{DiskImageInstaller, GithubReleaseGateway};
+use crate::app::repository::update::{DiskImageInstaller, GithubReleaseGateway};
 
 fn bundle_in(root: &Path) -> PathBuf {
     let bundle = root.join("Applications").join("PSI Fatture.app");

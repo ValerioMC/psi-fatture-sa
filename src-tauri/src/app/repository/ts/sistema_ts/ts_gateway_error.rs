@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::app::common::AppError;
+
 /// A call that produced no Sistema TS verdict. `Authentication` is the
 /// HTTP-level refusal of the username/password pair.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -18,4 +20,10 @@ pub enum TsGatewayError {
     Request(String),
     #[error("Ambiente Sistema TS non disponibile in questa versione dell'app")]
     UnavailableEnvironment,
+}
+
+impl From<TsGatewayError> for AppError {
+    fn from(error: TsGatewayError) -> Self {
+        AppError::External(error.to_string())
+    }
 }

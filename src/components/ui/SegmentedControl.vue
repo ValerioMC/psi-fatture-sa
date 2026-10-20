@@ -7,7 +7,7 @@
  * native radio group.
  */
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { Tone } from '@/utils/labels'
+import type { Tone } from '@/common/lib/labels'
 import type { SegmentOption } from './types'
 
 const props = withDefaults(

@@ -1,4 +1,4 @@
-import type { Tone } from '@/utils/labels'
+import type { Tone } from '@/common/lib/labels'
 
 /** One option of a SegmentedControl. */
 export interface SegmentOption<V> {

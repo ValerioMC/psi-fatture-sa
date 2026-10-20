@@ -1,6 +1,5 @@
-//! Pure, stateless helpers shared by several services: input validation, tax
-//! arithmetic and Italian formatting. None of them is a service of an entity.
+//! Pure, stateless helpers every domain shares: input validation and Italian
+//! formatting. None of them is a service of an entity or names a domain.
 
 pub mod italian_format;
-pub mod tax_calculator;
 pub mod validation;

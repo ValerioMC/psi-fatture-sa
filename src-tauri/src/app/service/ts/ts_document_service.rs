@@ -27,10 +27,8 @@ pub async fn build(
     vat_number: &str,
     id: Option<TsDocumentId>,
 ) -> Result<TsExpenseDocument, AppError> {
-    let invoice = invoice_repository::load_invoice(db, invoice_id).await?;
-    let client = client_repository::find_by_id(db, invoice.client_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("Paziente {} non trovato", invoice.client_id)))?;
+    let invoice = invoice_repository::require(db, invoice_id).await?;
+    let client = client_repository::require(db, invoice.client_id).await?;
     let regime = config_repository::find(db)
         .await?
         .map(|c| TaxRegime::from(c.tax_regime))

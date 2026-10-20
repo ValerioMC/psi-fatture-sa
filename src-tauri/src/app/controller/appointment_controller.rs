@@ -7,7 +7,6 @@ use crate::app::model::appointment::{
 };
 use crate::app::service::appointment_service;
 
-/// Lists appointments with optional date range and client filters.
 #[tauri::command]
 pub async fn list_appointments(
     state: State<'_, AppState>,
@@ -18,7 +17,6 @@ pub async fn list_appointments(
     appointment_service::list(&state.db, date_from, date_to, client_id).await
 }
 
-/// Creates a single appointment and returns it.
 #[tauri::command]
 pub async fn create_appointment(
     state: State<'_, AppState>,
@@ -36,16 +34,14 @@ pub async fn create_recurring_appointments(
     appointment_service::create_recurring(&state.db, input).await
 }
 
-/// Updates an appointment and returns the updated record.
 #[tauri::command]
 pub async fn update_appointment(
     state: State<'_, AppState>,
     input: UpdateAppointmentInput,
 ) -> Result<Appointment, AppError> {
-    appointment_service::update(&state.db, input).await
+    appointment_service::update(&state.db, state.clock.as_ref(), input).await
 }
 
-/// Deletes an appointment by id.
 #[tauri::command]
 pub async fn delete_appointment(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
     appointment_service::remove(&state.db, id).await

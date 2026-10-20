@@ -5,7 +5,7 @@
  * nothing went. The seal lands once, on an actual change to sent.
  */
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { describeMailMark, type MailMarkKind } from '@/utils/email'
+import { describeMailMark, type MailMarkKind } from '@/features/email/lib/email'
 
 const props = withDefaults(defineProps<{ kind: MailMarkKind; size?: number }>(), { size: 20 })
 

@@ -10,16 +10,17 @@ use std::sync::Arc;
 use tauri::Manager;
 
 use app::app_state::AppState;
+use app::common::SystemClock;
 use app::controller::{
     appointment_controller::*, backup_controller::*, client_controller::*, config_controller::*,
-    dashboard_controller::*, email_controller::*, invoice_controller::*, invoice_pdf_controller::*,
-    print_controller::*, service_controller::*, terms_controller::*, ts::ts_controller::*,
-    update_controller::*,
+    dashboard_controller::*, email_controller::*, invoice_change_controller::*,
+    invoice_controller::*, pdf_controller::*, service_controller::*, terms_controller::*,
+    ts::ts_controller::*, update_controller::*,
 };
 use app::repository::email::LettreMailGateway;
-use app::repository::release::{DiskImageInstaller, GithubReleaseGateway, ReleaseGateway};
 use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
 use app::repository::ts::sistema_ts::{HttpSistemaTsGateway, SistemaTsGateway};
+use app::repository::update::{DiskImageInstaller, GithubReleaseGateway, ReleaseGateway};
 use app::service::backup::RotatingBackups;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -136,6 +137,7 @@ fn build_app_state() -> AppState {
     );
     AppState {
         db,
+        clock: Arc::new(SystemClock),
         secrets,
         ts_gateway,
         mail_gateway: Arc::new(LettreMailGateway),
@@ -151,8 +153,13 @@ fn spawn_workers(handle: &tauri::AppHandle) {
     app::scheduler::ts_worker::spawn(
         handle.clone(),
         state.db.clone(),
+        state.clock.clone(),
         state.secrets.clone(),
         state.ts_gateway.clone(),
     );
-    app::scheduler::backup_worker::spawn(state.db.clone(), state.backups.clone());
+    app::scheduler::backup_worker::spawn(
+        state.db.clone(),
+        state.clock.clone(),
+        state.backups.clone(),
+    );
 }

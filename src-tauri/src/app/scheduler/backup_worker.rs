@@ -6,17 +6,17 @@ use std::time::Duration;
 
 use sea_orm::DatabaseConnection;
 
+use crate::app::common::Clock;
 use crate::app::service::backup::RotatingBackups;
 
 const FIRST_CHECK_AFTER: Duration = Duration::from_secs(5);
 const CHECK_EVERY: Duration = Duration::from_secs(3600);
 
-pub fn spawn(db: DatabaseConnection, backups: Arc<RotatingBackups>) {
+pub fn spawn(db: DatabaseConnection, clock: Arc<dyn Clock>, backups: Arc<RotatingBackups>) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(FIRST_CHECK_AFTER).await;
         loop {
-            let now = chrono::Local::now().naive_local();
-            if let Err(error) = backups.back_up_if_due(&db, now).await {
+            if let Err(error) = backups.back_up_if_due(&db, clock.local_now()).await {
                 log::warn!(target: "backup", error:% = error; "daily backup failed");
             }
             tokio::time::sleep(CHECK_EVERY).await;

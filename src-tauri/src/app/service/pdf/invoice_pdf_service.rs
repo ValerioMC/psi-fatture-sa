@@ -1,9 +1,12 @@
+use std::path::{Path, PathBuf};
+
 use krilla::metadata::Metadata;
 use sea_orm::ConnectionTrait;
 
 use crate::app::common::AppError;
 use crate::app::model::invoice::{Invoice, InvoicePdf};
 use crate::app::repository::invoice::invoice_repository;
+use crate::app::repository::pdf::document_file_repository;
 use crate::app::repository::{client_repository, config_repository};
 use crate::app::service::{client_service, config_service};
 
@@ -15,14 +18,32 @@ pub async fn render(db: &impl ConnectionTrait, invoice_id: i64) -> Result<Invoic
     render_document(&document)
 }
 
+/// Writes the PDF to the app's temporary folder, replacing an earlier preview, and returns where.
+pub async fn write_preview(
+    db: &impl ConnectionTrait,
+    invoice_id: i64,
+) -> Result<PathBuf, AppError> {
+    let pdf = render(db, invoice_id).await?;
+    document_file_repository::write_preview(&pdf.file_name, &pdf.bytes)
+}
+
+pub async fn save(db: &impl ConnectionTrait, invoice_id: i64, path: &Path) -> Result<(), AppError> {
+    let pdf = render(db, invoice_id).await?;
+    document_file_repository::write(path, &pdf.bytes)
+}
+
+/// Loads the whole document, so an incomplete profile is reported before the save dialog opens.
+pub async fn file_name_of(db: &impl ConnectionTrait, invoice_id: i64) -> Result<String, AppError> {
+    let document = load_document(db, invoice_id).await?;
+    Ok(file_name(&document.invoice))
+}
+
 pub async fn load_document(
     db: &impl ConnectionTrait,
     invoice_id: i64,
 ) -> Result<InvoiceDocument, AppError> {
-    let invoice = invoice_repository::load_invoice(db, invoice_id).await?;
-    let client = client_repository::find_by_id(db, invoice.client_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound(format!("Paziente {} non trovato", invoice.client_id)))?;
+    let invoice = invoice_repository::require(db, invoice_id).await?;
+    let client = client_repository::require(db, invoice.client_id).await?;
     let config = config_repository::find(db).await?.ok_or_else(|| {
         AppError::Invalid(
             "Completa il profilo professionale prima di preparare la fattura".to_string(),

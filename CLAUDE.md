@@ -26,14 +26,28 @@ Layering, one-type-per-file, typed errors and test placement are described in
 
 ## Backend structure
 
+- **Every layer is cut by the same domains.** A domain with one entity named like itself is a
+  flat file (`client_service.rs`), otherwise a folder (`service/ts/`). Which domain may use which
+  is the `ALLOWED` table in `src-tauri/tests/architecture/domain_edges.rs`, mirrored in the
+  README; layer direction is checked in `layer_direction.rs`. A new edge changes both tables
+  in the same commit, or the code changes instead. No cycles: `ts` depends on `invoice`, never
+  the reverse.
+- **A cross-entity flow is its own small service** that calls the entity services and holds no
+  queries (`invoice_change_service`: Sistema TS rules first, then `invoice_service`).
 - **One service per entity.** `service/<entity>_service.rs`, or a package `service/<entity>/`
   when the entity needs collaborators. In a package only `<entity>_service` is `pub`; the other
   files (rules, value types) are private modules with `pub(super)` items, re-exported by `mod.rs`.
   Example: `service/invoice/` (`invoice_service`, `invoice_guard`, `ClientSessions`, `InvoiceContent`).
-- **`service/support/` is not a service.** Pure, stateless helpers shared by several services
-  (`validation`, `tax_calculator`, `italian_format`). No database, no gateway, no `_service` name.
+- **`service/support/` is not a service.** Pure, stateless helpers every domain shares
+  (`validation`, `italian_format`); it names no domain. A rule of one domain lives in that
+  domain (`model/tax/tax_calculator`, `service/invoice/invoice_validation`).
 - **Controllers forward.** A Tauri command validates nothing and maps nothing beyond calling one
-  service function with `&state.db` and the gateways it needs.
+  service function with `&state.db` and the gateways it needs. It never names a repository.
+- **Time comes from `Clock`.** Only `SystemClock` reads the system time; services receive
+  `&dyn Clock` (or a `now` taken from it), repositories receive the timestamp as an argument,
+  tests use `FixedClock`.
+- **Repositories take `&impl ConnectionTrait`**, so a query runs in the caller's transaction.
+  `require(db, id)` is each repository's one must-exist lookup, returning `NotFound`.
 - **Repositories return data, not presentation.** Numbers as numbers, dates as stored; formatting
   (`"007"`, `05/03`, `€ 70,00`) happens in the service or the PDF/email layer.
 - **Rules live in one place.** A business rule that refuses a change (numbering, Sistema TS
@@ -41,9 +55,16 @@ Layering, one-type-per-file, typed errors and test placement are described in
 
 ## Frontend structure
 
-- Every backend call goes through `src/api.ts`; views and components never call `invoke` directly.
-- Domain logic lives in `src/utils/*.ts` (pure, unit-tested) or a composable; a `.vue` file keeps
-  only presentation state. Totals shown to the user come from the backend (`preview_invoice_totals`).
+- **Feature folders.** `src/features/<feature>/{api,model,store,composables,lib,components,views}`,
+  features named like the backend domains. What no feature owns goes in `src/common/` or
+  `src/components/{ui,layout}`.
+- Every backend call goes through a `features/<feature>/api/` module, one per backend domain;
+  views and components never call `invoke` directly.
+- Domain logic lives in `features/<feature>/lib/*.ts` (pure, unit-tested) or a composable; a
+  `.vue` file keeps only presentation state. Totals shown to the user come from the backend
+  (`preview_invoice_totals`).
+- Tests sit beside the module: `foo.ts` is tested in `foo.test.ts`, one test file per module.
+- Split a component when it does several jobs or serves several entities, not for its length.
 - `<script setup lang="ts">`, typed `defineProps`/`defineEmits`, no `any`.
 
 ## Before handing work back

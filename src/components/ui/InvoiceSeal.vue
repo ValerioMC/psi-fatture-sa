@@ -23,8 +23,8 @@
  * draws itself when a draft is issued.
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import type { InvoiceStatus } from '@/types'
-import { deriveSeal, describeSeal, type SealKind } from '@/utils/invoiceSeal'
+import type { InvoiceStatus } from '@/features/invoice/model/invoice'
+import { deriveSeal, describeSeal, type SealKind } from '@/features/invoice/lib/invoiceSeal'
 
 const props = withDefaults(
   defineProps<{

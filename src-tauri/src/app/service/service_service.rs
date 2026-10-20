@@ -1,7 +1,6 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::service::{self, ActiveModel};
 use crate::app::model::service::{CreateServiceInput, Service, UpdateServiceInput};
 use crate::app::repository::service_repository;
@@ -33,9 +32,9 @@ pub async fn create(
 /// Updates an existing service and returns the updated record.
 pub async fn update(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     input: UpdateServiceInput,
 ) -> Result<Service, AppError> {
-    let now = timestamp::now();
     let active = ActiveModel {
         id: Set(input.id),
         name: Set(input.name),
@@ -43,7 +42,7 @@ pub async fn update(
         default_price: Set(input.default_price),
         vat_rate: Set(input.vat_rate),
         is_active: Set(input.is_active as i32),
-        updated_at: Set(now),
+        updated_at: Set(clock.timestamp()),
         ..Default::default()
     };
 

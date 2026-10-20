@@ -2,9 +2,6 @@ use sea_orm::DbErr;
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
-use crate::app::repository::secret::SecretStoreError;
-use crate::app::repository::ts::sistema_ts::TsGatewayError;
-
 /// Every way an application command can fail. The kind drives handling in
 /// Rust; the frontend receives only the Italian message, serialized as a string.
 #[derive(Debug, Error)]
@@ -22,18 +19,6 @@ pub enum AppError {
     /// A failure outside the app: Sistema TS, mail server, file system, credentials.
     #[error("{0}")]
     External(String),
-}
-
-impl From<SecretStoreError> for AppError {
-    fn from(error: SecretStoreError) -> Self {
-        AppError::External(error.to_string())
-    }
-}
-
-impl From<TsGatewayError> for AppError {
-    fn from(error: TsGatewayError) -> Self {
-        AppError::External(error.to_string())
-    }
 }
 
 impl From<tauri::Error> for AppError {

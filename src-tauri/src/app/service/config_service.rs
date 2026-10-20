@@ -1,7 +1,6 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::professional_config::{self, ActiveModel};
 use crate::app::model::config::{Profession, ProfessionalConfig, TaxRegime, UpsertConfigInput};
 use crate::app::repository::config_repository;
@@ -16,10 +15,12 @@ pub async fn get(db: &DatabaseConnection) -> Result<Option<ProfessionalConfig>, 
 /// Inserts or updates the professional config (singleton, id=1).
 pub async fn upsert(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     input: UpsertConfigInput,
 ) -> Result<ProfessionalConfig, AppError> {
     validate_config_input(&input)?;
-    let active = build_active_model(&input);
+    let mut active = build_active_model(&input);
+    active.updated_at = Set(clock.timestamp());
     let model = config_repository::save(db, active).await?;
     Ok(into_domain(model))
 }
@@ -76,7 +77,6 @@ fn build_active_model(input: &UpsertConfigInput) -> ActiveModel {
         hide_quantity_in_invoice: Set(input.hide_quantity_in_invoice as i32),
         enpap_excludes_bollo: Set(input.enpap_excludes_bollo as i32),
         initial_invoice_number: Set(input.initial_invoice_number),
-        updated_at: Set(timestamp::now()),
         ..Default::default()
     }
 }

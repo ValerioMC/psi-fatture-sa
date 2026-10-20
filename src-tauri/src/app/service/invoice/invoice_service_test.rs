@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_support::FixedClock;
 
 #[test]
 fn last_day_of_month_handles_regular_and_leap_years() {
@@ -10,13 +11,14 @@ fn last_day_of_month_handles_regular_and_leap_years() {
 
 #[test]
 fn paid_date_kept_for_paid_and_cleared_otherwise() {
-    let kept = resolve_paid_date(&InvoiceStatus::Paid, Some("2026-07-01"));
+    let clock = FixedClock::at("2026-03-10 09:00:00");
+    let kept = resolve_paid_date(&InvoiceStatus::Paid, Some("2026-07-01"), &clock);
     assert_eq!(kept, Some("2026-07-01".to_string()));
 
-    let defaulted = resolve_paid_date(&InvoiceStatus::Paid, None);
-    assert!(defaulted.is_some());
+    let defaulted = resolve_paid_date(&InvoiceStatus::Paid, None, &clock);
+    assert_eq!(defaulted, Some("2026-03-10".to_string()));
 
-    let cleared = resolve_paid_date(&InvoiceStatus::Issued, Some("2026-07-01"));
+    let cleared = resolve_paid_date(&InvoiceStatus::Issued, Some("2026-07-01"), &clock);
     assert_eq!(cleared, None);
 }
 
@@ -112,34 +114,56 @@ fn update_input_from(invoice: &Invoice, new_number: Option<&str>) -> UpdateInvoi
 async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
     let db = test_db().await;
 
-    let first = create(&db, invoice_input("2026-03-01")).await.unwrap();
-    let second = create(&db, invoice_input("2026-04-01")).await.unwrap();
+    let first = create(&db, &FixedClock::default(), invoice_input("2026-03-01"))
+        .await
+        .unwrap();
+    let second = create(&db, &FixedClock::default(), invoice_input("2026-04-01"))
+        .await
+        .unwrap();
     assert_eq!(first.invoice_number, "001");
     assert_eq!(second.invoice_number, "002");
 
     // Taking a number already in use must fail with a clear message.
-    let err = update(&db, update_input_from(&second, Some("001")))
-        .await
-        .unwrap_err();
+    let err = update(
+        &db,
+        &FixedClock::default(),
+        update_input_from(&second, Some("001")),
+    )
+    .await
+    .unwrap_err();
     assert!(err.to_string().contains("già utilizzato"));
 
     // Renumbering to a free number works and is zero-padded.
-    let renumbered = update(&db, update_input_from(&second, Some("7")))
-        .await
-        .unwrap();
+    let renumbered = update(
+        &db,
+        &FixedClock::default(),
+        update_input_from(&second, Some("7")),
+    )
+    .await
+    .unwrap();
     assert_eq!(renumbered.invoice_number, "007");
 
     // The freed number 002 can now be reassigned (gap filling), keeping dates in order.
-    let third = create(&db, invoice_input("2026-04-01")).await.unwrap();
-    let filled = update(&db, update_input_from(&third, Some("2")))
+    let third = create(&db, &FixedClock::default(), invoice_input("2026-04-01"))
         .await
         .unwrap();
+    let filled = update(
+        &db,
+        &FixedClock::default(),
+        update_input_from(&third, Some("2")),
+    )
+    .await
+    .unwrap();
     assert_eq!(filled.invoice_number, "002");
 
     // Update without a number keeps the current one.
-    let untouched = update(&db, update_input_from(&renumbered, None))
-        .await
-        .unwrap();
+    let untouched = update(
+        &db,
+        &FixedClock::default(),
+        update_input_from(&renumbered, None),
+    )
+    .await
+    .unwrap();
     assert_eq!(untouched.invoice_number, "007");
 }
 
@@ -147,12 +171,14 @@ async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
 async fn moving_issue_date_to_another_year_updates_year_column() {
     let db = test_db().await;
 
-    let invoice = create(&db, invoice_input("2026-03-01")).await.unwrap();
+    let invoice = create(&db, &FixedClock::default(), invoice_input("2026-03-01"))
+        .await
+        .unwrap();
     assert_eq!(invoice.year, 2026);
 
     let mut input = update_input_from(&invoice, None);
     input.issue_date = "2025-12-31".to_string();
-    let moved = update(&db, input).await.unwrap();
+    let moved = update(&db, &FixedClock::default(), input).await.unwrap();
     assert_eq!(moved.year, 2025);
 }
 
@@ -177,7 +203,9 @@ fn package_input() -> CreateInvoiceInput {
 async fn hand_typed_amount_is_taxed_and_kept_on_the_line() {
     let db = test_db().await;
 
-    let invoice = create(&db, package_input()).await.unwrap();
+    let invoice = create(&db, &FixedClock::default(), package_input())
+        .await
+        .unwrap();
     assert_eq!(invoice.total_net, 250.0);
     assert_eq!(invoice.contributo_enpap, 5.04);
     assert_eq!(invoice.total_due, 257.04);
@@ -185,9 +213,13 @@ async fn hand_typed_amount_is_taxed_and_kept_on_the_line() {
     assert_eq!(invoice.lines[0].line_total, 250.0);
 
     // Saving it again unchanged keeps the amount instead of recomputing 4 × 70.
-    let resaved = update(&db, update_input_from(&invoice, None))
-        .await
-        .unwrap();
+    let resaved = update(
+        &db,
+        &FixedClock::default(),
+        update_input_from(&invoice, None),
+    )
+    .await
+    .unwrap();
     assert_eq!(resaved.total_net, 250.0);
 }
 
@@ -196,7 +228,7 @@ async fn invalid_hand_typed_amount_is_refused() {
     let db = test_db().await;
     let mut input = package_input();
     input.lines[0].amount_override = Some(-1.0);
-    assert!(create(&db, input).await.is_err());
+    assert!(create(&db, &FixedClock::default(), input).await.is_err());
 }
 
 #[tokio::test]
@@ -206,7 +238,7 @@ async fn ordinario_leaves_bollo_out_of_enpap() {
 
     let mut input = invoice_input("2026-03-01");
     input.lines[0].unit_price = 100.0;
-    let invoice = create(&db, input).await.unwrap();
+    let invoice = create(&db, &FixedClock::default(), input).await.unwrap();
     assert!(invoice.marca_da_bollo);
     assert_eq!(invoice.contributo_enpap, 2.0);
 }
@@ -218,7 +250,7 @@ async fn forfettario_profile_can_force_bollo_out_of_enpap() {
 
     let mut input = invoice_input("2026-03-01");
     input.lines[0].unit_price = 100.0;
-    let invoice = create(&db, input).await.unwrap();
+    let invoice = create(&db, &FixedClock::default(), input).await.unwrap();
     assert_eq!(invoice.contributo_enpap, 2.0);
 }
 
@@ -230,18 +262,27 @@ async fn quantity_visibility_follows_patient_then_profile() {
         .await
         .unwrap();
 
-    let from_profile = create(&db, invoice_input("2026-03-01")).await.unwrap();
+    let from_profile = create(&db, &FixedClock::default(), invoice_input("2026-03-01"))
+        .await
+        .unwrap();
     assert!(from_profile.hide_quantity);
 
     db.execute_unprepared("UPDATE clients SET hide_quantity_in_invoice = 0")
         .await
         .unwrap();
-    let from_patient = create(&db, invoice_input("2026-03-02")).await.unwrap();
+    let from_patient = create(&db, &FixedClock::default(), invoice_input("2026-03-02"))
+        .await
+        .unwrap();
     assert!(!from_patient.hide_quantity);
 
     let mut explicit = invoice_input("2026-03-03");
     explicit.hide_quantity = Some(true);
-    assert!(create(&db, explicit).await.unwrap().hide_quantity);
+    assert!(
+        create(&db, &FixedClock::default(), explicit)
+            .await
+            .unwrap()
+            .hide_quantity
+    );
 }
 
 #[tokio::test]
@@ -249,27 +290,44 @@ async fn update_without_visibility_keeps_the_saved_one() {
     let db = test_db().await;
     let mut input = invoice_input("2026-03-01");
     input.hide_quantity = Some(true);
-    let invoice = create(&db, input).await.unwrap();
+    let invoice = create(&db, &FixedClock::default(), input).await.unwrap();
 
-    let kept = update(&db, update_input_from(&invoice, None))
-        .await
-        .unwrap();
+    let kept = update(
+        &db,
+        &FixedClock::default(),
+        update_input_from(&invoice, None),
+    )
+    .await
+    .unwrap();
     assert!(kept.hide_quantity);
 
     let mut shown = update_input_from(&invoice, None);
     shown.hide_quantity = Some(false);
-    assert!(!update(&db, shown).await.unwrap().hide_quantity);
+    assert!(
+        !update(&db, &FixedClock::default(), shown)
+            .await
+            .unwrap()
+            .hide_quantity
+    );
 }
 
 #[tokio::test]
 async fn a_new_invoice_cannot_predate_the_last_one_of_the_year() {
     let db = test_db().await;
-    create(&db, invoice_input("2026-04-10")).await.unwrap();
+    create(&db, &FixedClock::default(), invoice_input("2026-04-10"))
+        .await
+        .unwrap();
 
-    let error = create(&db, invoice_input("2026-04-09")).await.unwrap_err();
+    let error = create(&db, &FixedClock::default(), invoice_input("2026-04-09"))
+        .await
+        .unwrap_err();
 
     assert!(matches!(error, AppError::Conflict(_)));
-    assert!(create(&db, invoice_input("2026-04-10")).await.is_ok());
+    assert!(
+        create(&db, &FixedClock::default(), invoice_input("2026-04-10"))
+            .await
+            .is_ok()
+    );
 }
 
 #[tokio::test]
@@ -278,7 +336,9 @@ async fn a_zero_total_invoice_is_refused() {
     let mut input = invoice_input("2026-03-01");
     input.lines[0].unit_price = 0.0;
 
-    let error = create(&db, input).await.unwrap_err();
+    let error = create(&db, &FixedClock::default(), input)
+        .await
+        .unwrap_err();
 
     assert!(matches!(error, AppError::Invalid(_)));
 }
@@ -311,7 +371,7 @@ async fn monthly_invoicing_refuses_sessions_without_a_price() {
     let preview = preview_monthly(&db, 2026, 3).await.unwrap();
     assert!(preview[0].missing_price);
 
-    let error = generate_monthly(&db, monthly_input(None))
+    let error = generate_monthly(&db, &FixedClock::default(), monthly_input(None))
         .await
         .unwrap_err();
     assert!(error.to_string().contains("Luca Bianchi"));
@@ -327,16 +387,22 @@ async fn monthly_invoicing_takes_an_explicit_issue_date() {
     .await
     .unwrap();
     completed_session(&db, "2026-03-05", "1").await;
-    create(&db, invoice_input("2026-04-02")).await.unwrap();
+    create(&db, &FixedClock::default(), invoice_input("2026-04-02"))
+        .await
+        .unwrap();
 
-    let late = generate_monthly(&db, monthly_input(None))
+    let late = generate_monthly(&db, &FixedClock::default(), monthly_input(None))
         .await
         .unwrap_err();
     assert!(matches!(late, AppError::Conflict(_)));
 
-    let created = generate_monthly(&db, monthly_input(Some("2026-04-03")))
-        .await
-        .unwrap();
+    let created = generate_monthly(
+        &db,
+        &FixedClock::default(),
+        monthly_input(Some("2026-04-03")),
+    )
+    .await
+    .unwrap();
     assert_eq!(created[0].issue_date, "2026-04-03");
     assert_eq!(created[0].invoice_number, "002");
 }

@@ -5,7 +5,7 @@ use crate::app::service::ts::ts_dispatch_service;
 use crate::app::service::ts::ts_submission_service as queue;
 use crate::test_support::clock::at;
 use crate::test_support::ts_database::setup;
-use crate::test_support::{FakeGateway, InMemorySecretStore, RecordedCall};
+use crate::test_support::{FakeGateway, FixedClock, InMemorySecretStore, RecordedCall};
 
 fn store() -> InMemorySecretStore {
     let store = InMemorySecretStore::default();
@@ -49,7 +49,9 @@ async fn never_sent_invoice_is_looked_up_by_its_own_id() {
 async fn sent_invoice_is_looked_up_by_the_id_it_was_accepted_with() {
     let db = setup().await;
     let gateway = FakeGateway::default();
-    let sent = queue::enqueue_invio(&db, 1).await.unwrap();
+    let sent = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     ts_dispatch_service::dispatch_due(&db, &store(), &gateway, &|_| {}, at("2099-01-01 10:00:00"))
         .await
         .unwrap();
@@ -128,12 +130,19 @@ async fn monthly_report_surfaces_refusals_and_bad_periods() {
 async fn connection_check_reads_not_found_as_valid_credentials() {
     let db = setup().await;
     let gateway = FakeGateway::default();
-    let check = check_connection(&db, &store(), &gateway).await.unwrap();
-    assert!(check.ok);
-
-    let missing = check_connection(&db, &InMemorySecretStore::default(), &gateway)
+    let check = check_connection(&db, &FixedClock::default(), &store(), &gateway)
         .await
         .unwrap();
+    assert!(check.ok);
+
+    let missing = check_connection(
+        &db,
+        &FixedClock::default(),
+        &InMemorySecretStore::default(),
+        &gateway,
+    )
+    .await
+    .unwrap();
     assert!(!missing.ok);
     assert!(missing.message.contains("password"));
 }

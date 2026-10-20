@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    EntityTrait, FromQueryResult, QueryFilter, QueryOrder, Statement,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult,
+    QueryFilter, QueryOrder, Statement,
 };
 
 use super::{InvoiceRow, NumberedDate};
-use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::entity::{invoice as invoices, invoice_line};
 use crate::app::model::config::TaxRegime;
@@ -15,7 +14,7 @@ use crate::app::model::tax::{round_cents, InvoiceLineData, TaxProfile};
 
 /// Returns invoice ids matching the given filters.
 pub async fn find_ids(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     filters: &InvoiceFilters,
 ) -> Result<Vec<i64>, AppError> {
     let (conditions, values) = filter_clauses(filters);
@@ -77,7 +76,8 @@ const SEARCH_CONDITION: &str =
     "(lower(c.first_name || ' ' || c.last_name) LIKE lower(?) OR i.invoice_number LIKE ?)";
 
 /// Loads a full invoice (with client_name and lines) by id.
-pub async fn load_invoice(db: &impl ConnectionTrait, id: i64) -> Result<Invoice, AppError> {
+/// The invoice with its lines, or `NotFound`: the one lookup that requires it to exist.
+pub async fn require(db: &impl ConnectionTrait, id: i64) -> Result<Invoice, AppError> {
     let row = InvoiceRow::find_by_statement(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Sqlite,
         "SELECT i.*, c.first_name || ' ' || c.last_name AS client_name
@@ -99,7 +99,7 @@ fn in_clause_of(ids: &[i64]) -> (String, Vec<sea_orm::Value>) {
     (placeholders, ids.iter().map(|id| (*id).into()).collect())
 }
 
-async fn find_rows(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<InvoiceRow>, AppError> {
+async fn find_rows(db: &impl ConnectionTrait, ids: &[i64]) -> Result<Vec<InvoiceRow>, AppError> {
     let (placeholders, values) = in_clause_of(ids);
     let sql = format!(
         "SELECT i.*, c.first_name || ' ' || c.last_name AS client_name
@@ -112,7 +112,7 @@ async fn find_rows(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<InvoiceRo
 }
 
 async fn find_line_models(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     ids: &[i64],
 ) -> Result<Vec<invoice_line::Model>, AppError> {
     let (placeholders, values) = in_clause_of(ids);
@@ -126,7 +126,10 @@ async fn find_line_models(
 
 /// Loads multiple invoices (with client_name and lines) in two queries,
 /// preserving the order of the given ids.
-pub async fn load_invoices(db: &DatabaseConnection, ids: &[i64]) -> Result<Vec<Invoice>, AppError> {
+pub async fn load_invoices(
+    db: &impl ConnectionTrait,
+    ids: &[i64],
+) -> Result<Vec<Invoice>, AppError> {
     if ids.is_empty() {
         return Ok(vec![]);
     }
@@ -177,7 +180,7 @@ pub async fn update_invoice(
 }
 
 /// Deletes an invoice by id.
-pub async fn delete_invoice(db: &DatabaseConnection, id: i64) -> Result<(), sea_orm::DbErr> {
+pub async fn delete_invoice(db: &impl ConnectionTrait, id: i64) -> Result<(), sea_orm::DbErr> {
     invoices::Entity::delete_by_id(id).exec(db).await?;
     Ok(())
 }
@@ -328,10 +331,11 @@ pub async fn default_hide_quantity(
 /// Updates the status (and optionally paid_date) for multiple invoices in one
 /// query, returning the number of rows actually updated.
 pub async fn bulk_update_status(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     ids: &[i64],
     status: &str,
     paid_date: &Option<String>,
+    updated_at: &str,
 ) -> Result<u64, AppError> {
     if ids.is_empty() {
         return Ok(0);
@@ -341,11 +345,8 @@ pub async fn bulk_update_status(
     let sql = format!(
         "UPDATE invoices SET status = ?, paid_date = ?, updated_at = ? WHERE id IN ({placeholders})"
     );
-    let mut values: Vec<sea_orm::Value> = vec![
-        status.into(),
-        paid_date.clone().into(),
-        timestamp::now().into(),
-    ];
+    let mut values: Vec<sea_orm::Value> =
+        vec![status.into(), paid_date.clone().into(), updated_at.into()];
     values.extend(id_values);
 
     let result = db

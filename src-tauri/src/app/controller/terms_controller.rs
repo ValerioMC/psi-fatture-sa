@@ -19,5 +19,5 @@ pub async fn accept_terms(
     state: State<'_, AppState>,
     input: AcceptTermsInput,
 ) -> Result<TermsAcceptance, AppError> {
-    terms_service::accept(&state.db, input).await
+    terms_service::accept(&state.db, state.clock.as_ref(), input).await
 }

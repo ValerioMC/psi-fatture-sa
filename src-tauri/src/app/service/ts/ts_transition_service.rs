@@ -44,7 +44,7 @@ pub async fn release_for_retry(
     error: &str,
     now: NaiveDateTime,
 ) -> Result<TsSubmission, AppError> {
-    let row = ts_submission_repository::find_row(db, id).await?;
+    let row = ts_submission_repository::require(db, id).await?;
     transition_guard(&row, TsSubmissionStatus::NonInviata)?;
 
     let attempts = row.attempt_count;
@@ -66,7 +66,7 @@ pub async fn reject_locally(
     reason: &str,
     now: NaiveDateTime,
 ) -> Result<TsSubmission, AppError> {
-    let row = ts_submission_repository::find_row(db, id).await?;
+    let row = ts_submission_repository::require(db, id).await?;
     transition_guard(&row, TsSubmissionStatus::Scartata)?;
 
     let stamp = timestamp::format(now);
@@ -99,7 +99,7 @@ where
     let stamp = timestamp::format(now);
     let tx = db.begin().await?;
 
-    let row = ts_submission_repository::find_row(&tx, id).await?;
+    let row = ts_submission_repository::require(&tx, id).await?;
     transition_guard(&row, next)?;
     let retired_target = retired_target(&row, outcome)?;
     store_verdict(&tx, row, next, outcome, &stamp).await?;
@@ -161,7 +161,7 @@ async fn retire_target(
     retired: TsSubmissionStatus,
     stamp: &str,
 ) -> Result<(), AppError> {
-    let target = ts_submission_repository::find_row(db, target_id).await?;
+    let target = ts_submission_repository::require(db, target_id).await?;
     transition_guard(&target, retired)?;
     let mut active = target.into_active_model();
     active.status = Set(retired.as_str().to_owned());

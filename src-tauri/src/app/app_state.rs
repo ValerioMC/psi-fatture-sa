@@ -2,15 +2,17 @@ use std::sync::Arc;
 
 use sea_orm::DatabaseConnection;
 
+use crate::app::common::Clock;
 use crate::app::repository::email::MailGateway;
-use crate::app::repository::release::{BundleInstaller, ReleaseGateway};
 use crate::app::repository::secret::SecretStore;
 use crate::app::repository::ts::sistema_ts::SistemaTsGateway;
+use crate::app::repository::update::{BundleInstaller, ReleaseGateway};
 use crate::app::service::backup::RotatingBackups;
 
 /// Application state shared across all Tauri commands.
 pub struct AppState {
     pub db: DatabaseConnection,
+    pub clock: Arc<dyn Clock>,
     pub secrets: Arc<dyn SecretStore>,
     pub ts_gateway: Arc<dyn SistemaTsGateway>,
     pub mail_gateway: Arc<dyn MailGateway>,

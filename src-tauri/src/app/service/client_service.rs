@@ -1,7 +1,6 @@
 use sea_orm::{ActiveValue::Set, DatabaseConnection};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::client::{self, ActiveModel};
 use crate::app::model::client::{Client, ClientType, CreateClientInput, UpdateClientInput};
 use crate::app::repository::client_repository;
@@ -18,10 +17,7 @@ pub async fn list(
 
 /// Returns a single client by id.
 pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Client, AppError> {
-    client_repository::find_by_id(db, id)
-        .await?
-        .map(into_domain)
-        .ok_or_else(|| AppError::NotFound(format!("Paziente {id} non trovato")))
+    client_repository::require(db, id).await.map(into_domain)
 }
 
 /// Creates a new client and returns the created record.
@@ -39,7 +35,11 @@ pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result
 }
 
 /// Updates an existing client and returns the updated record.
-pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result<Client, AppError> {
+pub async fn update(
+    db: &DatabaseConnection,
+    clock: &dyn Clock,
+    input: UpdateClientInput,
+) -> Result<Client, AppError> {
     validate::validate_id(input.id, "Cliente")?;
     validate_client_fields(
         &input.last_name,
@@ -50,7 +50,7 @@ pub async fn update(db: &DatabaseConnection, input: UpdateClientInput) -> Result
     let id = input.id;
     let mut active = client_record(input.into());
     active.id = Set(id);
-    active.updated_at = Set(timestamp::now());
+    active.updated_at = Set(clock.timestamp());
 
     let model = client_repository::update(db, active).await?;
     Ok(into_domain(model))

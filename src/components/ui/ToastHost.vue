@@ -6,7 +6,7 @@
  * would land on the invoice.
  */
 import { CircleCheck, CircleAlert, Info, X } from 'lucide-vue-next'
-import { useToastStore, type ToastKind } from '@/stores/toast'
+import { useToastStore, type ToastKind } from '@/common/store/toast'
 
 const toastStore = useToastStore()
 

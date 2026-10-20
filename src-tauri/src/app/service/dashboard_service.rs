@@ -63,7 +63,7 @@ fn monthly_revenue(totals: &[MonthTotal]) -> Vec<MonthlyRevenue> {
 async fn recent_invoices(db: &DatabaseConnection, year: i64) -> Result<Vec<Invoice>, AppError> {
     let mut invoices = Vec::new();
     for id in dashboard_repository::recent_invoice_ids(db, year).await? {
-        match invoice_repository::load_invoice(db, id).await {
+        match invoice_repository::require(db, id).await {
             Ok(invoice) => invoices.push(invoice),
             Err(error) => {
                 log::warn!(target: "dashboard", invoice_id = id, error:% = error; "recent invoice skipped")

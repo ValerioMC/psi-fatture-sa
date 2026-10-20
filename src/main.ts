@@ -1,9 +1,9 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import router from './router'
+import router from '@/router'
 import App from './App.vue'
-import { initTheme } from './composables/useTheme'
-import { markPlatform } from './utils/platform'
+import { initTheme } from '@/common/composables/useTheme'
+import { markPlatform } from '@/common/lib/platform'
 import './style.css'
 
 // Theme and platform marks go on <html> before the first paint, so there is no flash.

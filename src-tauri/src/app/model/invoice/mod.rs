@@ -5,6 +5,7 @@ pub mod invoice;
 pub mod invoice_filters;
 pub mod invoice_line;
 pub mod invoice_line_input;
+pub mod invoice_number;
 pub mod invoice_pdf;
 pub mod invoice_status;
 pub mod monthly_invoice_preview;

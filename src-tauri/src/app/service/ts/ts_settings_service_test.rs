@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_support::FixedClock;
 use sea_orm::{Database, DatabaseConnection};
 use sea_orm_migration::MigratorTrait;
 
@@ -16,7 +17,7 @@ async fn save_anywhere(
     db: &DatabaseConnection,
     input: UpdateTsSettingsInput,
 ) -> Result<TsSettings, AppError> {
-    update_within(db, input, EVERY_ENVIRONMENT).await
+    update_within(db, &FixedClock::default(), input, EVERY_ENVIRONMENT).await
 }
 
 fn input(environment: TsEnvironment, username: &str, vat: &str) -> UpdateTsSettingsInput {
@@ -60,6 +61,7 @@ async fn production_requires_valid_checksums() {
     let db = setup().await;
     let err = update(
         &db,
+        &FixedClock::default(),
         input(TsEnvironment::Produzione, "MTOMRA66A41G224M", "65498732105"),
     )
     .await
@@ -67,6 +69,7 @@ async fn production_requires_valid_checksums() {
     assert!(!err.to_string().is_empty());
     assert!(update(
         &db,
+        &FixedClock::default(),
         input(TsEnvironment::Produzione, "RSSMRA80A41H501Y", "12345678903")
     )
     .await
@@ -78,6 +81,7 @@ async fn a_production_only_build_refuses_the_test_environment() {
     let db = setup().await;
     let err = update_within(
         &db,
+        &FixedClock::default(),
         input(TsEnvironment::Test, "MTOMRA66A41G224M", "65498732105"),
         PRODUCTION_ONLY,
     )

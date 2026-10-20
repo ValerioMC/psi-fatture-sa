@@ -1,7 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::email_account::{self, ActiveModel};
 use crate::app::entity::professional_config;
 use crate::app::model::email::{
@@ -43,6 +42,7 @@ pub async fn saved(db: &impl ConnectionTrait) -> Result<EmailAccount, AppError> 
 /// A preset provider always gets the preset server: only `Custom` stores what was typed.
 pub async fn update(
     db: &impl ConnectionTrait,
+    clock: &dyn Clock,
     input: UpdateEmailAccountInput,
 ) -> Result<EmailAccount, AppError> {
     let account = normalise(input);
@@ -57,7 +57,7 @@ pub async fn update(
         security: Set(account.security.as_str().to_string()),
         username: Set(account.username),
         bcc_self: Set(i32::from(account.bcc_self)),
-        updated_at: Set(timestamp::now()),
+        updated_at: Set(clock.timestamp()),
     };
     email_account_repository::save(db, active).await?;
     get(db).await

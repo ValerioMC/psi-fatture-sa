@@ -5,7 +5,7 @@
  * way, so the eye learns where to look once.
  */
 import type { Component } from 'vue'
-import type { Tone } from '@/utils/labels'
+import type { Tone } from '@/common/lib/labels'
 
 withDefaults(
   defineProps<{

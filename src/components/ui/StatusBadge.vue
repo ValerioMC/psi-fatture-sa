@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { AppointmentStatus, InvoiceStatus } from '@/types'
-import { APPOINTMENT_STATUS, INVOICE_STATUS, type StatusPresentation } from '@/utils/labels'
+import type { AppointmentStatus } from '@/features/appointment/model/appointment'
+import type { InvoiceStatus } from '@/features/invoice/model/invoice'
+import { APPOINTMENT_STATUS, INVOICE_STATUS, type StatusPresentation } from '@/common/lib/labels'
 import AppBadge from './AppBadge.vue'
 
 const props = defineProps<

@@ -45,8 +45,10 @@ impl RotatingBackups {
         }
     }
 
-    pub fn folder(&self) -> &Path {
-        &self.folder
+    /// The backups folder, created when no copy has been taken yet.
+    pub fn existing_folder(&self) -> Result<&Path, AppError> {
+        backup_repository::create_folder(&self.folder)?;
+        Ok(&self.folder)
     }
 
     /// A folder that cannot be read is reported in `last_failure`, never as a failed page.

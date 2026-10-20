@@ -8,7 +8,7 @@
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { Check, ChevronsUpDown, Search } from 'lucide-vue-next'
 import type { ComboOption } from './types'
-import { searchKey } from '@/utils/search'
+import { searchKey } from '@/common/lib/search'
 
 const props = withDefaults(
   defineProps<{

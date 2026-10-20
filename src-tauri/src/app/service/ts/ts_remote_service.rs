@@ -4,8 +4,7 @@
 
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::model::ts::{
     TsConnectionCheck, TsDocumentId, TsEnvironment, TsMessage, TsOperation, TsQueryResult,
     TsReportBasis, TsReportRow, TsSettings, TsSubmissionFilters, TsSubmissionStatus,
@@ -79,6 +78,7 @@ fn rows_of(outcome: ReportOutcome) -> Result<Vec<TsReportRow>, AppError> {
 /// does not exist: "not found" means every credential was accepted.
 pub async fn check_connection(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     store: &dyn SecretStore,
     gateway: &dyn SistemaTsGateway,
 ) -> Result<TsConnectionCheck, AppError> {
@@ -89,7 +89,7 @@ pub async fn check_connection(
     };
     let probe = TsDocumentId {
         vat_number: settings.vat_number.clone(),
-        issue_date: timestamp::today(),
+        issue_date: clock.today(),
         number: PROBE_DOCUMENT_NUMBER.to_string(),
     };
     let answer = gateway.query(&session, &probe).await;
@@ -149,7 +149,7 @@ async fn own_id(
     invoice_id: i64,
     settings: &TsSettings,
 ) -> Result<TsDocumentId, AppError> {
-    let invoice = invoice_repository::load_invoice(db, invoice_id).await?;
+    let invoice = invoice_repository::require(db, invoice_id).await?;
     Ok(TsDocumentId {
         vat_number: settings.vat_number.clone(),
         issue_date: invoice.issue_date,

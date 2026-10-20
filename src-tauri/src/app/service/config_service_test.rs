@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_support::FixedClock;
 
 fn valid_input() -> UpsertConfigInput {
     UpsertConfigInput {
@@ -111,7 +112,7 @@ async fn registration_persists_profession_and_psicoanalista_flag() {
     }"#;
     let input: UpsertConfigInput = serde_json::from_str(payload).unwrap();
 
-    let saved = upsert(&db, input).await.unwrap();
+    let saved = upsert(&db, &FixedClock::default(), input).await.unwrap();
     assert_eq!(saved.profession, Profession::Psicoterapeuta);
     assert!(saved.is_psicoanalista);
 
@@ -134,7 +135,9 @@ async fn registration_rejects_invalid_fiscal_code_with_clear_message() {
 
     let mut input = valid_input();
     input.fiscal_code = "RSSMRA80A41H501X".to_string();
-    let err = upsert(&db, input).await.unwrap_err();
+    let err = upsert(&db, &FixedClock::default(), input)
+        .await
+        .unwrap_err();
     assert!(err.to_string().contains("carattere di controllo errato"));
 
     assert!(get(&db).await.unwrap().is_none());

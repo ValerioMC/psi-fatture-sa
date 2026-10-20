@@ -9,6 +9,7 @@ use std::time::Duration;
 use sea_orm::DatabaseConnection;
 use tauri::AppHandle;
 
+use crate::app::common::Clock;
 use crate::app::controller::ts::ts_progress_event;
 use crate::app::repository::secret::SecretStore;
 use crate::app::repository::ts::sistema_ts::SistemaTsGateway;
@@ -19,23 +20,22 @@ const PASS_INTERVAL: Duration = Duration::from_secs(60);
 pub fn spawn(
     app: AppHandle,
     db: DatabaseConnection,
+    clock: Arc<dyn Clock>,
     secrets: Arc<dyn SecretStore>,
     gateway: Arc<dyn SistemaTsGateway>,
 ) {
     tauri::async_runtime::spawn(async move {
         let report = ts_progress_event::emitter(app);
-        let started = chrono::Utc::now().naive_utc();
-        if let Err(error) = ts_transition_service::requeue_interrupted(&db, started).await {
+        if let Err(error) = ts_transition_service::requeue_interrupted(&db, clock.utc_now()).await {
             log::warn!(target: "sistema_ts", error:% = error; "requeue of interrupted calls failed");
         }
         loop {
-            let now = chrono::Utc::now().naive_utc();
             match ts_dispatch_service::dispatch_due(
                 &db,
                 secrets.as_ref(),
                 gateway.as_ref(),
                 &report,
-                now,
+                clock.utc_now(),
             )
             .await
             {

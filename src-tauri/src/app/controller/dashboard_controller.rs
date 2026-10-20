@@ -5,7 +5,6 @@ use crate::app::common::AppError;
 use crate::app::model::dashboard::DashboardData;
 use crate::app::service::dashboard_service;
 
-/// Returns aggregated dashboard analytics for the given year.
 #[tauri::command]
 pub async fn get_dashboard(
     state: State<'_, AppState>,

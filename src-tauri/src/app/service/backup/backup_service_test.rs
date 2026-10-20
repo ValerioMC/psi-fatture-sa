@@ -2,6 +2,7 @@ use sea_orm::{ConnectionTrait, Database};
 use sea_orm_migration::MigratorTrait;
 
 use super::*;
+use crate::test_support::FixedClock;
 
 fn scratch_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("psi-backup-test-{name}-{}", std::process::id()));
@@ -55,7 +56,7 @@ async fn an_empty_target_is_refused() {
 
 #[test]
 fn the_proposed_name_carries_the_date() {
-    let today = chrono::NaiveDate::from_ymd_opt(2026, 10, 2).unwrap();
+    let clock = FixedClock::at("2026-10-02 18:30:00");
 
-    assert_eq!(file_name(today), "PSI-Fatture-backup-2026-10-02.db");
+    assert_eq!(file_name(&clock), "PSI-Fatture-backup-2026-10-02.db");
 }

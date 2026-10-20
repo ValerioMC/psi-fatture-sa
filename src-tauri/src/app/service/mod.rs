@@ -5,6 +5,7 @@ pub mod config_service;
 pub mod dashboard_service;
 pub mod email;
 pub mod invoice;
+pub mod invoice_change_service;
 pub mod pdf;
 pub mod service_service;
 pub mod support;

@@ -5,7 +5,7 @@ use crate::app::service::ts::ts_submission_service as queue;
 use crate::test_support::clock::at;
 use crate::test_support::ts_call_responses::{accepted, rejected};
 use crate::test_support::ts_database::setup;
-use crate::test_support::{FakeGateway, InMemorySecretStore, RecordedCall};
+use crate::test_support::{FakeGateway, FixedClock, InMemorySecretStore, RecordedCall};
 use sea_orm::ConnectionTrait;
 use std::sync::Mutex;
 
@@ -41,8 +41,12 @@ async fn queue_two_paid_invoices(db: &DatabaseConnection) {
     )
     .await
     .unwrap();
-    queue::enqueue_invio(db, 1).await.unwrap();
-    queue::enqueue_invio(db, 3).await.unwrap();
+    queue::enqueue_invio(db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
+    queue::enqueue_invio(db, &FixedClock::default(), 3)
+        .await
+        .unwrap();
 }
 
 async fn load(db: &DatabaseConnection, id: i64) -> TsSubmission {
@@ -52,7 +56,9 @@ async fn load(db: &DatabaseConnection, id: i64) -> TsSubmission {
 #[tokio::test]
 async fn sends_a_queued_invoice_and_records_the_protocol() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     gateway.script(Ok(accepted("99260926001866680")));
 
@@ -82,7 +88,9 @@ async fn sends_a_queued_invoice_and_records_the_protocol() {
 #[tokio::test]
 async fn missing_credentials_block_the_pass_without_touching_the_queue() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     let summary = dispatch_due(
         &db,
@@ -162,7 +170,9 @@ async fn an_empty_queue_reports_nothing() {
 #[tokio::test]
 async fn network_errors_and_ws99_are_retried_later() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     gateway.script(Err(TsGatewayError::Network("timeout".to_string())));
     gateway.script(Ok(rejected("WS99")));
@@ -189,8 +199,12 @@ async fn refused_login_stops_the_pass_and_keeps_everything_queued() {
     )
     .await
     .unwrap();
-    let first = queue::enqueue_invio(&db, 1).await.unwrap();
-    let second = queue::enqueue_invio(&db, 3).await.unwrap();
+    let first = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
+    let second = queue::enqueue_invio(&db, &FixedClock::default(), 3)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     gateway.script(Err(TsGatewayError::Authentication));
 
@@ -210,7 +224,9 @@ async fn refused_login_stops_the_pass_and_keeps_everything_queued() {
 #[tokio::test]
 async fn wrong_pincode_is_a_credential_problem_not_a_rejection() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     gateway.script(Ok(rejected("005")));
     let summary = run(&db, &gateway, "2099-01-01 10:00:00").await;
@@ -224,7 +240,9 @@ async fn wrong_pincode_is_a_credential_problem_not_a_rejection() {
 #[tokio::test]
 async fn document_errors_are_final() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     gateway.script(Ok(rejected("WS19")));
     assert_eq!(run(&db, &gateway, "2099-01-01 10:00:00").await.rejected, 1);
@@ -236,7 +254,9 @@ async fn document_errors_are_final() {
 #[tokio::test]
 async fn duplicate_after_a_lost_answer_counts_as_accepted() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     gateway.script(Err(TsGatewayError::Network("reset".to_string())));
     gateway.script(Ok(rejected("S017")));
@@ -252,7 +272,9 @@ async fn duplicate_after_a_lost_answer_counts_as_accepted() {
 #[tokio::test]
 async fn duplicate_on_a_first_attempt_is_a_rejection() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     gateway.script(Ok(rejected("S017")));
     run(&db, &gateway, "2099-01-01 10:00:00").await;
@@ -265,7 +287,9 @@ async fn duplicate_on_a_first_attempt_is_a_rejection() {
 #[tokio::test]
 async fn replacement_and_cancellation_reuse_the_original_document_id() {
     let db = setup().await;
-    let original = queue::enqueue_invio(&db, 1).await.unwrap();
+    let original = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let gateway = FakeGateway::default();
     run(&db, &gateway, "2099-01-01 10:00:00").await;
     let sent_id = load(&db, original.id).await.document.unwrap();
@@ -275,14 +299,16 @@ async fn replacement_and_cancellation_reuse_the_original_document_id() {
     )
     .await
     .unwrap();
-    let replacement = queue::enqueue_replacement(&db, original.id).await.unwrap();
+    let replacement = queue::enqueue_replacement(&db, &FixedClock::default(), original.id)
+        .await
+        .unwrap();
     run(&db, &gateway, "2099-01-01 10:05:00").await;
     assert_eq!(
         load(&db, original.id).await.status,
         TsSubmissionStatus::Sostituita
     );
 
-    let cancellation = queue::enqueue_cancellation(&db, replacement.id)
+    let cancellation = queue::enqueue_cancellation(&db, &FixedClock::default(), replacement.id)
         .await
         .unwrap();
     run(&db, &gateway, "2099-01-01 10:10:00").await;
@@ -307,7 +333,9 @@ async fn replacement_and_cancellation_reuse_the_original_document_id() {
 #[tokio::test]
 async fn invoice_changed_since_queueing_is_rejected_locally() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     db.execute_unprepared("UPDATE invoices SET status = 'issued' WHERE id = 1")
         .await
         .unwrap();
@@ -321,7 +349,9 @@ async fn invoice_changed_since_queueing_is_rejected_locally() {
 #[tokio::test]
 async fn submissions_for_another_environment_wait() {
     let db = setup().await;
-    queue::enqueue_invio(&db, 1).await.unwrap();
+    queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     db.execute_unprepared("UPDATE ts_settings SET environment = 'produzione'")
         .await
         .unwrap();

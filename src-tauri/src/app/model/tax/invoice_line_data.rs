@@ -1,5 +1,4 @@
 use super::money::round_cents;
-use crate::app::model::invoice::InvoiceLineInput;
 
 /// The part of an invoice line the totals are computed from.
 #[derive(Debug, Clone)]
@@ -22,16 +21,5 @@ impl InvoiceLineData {
 
     pub fn vat_amount(&self) -> f64 {
         round_cents(self.net_amount() * self.vat_rate / 100.0)
-    }
-}
-
-impl From<&InvoiceLineInput> for InvoiceLineData {
-    fn from(line: &InvoiceLineInput) -> Self {
-        InvoiceLineData {
-            quantity: line.quantity,
-            unit_price: line.unit_price,
-            vat_rate: line.vat_rate,
-            amount_override: line.amount_override,
-        }
     }
 }

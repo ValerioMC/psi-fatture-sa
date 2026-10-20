@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use super::update_service;
 use crate::app::common::AppError;
 use crate::app::model::update::{LatestRelease, Platform, UpdateCheck};
-use crate::app::repository::release::{bundle_file_repository, BundleInstaller, ReleaseGateway};
+use crate::app::repository::update::{bundle_file_repository, BundleInstaller, ReleaseGateway};
 
 /// Only files of this repository's releases are ever installed.
 const DOWNLOAD_PREFIX: &str = "https://github.com/ValerioMC/psi-fatture-sa/releases/download/";

@@ -2,6 +2,7 @@ use super::*;
 use crate::app::service::ts::ts_submission_service as queue;
 use crate::test_support::clock::at;
 use crate::test_support::ts_database::{force_status, setup};
+use crate::test_support::FixedClock;
 
 fn document() -> TsDocumentId {
     TsDocumentId {
@@ -38,7 +39,9 @@ fn backoff_doubles_from_one_minute_and_caps_at_six_hours() {
 #[tokio::test]
 async fn claim_is_won_once_and_records_the_document_id() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let now = at("2099-01-01 10:00:00");
 
     assert!(claim(&db, queued.id, &document(), None, now).await.unwrap());
@@ -56,7 +59,9 @@ async fn claim_is_won_once_and_records_the_document_id() {
 #[tokio::test]
 async fn failed_call_goes_back_to_the_queue_with_backoff() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let now = at("2099-01-01 10:00:00");
     claimed(&db, queued.id, now).await;
 
@@ -82,7 +87,9 @@ async fn failed_call_goes_back_to_the_queue_with_backoff() {
 #[tokio::test]
 async fn acceptance_records_protocol_and_clears_the_last_error() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let now = at("2099-01-01 10:00:00");
     claimed(&db, queued.id, now).await;
     release_for_retry(&db, queued.id, "timeout", now)
@@ -102,7 +109,9 @@ async fn acceptance_records_protocol_and_clears_the_last_error() {
 #[tokio::test]
 async fn rejection_keeps_the_code() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let now = at("2099-01-01 10:00:00");
     claimed(&db, queued.id, now).await;
     let rejected = record_outcome(&db, queued.id, &verdict(false), now)
@@ -116,7 +125,9 @@ async fn rejection_keeps_the_code() {
 #[tokio::test]
 async fn local_rejection_ends_a_queued_submission() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let rejected = reject_locally(&db, queued.id, "manca la data", at("2099-01-01 10:00:00"))
         .await
         .unwrap();
@@ -127,7 +138,9 @@ async fn local_rejection_ends_a_queued_submission() {
 #[tokio::test]
 async fn refuses_transitions_out_of_order() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let now = at("2099-01-01 10:00:00");
     assert!(record_outcome(&db, queued.id, &verdict(true), now)
         .await
@@ -143,10 +156,14 @@ async fn refuses_transitions_out_of_order() {
 async fn accepted_cancellation_retires_its_target() {
     let db = setup().await;
     let now = at("2099-01-01 10:00:00");
-    let original = queue::enqueue_invio(&db, 1).await.unwrap();
+    let original = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
 
-    let cancellation = queue::enqueue_cancellation(&db, original.id).await.unwrap();
+    let cancellation = queue::enqueue_cancellation(&db, &FixedClock::default(), original.id)
+        .await
+        .unwrap();
     claimed(&db, cancellation.id, now).await;
     record_outcome(&db, cancellation.id, &verdict(true), now)
         .await
@@ -162,10 +179,14 @@ async fn accepted_cancellation_retires_its_target() {
 async fn accepted_replacement_supersedes_its_target_and_rejection_leaves_it() {
     let db = setup().await;
     let now = at("2099-01-01 10:00:00");
-    let original = queue::enqueue_invio(&db, 1).await.unwrap();
+    let original = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
 
-    let rejected = queue::enqueue_replacement(&db, original.id).await.unwrap();
+    let rejected = queue::enqueue_replacement(&db, &FixedClock::default(), original.id)
+        .await
+        .unwrap();
     claimed(&db, rejected.id, now).await;
     record_outcome(&db, rejected.id, &verdict(false), now)
         .await
@@ -175,7 +196,9 @@ async fn accepted_replacement_supersedes_its_target_and_rejection_leaves_it() {
         .unwrap();
     assert_eq!(still.status, TsSubmissionStatus::Accettata);
 
-    let replacement = queue::enqueue_replacement(&db, original.id).await.unwrap();
+    let replacement = queue::enqueue_replacement(&db, &FixedClock::default(), original.id)
+        .await
+        .unwrap();
     claimed(&db, replacement.id, now).await;
     record_outcome(&db, replacement.id, &verdict(true), now)
         .await
@@ -189,7 +212,9 @@ async fn accepted_replacement_supersedes_its_target_and_rejection_leaves_it() {
 #[tokio::test]
 async fn start_up_requeues_calls_left_in_flight() {
     let db = setup().await;
-    let queued = queue::enqueue_invio(&db, 1).await.unwrap();
+    let queued = queue::enqueue_invio(&db, &FixedClock::default(), 1)
+        .await
+        .unwrap();
     let now = at("2099-01-01 10:00:00");
     claimed(&db, queued.id, now).await;
 

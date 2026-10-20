@@ -1,7 +1,6 @@
 use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
-use crate::app::common::timestamp;
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::entity::appointment as appointments;
 use crate::app::model::appointment::{
     Appointment, CreateAppointmentInput, CreateRecurringAppointmentsInput, UpdateAppointmentInput,
@@ -43,7 +42,7 @@ pub async fn create(
     );
 
     let model = appointment_repository::insert(db, active).await?;
-    appointment_repository::find_by_id(db, model.id).await
+    appointment_repository::require(db, model.id).await
 }
 
 /// Creates multiple recurring appointments in a transaction.
@@ -58,7 +57,7 @@ pub async fn create_recurring(
 
     let mut created = Vec::with_capacity(ids.len());
     for id in ids {
-        created.push(appointment_repository::find_by_id(db, id).await?);
+        created.push(appointment_repository::require(db, id).await?);
     }
     Ok(created)
 }
@@ -66,6 +65,7 @@ pub async fn create_recurring(
 /// Updates an appointment and returns the updated record.
 pub async fn update(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     input: UpdateAppointmentInput,
 ) -> Result<Appointment, AppError> {
     validate::validate_id(input.id, "Appuntamento")?;
@@ -76,7 +76,6 @@ pub async fn update(
         &input.end_time,
     )?;
 
-    let now = timestamp::now();
     let active = appointments::ActiveModel {
         id: Set(input.id),
         client_id: Set(input.client_id),
@@ -87,12 +86,12 @@ pub async fn update(
         status: Set(input.status.as_str().to_owned()),
         notes: Set(Some(input.notes)),
         recurrence_group_id: Set(input.recurrence_group_id),
-        updated_at: Set(now),
+        updated_at: Set(clock.timestamp()),
         ..Default::default()
     };
 
     appointment_repository::update(db, active).await?;
-    appointment_repository::find_by_id(db, input.id).await
+    appointment_repository::require(db, input.id).await
 }
 
 /// Removes an appointment by id.

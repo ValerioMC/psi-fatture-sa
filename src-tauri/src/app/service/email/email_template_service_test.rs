@@ -1,5 +1,6 @@
 use super::*;
 use crate::test_support::email_database;
+use crate::test_support::FixedClock;
 
 fn template(subject: &str, body: &str) -> EmailTemplate {
     EmailTemplate {
@@ -14,6 +15,7 @@ async fn starts_from_the_built_in_template_and_returns_to_it() {
     assert_eq!(get(&db).await.unwrap(), default_template());
     let saved = update(
         &db,
+        &FixedClock::default(),
         template(" Fattura {numero_fattura} ", "Gentile {nome_paziente}\n"),
     )
     .await
@@ -32,6 +34,7 @@ async fn refuses_unknown_placeholders_naming_them() {
     let db = email_database::setup(None).await;
     let error = update(
         &db,
+        &FixedClock::default(),
         template("Fattura {numero}", "Gentile {paziente}, {saldo}"),
     )
     .await
@@ -45,15 +48,27 @@ async fn refuses_unknown_placeholders_naming_them() {
 #[tokio::test]
 async fn refuses_empty_or_multiline_subjects_and_empty_bodies() {
     let db = email_database::setup(None).await;
-    assert!(update(&db, template("", "testo")).await.is_err());
-    assert!(update(&db, template("a\nb", "testo")).await.is_err());
-    assert!(update(&db, template("oggetto", "  ")).await.is_err());
+    assert!(update(&db, &FixedClock::default(), template("", "testo"))
+        .await
+        .is_err());
+    assert!(
+        update(&db, &FixedClock::default(), template("a\nb", "testo"))
+            .await
+            .is_err()
+    );
+    assert!(
+        update(&db, &FixedClock::default(), template("oggetto", "  "))
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
 async fn previews_with_an_example_patient_and_the_real_professional() {
     let db = email_database::setup(None).await;
-    let preview = preview(&db, default_template()).await.unwrap();
+    let preview = preview(&db, &FixedClock::default(), default_template())
+        .await
+        .unwrap();
     assert!(preview.subject.ends_with("– Dott.ssa Maria Demo"));
     assert!(preview.body.starts_with("Gentile Anna Bianchi,"));
     assert!(preview.body.contains("81,60 €"));

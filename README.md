@@ -235,7 +235,7 @@ e usa la lavanda come accento. Tutti i testi stanno sopra 4,5:1 di contrasto.
   Fatturazione (`useSettingsProfile.ts`) e si salva da un'unica barra.
 - **Sigillo della fattura**: `InvoiceSeal.vue` disegna lo stato di una fattura
   (bozza, emessa con l'arco verso la scadenza, pagata, scaduta, annullata); la logica
-  sta in `src/utils/invoiceSeal.ts`.
+  sta in `src/features/invoice/lib/invoiceSeal.ts`.
 - **Layout adattivo**: le colonne affiancate (riepilogo, anteprima, giorno in agenda)
   dipendono dalla larghezza dell'area di contenuto, non della finestra: container query
   su `@container/pane` (`AppLayout.vue`), `@container/settings` (Impostazioni) e
@@ -251,9 +251,9 @@ e usa la lavanda come accento. Tutti i testi stanno sopra 4,5:1 di contrasto.
 
 ## Calcolo della fattura
 
-Solo il backend (`src-tauri/src/app/service/support/tax_calculator.rs`) calcola i totali: il
+Solo il backend (`src-tauri/src/app/model/tax/tax_calculator.rs`) calcola i totali: il
 riepilogo del modulo li chiede mentre scrivi al comando `preview_invoice_totals`
-(`src/composables/useInvoiceTotals.ts`), lo stesso codice che poi salva la fattura.
+(`src/features/invoice/composables/useInvoiceTotals.ts`), lo stesso codice che poi salva la fattura.
 
 - **Base ENPAP 2%**: nel forfettario la marca da bollo addebitata al paziente è compenso
   (Interpello AdE) e concorre alla base; nell'ordinario la base è il solo imponibile.
@@ -507,80 +507,138 @@ rimuove i pacchetti installati senza salvarli.
 
 ```
 psi-fatture-sa/
-├── src/                    # Frontend Vue 3 + TypeScript
-│   ├── api.ts              # Wrapper chiamate Tauri invoke
-│   ├── types/              # Tipi condivisi, un file per dominio come model/ nel backend
-│   ├── style.css           # Token del design system, campi, movimenti
-│   ├── views/              # Pagine dell'applicazione (settings/: una per contesto)
+├── src/                      # Frontend Vue 3 + TypeScript
+│   ├── features/<feature>/   # Una cartella per funzione, con gli stessi nomi dei domini del backend
+│   │   ├── api/              # Chiamate al backend del dominio (unico punto che usa `invoke`)
+│   │   ├── model/            # Tipi che rispecchiano `model/` del backend
+│   │   ├── store/            # Stato condiviso (Pinia)
+│   │   ├── composables/      # Stato e azioni delle viste
+│   │   ├── lib/              # Logica pura, con il suo `*.test.ts` accanto
+│   │   ├── components/       # Componenti della funzione
+│   │   └── views/            # Pagine raggiunte dal router
 │   ├── components/
-│   │   ├── ui/             # Componenti base (bottoni, campi, dialoghi, sigillo…)
-│   │   ├── layout/         # Barra laterale, layout, palette ⌘K
-│   │   ├── dashboard/      # Grafico mensile, soglia forfettario, stima fiscale
-│   │   ├── profile/        # Sezioni del profilo, navigazione impostazioni, credenziali
-│   │   ├── email/          # Casella, modello, invio e storico delle email ai pazienti
-│   │   ├── legal/          # Testo delle condizioni d'uso, uguale in accettazione e in Impostazioni
-│   │   └── sts/            # Pannelli del Sistema Tessera Sanitaria
-│   ├── composables/        # Stato e azioni delle viste: form fattura e paziente, azioni in blocco, tema
-│   ├── legal/              # Condizioni d'uso e loro versione
-│   ├── stores/             # State management (Pinia), notifiche
-│   └── utils/              # Logica pura con i suoi test: fisco, filtri e riepiloghi, agenda, validazione
-├── src-tauri/              # Backend Rust + Tauri
+│   │   ├── ui/               # Componenti base (bottoni, campi, dialoghi, sigillo, credenziali…)
+│   │   └── layout/           # Barra laterale, layout, palette ⌘K
+│   ├── common/               # Ciò che nessuna funzione possiede: formati, etichette, validazione,
+│   │                         # tema, notifiche (lib/, store/, composables/)
+│   ├── router/               # Rotte, guardie di onboarding e condizioni d'uso
+│   └── style.css             # Token del design system, campi, movimenti
+├── src-tauri/                # Backend Rust + Tauri
 │   ├── src/
-│   │   ├── lib.rs          # Avvio: stato condiviso, worker, registrazione comandi
+│   │   ├── lib.rs            # Avvio: stato condiviso, orologio, worker, registrazione comandi
 │   │   ├── app/
-│   │   │   ├── app_state.rs # Stato condiviso dai comandi (DB, credenziali, gateway)
-│   │   │   ├── controller/ # Comandi Tauri (API layer); ts/ per il Sistema TS
-│   │   │   ├── service/    # Logica di business, un service per entità
-│   │   │   │   ├── invoice/    # Fatture: invoice_service più regole e tipi privati
-│   │   │   │   ├── backup/     # Copia su richiesta (backup_service) e rotazione (RotatingBackups)
-│   │   │   │   ├── update/     # Controllo della release (update_service) e installazione su Mac
-│   │   │   │   ├── ts/         # Sistema TS: coda, invio, credenziali, impostazioni
-│   │   │   │   ├── email/      # Invio fatture e modello dell'email
-│   │   │   │   ├── pdf/        # PDF della fattura; layout/ disegna la pagina, un modulo per sezione
-│   │   │   │   └── support/    # Funzioni pure condivise: validazione, calcolo fiscale, formati italiani
-│   │   │   ├── repository/ # Accesso dati (SeaORM, SQL) e servizi esterni
-│   │   │   │   ├── appointment/ # Appuntamenti e riga letta con paziente e prestazione
-│   │   │   │   ├── invoice/    # Fatture e proiezione delle righe lette
-│   │   │   │   ├── secret/     # Archivio cifrato delle credenziali
-│   │   │   │   ├── email/      # Casella, modello, registro invii e gateway SMTP (lettre)
-│   │   │   │   └── ts/         # Coda STS; sistema_ts/ è il client SOAP
-│   │   │   ├── scheduler/  # Worker in background (invio coda STS, backup giornaliero)
-│   │   │   ├── entity/     # Entità database (una tabella per file)
-│   │   │   ├── model/      # DTO e tipi condivisi, un sottopackage per dominio
-│   │   │   ├── common/     # AppError e timestamp: unico formato con cui il database salva gli istanti
-│   │   │   └── db/         # Connessione e percorsi dei file dati
-│   │   ├── migration/      # Migrazioni schema SQLite
-│   │   └── test_support/   # Test double e fixture condivisi (solo in `cargo test`)
-│   ├── tauri.conf.json     # Configurazione Tauri
-│   └── Cargo.toml          # Dipendenze Rust
-├── CLAUDE.md               # Regole di progetto e di qualità del codice
-├── LICENSE                 # Licenza PolyForm Strict 1.0.0
-└── package.json            # Dipendenze frontend
+│   │   │   ├── app_state.rs  # Stato condiviso dai comandi (DB, orologio, credenziali, gateway)
+│   │   │   ├── controller/   # Comandi Tauri, uno per dominio; ts/ per il Sistema TS
+│   │   │   ├── service/      # Logica di business, un service per entità
+│   │   │   │   ├── invoice/      # Fatture: invoice_service più regole e tipi privati
+│   │   │   │   ├── invoice_change_service.rs # Modifiche che il Sistema TS può rifiutare
+│   │   │   │   ├── backup/       # Copia su richiesta (backup_service) e rotazione (RotatingBackups)
+│   │   │   │   ├── update/       # Controllo della release (update_service) e installazione su Mac
+│   │   │   │   ├── ts/           # Sistema TS: coda, invio, credenziali, impostazioni, vincoli sulle fatture
+│   │   │   │   ├── email/        # Invio fatture e modello dell'email
+│   │   │   │   ├── pdf/          # PDF della fattura; layout/ disegna la pagina, un modulo per sezione
+│   │   │   │   └── support/      # Funzioni pure condivise: validazione, formati italiani
+│   │   │   ├── repository/   # Accesso dati (SeaORM, SQL) e servizi esterni, una cartella o un file per dominio
+│   │   │   │   ├── invoice/      # Fatture e proiezione delle righe lette
+│   │   │   │   ├── secret/       # Archivio cifrato delle credenziali
+│   │   │   │   ├── email/        # Casella, modello, registro invii e gateway SMTP (lettre)
+│   │   │   │   ├── update/       # Release su GitHub e installazione dell'immagine disco
+│   │   │   │   └── ts/           # Coda STS; sistema_ts/ è il client SOAP
+│   │   │   ├── scheduler/    # Worker in background (invio coda STS, backup giornaliero)
+│   │   │   ├── entity/       # Entità database (una tabella per file)
+│   │   │   ├── model/        # DTO e tipi condivisi, un sottopackage per dominio; tax/ calcola i totali
+│   │   │   ├── common/       # AppError, Clock e il formato con cui il database salva gli istanti
+│   │   │   └── db/           # Connessione e percorsi dei file dati
+│   │   ├── migration/        # Migrazioni schema SQLite
+│   │   └── test_support/     # Test double e fixture condivisi (solo in `cargo test`)
+│   ├── tests/architecture/   # Direzione degli strati e dipendenze fra domini
+│   ├── tauri.conf.json       # Configurazione Tauri
+│   └── Cargo.toml            # Dipendenze Rust
+├── CLAUDE.md                 # Regole di progetto e di qualità del codice
+├── LICENSE                   # Licenza PolyForm Strict 1.0.0
+└── package.json              # Dipendenze frontend
 ```
 
 ### Convenzioni del backend
 
 - **Strati**: `controller → service → repository → model/entity`. I controller
-  inoltrano ai service; solo i repository scrivono SQL o chiamano servizi esterni.
+  inoltrano ai service; solo i repository scrivono SQL o chiamano servizi esterni. Il test
+  `tests/architecture` lo verifica: un repository non nomina service o controller, un
+  controller non nomina repository o entità, `model` nomina solo `model` e `common`, `common`
+  non nomina nulla dell'app. `app_state` e `scheduler` sono il cablaggio.
+- **Domini**: ogni strato è diviso per gli stessi domini. Un dominio con una sola entità
+  che porta il suo nome resta un file (`client_service.rs`), altrimenti è una cartella
+  (`service/ts/`). Un dominio usa solo quelli della tabella sotto; il test fallisce su una
+  dipendenza non elencata, su una voce che il codice non usa e su ogni ciclo. Un nuovo arco
+  è una decisione di progetto: si cambiano insieme questa tabella e `ALLOWED` in
+  `tests/architecture/domain_edges.rs`, oppure si cambia il codice.
+
+  | Dominio | Può usare |
+  |---|---|
+  | `appointment` | `support` |
+  | `backup` | |
+  | `client` | `support` |
+  | `config` | `support` |
+  | `dashboard` | `invoice` |
+  | `email` | `client`, `config`, `invoice`, `pdf`, `secret`, `support` |
+  | `invoice` | `appointment`, `config`, `service`, `support`, `tax` |
+  | `invoice_change` | `invoice`, `ts` |
+  | `pdf` | `client`, `config`, `invoice`, `support` |
+  | `secret` | |
+  | `service` | |
+  | `support` | |
+  | `tax` | `config` |
+  | `terms` | |
+  | `ts` | `client`, `config`, `invoice`, `secret`, `support` |
+  | `update` | |
+
+  Il Sistema TS invia le fatture, quindi `ts` dipende da `invoice` e mai il contrario: ciò che
+  una trasmissione accettata vieta (cambiare numero, data o stato pagato, eliminare la
+  fattura) sta in `service/ts/ts_invoice_guard.rs`, e `invoice_change_service` lo controlla
+  prima di passare la modifica a `invoice_service`.
 - **Un tipo per file**: ogni `struct`, `enum` e `trait` ha il suo file, chiamato come
   il tipo in snake_case (`TsSubmissionStatus` → `ts_submission_status.rs`). Il
   `mod.rs` del package lo riesporta, così si importa `model::ts::TsSubmission`.
   Eccezioni: le entità SeaORM (`Model` e `Relation` devono stare nello stesso modulo)
   e le struct di riga dichiarate dentro una sola funzione di query.
-- **Sottopackage per dominio** quando un concetto ha più file (`ts/`, `invoice/`,
-  `secret/`). I tipi di servizio interni al package sono `pub(super)`.
 - **Un service per entità**: in `service/invoice/` solo `invoice_service` è pubblico; le
-  regole (`invoice_guard`) e i tipi di appoggio (`ClientSessions`, `InvoiceContent`) sono
-  moduli privati del package. Allo stesso modo `backup/` espone `backup_service` e
-  `RotatingBackups`, `update/` solo `update_service` (che riesporta l'installazione) e in `ts/` `ts_document_service` è privato. Le regole di qualità del codice sono in `CLAUDE.md`.
+  regole (`invoice_guard`, `invoice_validation`) e i tipi di appoggio (`ClientSessions`,
+  `InvoiceContent`) sono moduli privati del package. Allo stesso modo `backup/` espone
+  `backup_service` e `RotatingBackups`, `update/` solo `update_service` (che riesporta
+  l'installazione) e in `ts/` `ts_document_service` e `ts_invoice_guard` sono privati
+  (`ts_submission_service` riesporta le regole del secondo). Le regole di qualità del
+  codice sono in `CLAUDE.md`.
+- **Repository**: ogni funzione riceve `&impl ConnectionTrait`, così gira dentro la
+  transazione del chiamante. `require(db, id)` è l'unica ricerca che esige che il record
+  esista e restituisce `NotFound` con il messaggio in italiano. Un repository non legge
+  l'orologio: riceve l'istante come argomento.
+- **Orologio**: solo `SystemClock` (`app/common/system_clock.rs`) legge l'ora di sistema;
+  `lib.rs` lo mette in `AppState` come `Arc<dyn Clock>` e i service lo ricevono dal
+  controller o dal worker. Nei test `FixedClock` lo ferma su un istante.
 - **Errori tipizzati**: controller, service e repository restituiscono
   `Result<_, AppError>` (`app/common/app_error.rs`): `Invalid` (dato da correggere),
   `NotFound`, `Conflict` (contrasta con lo stato salvato: numero già usato, fattura
   trasmessa), `Database`, `External` (Sistema TS, SMTP, file). Al frontend arriva solo
-  il messaggio in italiano, come stringa.
+  il messaggio in italiano, come stringa. La conversione da un errore di un gateway sta
+  accanto a quell'errore (`SecretStoreError`, `TsGatewayError`).
 - **Test separati**: i test di `foo.rs` stanno in `foo_test.rs` accanto, dichiarati
   con `#[cfg(test)] #[path = "foo_test.rs"] mod tests;`. Restano figli del modulo, quindi
   vedono anche le funzioni private. I doppi riusati in più test stanno in `src/test_support/`.
+  Le suite che leggono il crate da fuori stanno in `src-tauri/tests/`, dichiarate come
+  `[[test]]` in `Cargo.toml`.
+
+### Convenzioni del frontend
+
+- **Funzioni**: `src/features/<feature>/` con le cartelle `api`, `model`, `store`,
+  `composables`, `lib`, `components`, `views` che servono. Le funzioni hanno i nomi dei
+  domini del backend: `appointment` (agenda), `client`, `dashboard`, `email`, `invoice`
+  (anche PDF e stampa), `service`, `settings` (profilo, backup, onboarding), `sts`,
+  `terms`, `update`. Ciò che nessuna funzione possiede sta in `src/common/` e in
+  `src/components/{ui,layout}`.
+- **API**: ogni chiamata al backend passa da un modulo `features/<feature>/api/`, uno per
+  dominio del backend (`invoiceApi.ts`, `pdfApi.ts`, `tsApi.ts`…); viste e componenti non
+  usano mai `invoke` direttamente.
+- **Test**: i test di `foo.ts` stanno in `foo.test.ts` accanto, un file di test per modulo.
 
 ## Test
 
@@ -594,8 +652,8 @@ npm test
 # Backend (cargo): calcolo totali fattura, validazione input, Sistema TS (buste SOAP,
 # risposte reali catturate, coda, invio con gateway finto), PDF della fattura, email
 # (casella, modello, invio con gateway SMTP finto), rotazione dei backup, confronto
-# delle versioni e scelta del download. I test usano un archivio
-# credenziali in memoria o in un file temporaneo
+# delle versioni e scelta del download, più la suite `architecture` (strati e domini).
+# I test usano un orologio fermo e un archivio credenziali in memoria o in un file temporaneo
 cd src-tauri && cargo test
 
 # Test contro servizi reali (rete): ambiente di test Sogei e server SMTP di psypec.it,

@@ -4,7 +4,7 @@
  * the same colour, and no tint is ever louder than the ink accent.
  */
 import { computed } from 'vue'
-import { initialsOf, tintIndexOf } from '@/utils/monogram'
+import { initialsOf, tintIndexOf } from '@/common/lib/monogram'
 
 const props = withDefaults(defineProps<{ name: string; size?: 'sm' | 'md' | 'lg' }>(), { size: 'md' })
 

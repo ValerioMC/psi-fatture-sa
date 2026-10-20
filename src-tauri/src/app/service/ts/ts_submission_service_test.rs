@@ -1,10 +1,11 @@
 use super::*;
 use crate::test_support::ts_database::{force_status, setup};
+use crate::test_support::FixedClock;
 
 #[tokio::test]
 async fn queues_a_paid_invoice_with_its_details() {
     let db = setup().await;
-    let queued = enqueue_invio(&db, 1).await.unwrap();
+    let queued = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     assert_eq!(queued.status, TsSubmissionStatus::NonInviata);
     assert_eq!(queued.operation, TsOperation::Invio);
     assert_eq!(queued.invoice_number, "1");
@@ -15,31 +16,33 @@ async fn queues_a_paid_invoice_with_its_details() {
 #[tokio::test]
 async fn refuses_unpaid_or_undated_invoices() {
     let db = setup().await;
-    assert!(enqueue_invio(&db, 2)
+    assert!(enqueue_invio(&db, &FixedClock::default(), 2)
         .await
         .unwrap_err()
         .to_string()
         .contains("pagate"));
-    assert!(enqueue_invio(&db, 3)
+    assert!(enqueue_invio(&db, &FixedClock::default(), 3)
         .await
         .unwrap_err()
         .to_string()
         .contains("data di pagamento"));
-    assert!(enqueue_invio(&db, 99).await.is_err());
+    assert!(enqueue_invio(&db, &FixedClock::default(), 99)
+        .await
+        .is_err());
 }
 
 #[tokio::test]
 async fn allows_one_in_flight_submission_per_invoice() {
     let db = setup().await;
-    let first = enqueue_invio(&db, 1).await.unwrap();
-    assert!(enqueue_invio(&db, 1)
+    let first = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
+    assert!(enqueue_invio(&db, &FixedClock::default(), 1)
         .await
         .unwrap_err()
         .to_string()
         .contains("in corso"));
 
     force_status(&db, first.id, TsSubmissionStatus::Inviata).await;
-    assert!(enqueue_invio(&db, 1)
+    assert!(enqueue_invio(&db, &FixedClock::default(), 1)
         .await
         .unwrap_err()
         .to_string()
@@ -49,12 +52,12 @@ async fn allows_one_in_flight_submission_per_invoice() {
 #[tokio::test]
 async fn requeues_after_rejection_but_not_after_acceptance() {
     let db = setup().await;
-    let first = enqueue_invio(&db, 1).await.unwrap();
+    let first = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     force_status(&db, first.id, TsSubmissionStatus::Scartata).await;
-    let retry = enqueue_invio(&db, 1).await.unwrap();
+    let retry = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
 
     force_status(&db, retry.id, TsSubmissionStatus::Accettata).await;
-    assert!(enqueue_invio(&db, 1)
+    assert!(enqueue_invio(&db, &FixedClock::default(), 1)
         .await
         .unwrap_err()
         .to_string()
@@ -64,31 +67,41 @@ async fn requeues_after_rejection_but_not_after_acceptance() {
 #[tokio::test]
 async fn follow_ups_target_only_accepted_submissions() {
     let db = setup().await;
-    let original = enqueue_invio(&db, 1).await.unwrap();
-    assert!(enqueue_cancellation(&db, original.id).await.is_err());
+    let original = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
+    assert!(
+        enqueue_cancellation(&db, &FixedClock::default(), original.id)
+            .await
+            .is_err()
+    );
 
     force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
-    let cancellation = enqueue_cancellation(&db, original.id).await.unwrap();
+    let cancellation = enqueue_cancellation(&db, &FixedClock::default(), original.id)
+        .await
+        .unwrap();
     assert_eq!(cancellation.operation, TsOperation::Annullamento);
     assert_eq!(cancellation.target_submission_id, Some(original.id));
 
-    assert!(enqueue_replacement(&db, original.id)
-        .await
-        .unwrap_err()
-        .to_string()
-        .contains("in corso"));
+    assert!(
+        enqueue_replacement(&db, &FixedClock::default(), original.id)
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("in corso")
+    );
 }
 
 #[tokio::test]
 async fn a_cancelled_invoice_can_be_sent_again() {
     let db = setup().await;
-    let original = enqueue_invio(&db, 1).await.unwrap();
+    let original = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
-    let cancellation = enqueue_cancellation(&db, original.id).await.unwrap();
+    let cancellation = enqueue_cancellation(&db, &FixedClock::default(), original.id)
+        .await
+        .unwrap();
     force_status(&db, cancellation.id, TsSubmissionStatus::Accettata).await;
     force_status(&db, original.id, TsSubmissionStatus::Annullata).await;
 
-    let resent = enqueue_invio(&db, 1).await.unwrap();
+    let resent = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     assert_eq!(resent.operation, TsOperation::Invio);
     assert_eq!(resent.status, TsSubmissionStatus::NonInviata);
 }
@@ -96,11 +109,11 @@ async fn a_cancelled_invoice_can_be_sent_again() {
 #[tokio::test]
 async fn a_follow_up_on_a_retired_submission_says_where_it_stands() {
     let db = setup().await;
-    let original = enqueue_invio(&db, 1).await.unwrap();
+    let original = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
     force_status(&db, original.id, TsSubmissionStatus::Annullata).await;
 
-    let reason = enqueue_cancellation(&db, original.id)
+    let reason = enqueue_cancellation(&db, &FixedClock::default(), original.id)
         .await
         .unwrap_err()
         .to_string();
@@ -110,30 +123,38 @@ async fn a_follow_up_on_a_retired_submission_says_where_it_stands() {
 #[tokio::test]
 async fn replacement_requires_the_invoice_to_still_be_paid() {
     let db = setup().await;
-    let original = enqueue_invio(&db, 1).await.unwrap();
+    let original = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
     db.execute_unprepared("UPDATE invoices SET status = 'issued' WHERE id = 1")
         .await
         .unwrap();
 
-    assert!(enqueue_replacement(&db, original.id)
-        .await
-        .unwrap_err()
-        .to_string()
-        .contains("pagate"));
-    assert!(enqueue_cancellation(&db, original.id).await.is_ok());
+    assert!(
+        enqueue_replacement(&db, &FixedClock::default(), original.id)
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("pagate")
+    );
+    assert!(
+        enqueue_cancellation(&db, &FixedClock::default(), original.id)
+            .await
+            .is_ok()
+    );
 }
 
 #[tokio::test]
 async fn replacement_needs_the_id_the_original_was_sent_under() {
     let db = setup().await;
-    let original = enqueue_invio(&db, 1).await.unwrap();
+    let original = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
     db.execute_unprepared("UPDATE ts_submissions SET document_number = NULL")
         .await
         .unwrap();
 
-    let error = enqueue_replacement(&db, original.id).await.unwrap_err();
+    let error = enqueue_replacement(&db, &FixedClock::default(), original.id)
+        .await
+        .unwrap_err();
 
     assert!(matches!(error, AppError::Invalid(_)));
     assert!(error.to_string().contains("identificativo"));
@@ -142,14 +163,14 @@ async fn replacement_needs_the_id_the_original_was_sent_under() {
 #[tokio::test]
 async fn withdraws_only_unsent_submissions() {
     let db = setup().await;
-    let queued = enqueue_invio(&db, 1).await.unwrap();
+    let queued = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     withdraw(&db, queued.id).await.unwrap();
     assert!(list(&db, TsSubmissionFilters::default())
         .await
         .unwrap()
         .is_empty());
 
-    let sent = enqueue_invio(&db, 1).await.unwrap();
+    let sent = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     force_status(&db, sent.id, TsSubmissionStatus::Inviata).await;
     assert!(withdraw(&db, sent.id)
         .await
@@ -166,8 +187,8 @@ async fn lists_by_invoice_and_status() {
     )
     .await
     .unwrap();
-    let first = enqueue_invio(&db, 1).await.unwrap();
-    enqueue_invio(&db, 3).await.unwrap();
+    let first = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
+    enqueue_invio(&db, &FixedClock::default(), 3).await.unwrap();
     force_status(&db, first.id, TsSubmissionStatus::Accettata).await;
 
     let for_invoice = list(
@@ -195,56 +216,6 @@ async fn lists_by_invoice_and_status() {
     assert_eq!(accepted[0].id, first.id);
 }
 
-#[tokio::test]
-async fn blocks_deletion_while_production_holds_the_data() {
-    let db = setup().await;
-    use_production(&db).await;
-    let queued = enqueue_invio(&db, 1).await.unwrap();
-    assert!(!blocks_invoice_deletion(&db, 1).await.unwrap());
-
-    force_status(&db, queued.id, TsSubmissionStatus::Accettata).await;
-    assert!(blocks_invoice_deletion(&db, 1).await.unwrap());
-
-    force_status(&db, queued.id, TsSubmissionStatus::Annullata).await;
-    assert!(!blocks_invoice_deletion(&db, 1).await.unwrap());
-}
-
-#[tokio::test]
-async fn test_environment_data_never_blocks_deletion() {
-    let db = setup().await;
-    let queued = enqueue_invio(&db, 1).await.unwrap();
-    force_status(&db, queued.id, TsSubmissionStatus::Accettata).await;
-    assert!(!blocks_invoice_deletion(&db, 1).await.unwrap());
-}
-
-async fn use_production(db: &DatabaseConnection) {
-    db.execute_unprepared("UPDATE ts_settings SET environment = 'produzione'")
-        .await
-        .unwrap();
-}
-#[tokio::test]
-async fn invoice_deletion_is_refused_while_accepted_and_cascades_after_cancellation() {
-    use crate::app::service::invoice::invoice_service;
-
-    let db = setup().await;
-    use_production(&db).await;
-    let original = enqueue_invio(&db, 1).await.unwrap();
-    force_status(&db, original.id, TsSubmissionStatus::Accettata).await;
-    let err = invoice_service::remove(&db, 1).await.unwrap_err();
-    assert!(err.to_string().contains("Sistema TS"));
-
-    let cancellation = enqueue_cancellation(&db, original.id).await.unwrap();
-    force_status(&db, cancellation.id, TsSubmissionStatus::Accettata).await;
-    force_status(&db, original.id, TsSubmissionStatus::Annullata).await;
-    db.execute_unprepared("PRAGMA foreign_keys = ON")
-        .await
-        .unwrap();
-
-    invoice_service::remove(&db, 1).await.unwrap();
-    let left = list(&db, TsSubmissionFilters::default()).await.unwrap();
-    assert!(left.is_empty());
-}
-
 async fn accept_as_sent(db: &sea_orm::DatabaseConnection, submission_id: i64) {
     let settings = ts_settings_service::get(db).await.unwrap();
     let sent = ts_document_service::build(db, 1, &settings.vat_number, None)
@@ -266,7 +237,7 @@ async fn accept_as_sent(db: &sea_orm::DatabaseConnection, submission_id: i64) {
 #[tokio::test]
 async fn an_unchanged_invoice_is_in_step_with_the_sistema_ts() {
     let db = setup().await;
-    let sent = enqueue_invio(&db, 1).await.unwrap();
+    let sent = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     accept_as_sent(&db, sent.id).await;
 
     assert!(!invoice_out_of_date(&db, 1).await.unwrap());
@@ -275,7 +246,7 @@ async fn an_unchanged_invoice_is_in_step_with_the_sistema_ts() {
 #[tokio::test]
 async fn an_edited_amount_after_acceptance_asks_for_a_replacement() {
     let db = setup().await;
-    let sent = enqueue_invio(&db, 1).await.unwrap();
+    let sent = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     accept_as_sent(&db, sent.id).await;
 
     db.execute_unprepared("UPDATE invoices SET total_gross = 91.64 WHERE id = 1")
@@ -288,7 +259,7 @@ async fn an_edited_amount_after_acceptance_asks_for_a_replacement() {
 #[tokio::test]
 async fn a_submission_without_fingerprint_never_reports_a_change() {
     let db = setup().await;
-    let sent = enqueue_invio(&db, 1).await.unwrap();
+    let sent = enqueue_invio(&db, &FixedClock::default(), 1).await.unwrap();
     force_status(&db, sent.id, TsSubmissionStatus::Accettata).await;
 
     assert!(!invoice_out_of_date(&db, 1).await.unwrap());

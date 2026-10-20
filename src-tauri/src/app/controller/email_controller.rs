@@ -26,7 +26,7 @@ pub async fn update_email_account(
     state: State<'_, AppState>,
     input: UpdateEmailAccountInput,
 ) -> Result<EmailAccount, AppError> {
-    email_account_service::update(&state.db, input).await
+    email_account_service::update(&state.db, state.clock.as_ref(), input).await
 }
 
 /// Reports whether the mailbox password is stored; its value never leaves the backend.
@@ -75,7 +75,7 @@ pub async fn update_email_template(
     state: State<'_, AppState>,
     template: EmailTemplate,
 ) -> Result<EmailTemplate, AppError> {
-    email_template_service::update(&state.db, template).await
+    email_template_service::update(&state.db, state.clock.as_ref(), template).await
 }
 
 #[tauri::command]
@@ -94,7 +94,7 @@ pub async fn preview_email_template(
     state: State<'_, AppState>,
     template: EmailTemplate,
 ) -> Result<EmailPreview, AppError> {
-    email_template_service::preview(&state.db, template).await
+    email_template_service::preview(&state.db, state.clock.as_ref(), template).await
 }
 
 #[tauri::command]
@@ -112,6 +112,7 @@ pub async fn send_invoice_email(
 ) -> Result<InvoiceEmail, AppError> {
     invoice_email_service::send(
         &state.db,
+        state.clock.as_ref(),
         state.secrets.as_ref(),
         state.mail_gateway.as_ref(),
         input,
@@ -127,6 +128,7 @@ pub async fn send_prepared_invoice_email(
 ) -> Result<InvoiceEmail, AppError> {
     invoice_email_service::send_prepared(
         &state.db,
+        state.clock.as_ref(),
         state.secrets.as_ref(),
         state.mail_gateway.as_ref(),
         invoice_id,

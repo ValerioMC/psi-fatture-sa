@@ -13,7 +13,7 @@
  * Acceptance lands once, as a stamp, on an actual change and never on mount.
  */
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { describeTsMark, type TsMarkKind } from '@/utils/sts'
+import { describeTsMark, type TsMarkKind } from '@/features/sts/lib/sts'
 
 const props = withDefaults(defineProps<{ kind: TsMarkKind; size?: number }>(), { size: 20 })
 

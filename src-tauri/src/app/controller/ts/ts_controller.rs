@@ -73,7 +73,7 @@ pub async fn update_ts_settings(
     state: State<'_, AppState>,
     input: UpdateTsSettingsInput,
 ) -> Result<TsSettings, AppError> {
-    ts_settings_service::update(&state.db, input).await
+    ts_settings_service::update(&state.db, state.clock.as_ref(), input).await
 }
 
 /// Calls the Sistema TS once to tell whether the stored credentials work.
@@ -83,6 +83,7 @@ pub async fn check_ts_connection(
 ) -> Result<TsConnectionCheck, AppError> {
     ts_remote_service::check_connection(
         &state.db,
+        state.clock.as_ref(),
         state.secrets.as_ref(),
         state.ts_gateway.as_ref(),
     )
@@ -102,7 +103,7 @@ pub async fn enqueue_ts_submission(
     state: State<'_, AppState>,
     invoice_id: i64,
 ) -> Result<TsSubmission, AppError> {
-    ts_submission_service::enqueue_invio(&state.db, invoice_id).await
+    ts_submission_service::enqueue_invio(&state.db, state.clock.as_ref(), invoice_id).await
 }
 
 #[tauri::command]
@@ -110,7 +111,7 @@ pub async fn enqueue_ts_replacement(
     state: State<'_, AppState>,
     submission_id: i64,
 ) -> Result<TsSubmission, AppError> {
-    ts_submission_service::enqueue_replacement(&state.db, submission_id).await
+    ts_submission_service::enqueue_replacement(&state.db, state.clock.as_ref(), submission_id).await
 }
 
 #[tauri::command]
@@ -118,7 +119,8 @@ pub async fn enqueue_ts_cancellation(
     state: State<'_, AppState>,
     submission_id: i64,
 ) -> Result<TsSubmission, AppError> {
-    ts_submission_service::enqueue_cancellation(&state.db, submission_id).await
+    ts_submission_service::enqueue_cancellation(&state.db, state.clock.as_ref(), submission_id)
+        .await
 }
 
 /// Removes a submission that has not been sent yet.
@@ -141,7 +143,7 @@ pub async fn dispatch_ts_queue(
         state.secrets.as_ref(),
         state.ts_gateway.as_ref(),
         &ts_progress_event::emitter(app),
-        chrono::Utc::now().naive_utc(),
+        state.clock.utc_now(),
     )
     .await
 }

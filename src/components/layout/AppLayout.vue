@@ -3,10 +3,10 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import CommandPalette from './CommandPalette.vue'
-import UpdateDialog from '@/components/update/UpdateDialog.vue'
-import { useSmoothScroll } from '@/composables/useSmoothScroll'
-import { hasPrimaryModifier } from '@/utils/platform'
-import { useUpdateStore } from '@/stores/update'
+import UpdateDialog from '@/features/update/components/UpdateDialog.vue'
+import { useSmoothScroll } from '@/common/composables/useSmoothScroll'
+import { hasPrimaryModifier } from '@/common/lib/platform'
+import { useUpdateStore } from '@/features/update/store/update'
 
 const paletteOpen = ref(false)
 const scrollWrapperRef = ref<HTMLElement | null>(null)

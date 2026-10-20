@@ -1,13 +1,11 @@
-//! Rules an invoice change must respect beyond its own fields: the year's
-//! numbering (unique, in date order) and the data the production Sistema TS holds.
+//! Rules an invoice change must respect beyond its own fields: the year's numbering,
+//! unique and in date order. What the Sistema TS forbids lives in `ts`.
 
-use sea_orm::{ConnectionTrait, DbErr};
+use sea_orm::ConnectionTrait;
 
 use crate::app::common::AppError;
-use crate::app::model::invoice::{Invoice, InvoiceStatus};
-use crate::app::model::ts::TsEnvironment;
+use crate::app::model::invoice::invoice_number::parse_stored_number;
 use crate::app::repository::invoice::invoice_repository;
-use crate::app::repository::ts::ts_submission_repository;
 use crate::app::service::support::italian_format::date_long;
 
 /// A number is used once per year: "007" and "7" count as the same number.
@@ -38,7 +36,7 @@ pub(super) async fn ensure_chronological(
     else {
         return Ok(());
     };
-    let clash_number = stored_number(&clash.invoice_number)?;
+    let clash_number = parse_stored_number(&clash.invoice_number)?;
     let date = date_long(&clash.issue_date);
     let hint = if clash_number < number {
         format!("usa una data dal {date} in poi")
@@ -48,71 +46,6 @@ pub(super) async fn ensure_chronological(
     Err(AppError::Conflict(format!(
         "La fattura n. {} è del {date}: la numerazione deve seguire l'ordine delle date, {hint}",
         clash.invoice_number
-    )))
-}
-
-/// Stored numbers are written only by `format_invoice_number`, so a non-numeric one is corrupt data.
-fn stored_number(invoice_number: &str) -> Result<i64, AppError> {
-    invoice_number.parse().map_err(|_| {
-        AppError::Database(DbErr::Custom(format!(
-            "il numero della fattura «{invoice_number}» salvato in archivio non è numerico"
-        )))
-    })
-}
-
-/// Whether the production Sistema TS holds this invoice's expense document.
-async fn held_by_sistema_ts(db: &impl ConnectionTrait, invoice_id: i64) -> Result<bool, AppError> {
-    ts_submission_repository::invoice_holds_ts_data(db, invoice_id, TsEnvironment::Produzione).await
-}
-
-/// A transmitted invoice keeps the id the Sistema TS knows it by and stays paid;
-/// amounts and patient may change, then a replacement realigns the Sistema TS.
-pub(super) async fn ensure_ts_allows_update(
-    db: &impl ConnectionTrait,
-    current: &Invoice,
-    number: i64,
-    issue_date: &str,
-    status: &InvoiceStatus,
-) -> Result<(), AppError> {
-    if !held_by_sistema_ts(db, current.id).await? {
-        return Ok(());
-    }
-    let current_number = stored_number(&current.invoice_number)?;
-    if current_number != number || current.issue_date != issue_date {
-        return Err(AppError::Conflict(
-            "Fattura trasmessa al Sistema TS: numero e data non si possono cambiare. \
-             Per correggerli annulla prima la trasmissione"
-                .to_string(),
-        ));
-    }
-    ensure_stays_paid(status, &current.invoice_number)
-}
-
-/// A bulk status change may not move a transmitted invoice off "paid".
-pub(super) async fn ensure_ts_allows_status(
-    db: &impl ConnectionTrait,
-    invoice_ids: &[i64],
-    status: &InvoiceStatus,
-) -> Result<(), AppError> {
-    if *status == InvoiceStatus::Paid {
-        return Ok(());
-    }
-    for id in invoice_ids {
-        if held_by_sistema_ts(db, *id).await? {
-            let invoice = invoice_repository::load_invoice(db, *id).await?;
-            ensure_stays_paid(status, &invoice.invoice_number)?;
-        }
-    }
-    Ok(())
-}
-
-fn ensure_stays_paid(status: &InvoiceStatus, invoice_number: &str) -> Result<(), AppError> {
-    if *status == InvoiceStatus::Paid {
-        return Ok(());
-    }
-    Err(AppError::Conflict(format!(
-        "La fattura n. {invoice_number} è registrata al Sistema TS come pagata: \
-         annulla prima la trasmissione per cambiarne lo stato"
     )))
 }
 

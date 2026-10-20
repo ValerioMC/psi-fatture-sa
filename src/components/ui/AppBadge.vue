@@ -3,7 +3,7 @@
  * A short label with a tone. Each tone is a fixed wash / text / ring triple
  * derived from its status token, so a badge can never invent its own colour.
  */
-import type { Tone } from '@/utils/labels'
+import type { Tone } from '@/common/lib/labels'
 
 withDefaults(
   defineProps<{

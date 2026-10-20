@@ -10,11 +10,11 @@ import {
   CalendarDays, CalendarRange, ClipboardList, CornerDownLeft, FileText, IdCard, KeyRound, LayoutGrid,
   Mail, Moon, Plus, Search, Settings, Sun, UserPlus, Users,
 } from 'lucide-vue-next'
-import { useFocusTrap } from '@/composables/useFocusTrap'
-import { useTheme } from '@/composables/useTheme'
-import { useClientsStore } from '@/stores/clients'
-import { clientDisplayName } from '@/utils/client'
-import { searchKey } from '@/utils/search'
+import { useFocusTrap } from '@/common/composables/useFocusTrap'
+import { useTheme } from '@/common/composables/useTheme'
+import { useClientsStore } from '@/features/client/store/clients'
+import { clientDisplayName } from '@/features/client/lib/client'
+import { searchKey } from '@/common/lib/search'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 
 const props = defineProps<{ open: boolean }>()

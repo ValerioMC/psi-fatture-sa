@@ -1,0 +1,153 @@
+<script setup lang="ts">
+/**
+ * Settings, one context per page. The profile form spans "Profilo" and "Fatturazione"
+ * and is saved from one bar that rises when something differs; leaving with changes asks first.
+ */
+import { computed, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { BadgeInfo, DatabaseBackup, IdCard, KeyRound, Mail, Palette, ReceiptText, Scale, Settings } from 'lucide-vue-next'
+import { useEmailStore } from '@/features/email/store/email'
+import { useStsStore } from '@/features/sts/store/sts'
+import { useToastStore } from '@/common/store/toast'
+import { useUpdateStore } from '@/features/update/store/update'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import SettingsNav, { type SettingsNavItem } from '@/features/settings/components/SettingsNav.vue'
+import { provideSettingsProfile } from '@/features/settings/composables/useSettingsProfile'
+import { useSmoothScroll } from '@/common/composables/useSmoothScroll'
+
+const router = useRouter()
+const route = useRoute()
+
+// Nested in the app's Lenis: it takes the wheel only while the pane can scroll, so the stacked narrow layout still scrolls the page.
+const paneWrapperRef = ref<HTMLElement | null>(null)
+const paneContentRef = ref<HTMLElement | null>(null)
+const paneScroll = useSmoothScroll({ wrapper: paneWrapperRef, content: paneContentRef })
+
+watch(
+  () => route.path,
+  () => {
+    if (paneScroll.value !== null) paneScroll.value.scrollTo(0, { immediate: true })
+    else paneWrapperRef.value?.scrollTo({ top: 0 })
+  },
+)
+
+const toast = useToastStore()
+const email = useEmailStore()
+const sts = useStsStore()
+const update = useUpdateStore()
+const profile = provideSettingsProfile()
+
+onMounted(async () => {
+  await profile.load()
+  // The status dots are a courtesy: without them the pages still work.
+  email.load().catch(() => undefined)
+  if (!sts.loaded) sts.load().catch(() => undefined)
+  update.loadVersion().catch(() => undefined)
+})
+
+const items = computed<SettingsNavItem[]>(() => [
+  { to: '/settings/profile', label: 'Profilo', hint: 'Chi sei, studio, pagamenti', icon: IdCard },
+  { to: '/settings/invoicing', label: 'Fatturazione', hint: 'Regime, numerazione, stampa', icon: ReceiptText },
+  {
+    to: '/settings/email',
+    label: 'Email',
+    hint: 'Casella e modello',
+    icon: Mail,
+    status: email.loaded ? (email.ready ? { tone: 'safe', label: 'Pronta per inviare' } : { tone: 'warn', label: 'Da configurare' }) : undefined,
+  },
+  {
+    to: '/settings/sts',
+    label: 'Sistema TS',
+    hint: 'Credenziali di invio',
+    icon: KeyRound,
+    status: sts.loaded && !sts.connected ? { tone: 'warn', label: 'Credenziali mancanti' } : undefined,
+  },
+  { to: '/settings/data', label: 'Dati e backup', hint: 'Archivio e copie automatiche', icon: DatabaseBackup },
+  { to: '/settings/appearance', label: 'Aspetto', hint: 'Tema chiaro o scuro', icon: Palette },
+  { to: '/settings/legal', label: 'Condizioni d’uso', hint: 'Il testo che hai accettato', icon: Scale },
+  {
+    to: '/settings/version',
+    label: 'Versione',
+    hint: update.version ? `PSI Fatture ${update.version}` : 'Aggiornamenti',
+    icon: BadgeInfo,
+    status: update.latest?.update_available ? { tone: 'accent', label: `Disponibile la ${update.latest.latest_version}` } : undefined,
+  },
+])
+
+async function save(): Promise<void> {
+  const outcome = await profile.save()
+  if (outcome.ok) {
+    toast.notify('Profilo salvato')
+    return
+  }
+  if (outcome.page !== null) void router.push(`/settings/${outcome.page}`)
+  toast.notifyError(outcome.error, outcome.page !== null ? undefined : 'Salvataggio non riuscito')
+}
+
+const leaveOpen = ref(false)
+let pendingLeave: (() => void) | null = null
+onBeforeRouteLeave((_to, _from, next) => {
+  if (!profile.dirty.value) return next()
+  pendingLeave = () => next()
+  leaveOpen.value = true
+  next(false)
+})
+
+function discardAndLeave(): void {
+  leaveOpen.value = false
+  profile.reset()
+  pendingLeave?.()
+}
+</script>
+
+<template>
+  <div class="flex flex-col @min-[48rem]/pane:h-screen">
+    <PageHeader title="Impostazioni" subtitle="Il tuo profilo, come fatturi, la casella email, il Sistema TS, l'aspetto e la versione dell'app." :icon="Settings" />
+
+    <!-- Side by side, the frame fills the window and only the section pane scrolls: the nav sits outside it, so no section can move it. -->
+    <div class="page grid min-h-0 flex-1 grid-cols-1 gap-6 @min-[48rem]/pane:grid-cols-[14rem_minmax(0,1fr)]">
+      <aside class="settle pt-6 @min-[48rem]/pane:overflow-y-auto">
+        <SettingsNav :items="items" />
+      </aside>
+      <div
+        ref="paneWrapperRef"
+        class="min-w-0 @min-[48rem]/pane:-mr-(--spacing-gutter) @min-[48rem]/pane:overflow-y-auto @min-[48rem]/pane:pr-(--spacing-gutter)"
+      >
+        <div ref="paneContentRef" class="@container/settings pt-6 pb-28">
+          <RouterView v-slot="{ Component }">
+            <Transition name="pane" mode="out-in">
+              <component :is="Component" />
+            </Transition>
+          </RouterView>
+        </div>
+      </div>
+    </div>
+
+    <Teleport to="body">
+      <Transition name="rise">
+        <form
+          v-if="profile.dirty.value"
+          class="fixed bottom-6 left-[calc(50%+var(--spacing-sidebar)/2)] z-(--z-overlay) flex -translate-x-1/2 items-center gap-4 rounded-card border border-border bg-surface-raised py-2 pl-5 pr-2 shadow-modal"
+          aria-label="Modifiche non salvate al profilo"
+          novalidate
+          @submit.prevent="save"
+        >
+          <span class="whitespace-nowrap text-base text-text">Modifiche non salvate al profilo</span>
+          <AppButton variant="ghost" size="sm" @click="profile.reset">Annulla</AppButton>
+          <AppButton variant="primary" size="sm" type="submit" :loading="profile.saving.value">Salva</AppButton>
+        </form>
+      </Transition>
+    </Teleport>
+
+    <ConfirmDialog
+      :open="leaveOpen"
+      title="Uscire senza salvare?"
+      blast-radius="Le modifiche al profilo andranno perse."
+      confirm-label="Esci senza salvare"
+      @confirm="discardAndLeave"
+      @cancel="leaveOpen = false"
+    />
+  </div>
+</template>

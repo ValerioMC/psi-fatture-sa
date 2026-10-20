@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use sea_orm::DatabaseConnection;
 
-use crate::app::common::AppError;
+use crate::app::common::{AppError, Clock};
 use crate::app::repository::backup_repository;
 
 /// Copies the database to `target`, replacing a file the user chose to overwrite.
@@ -24,8 +24,8 @@ pub async fn export(db: &DatabaseConnection, target: &Path) -> Result<(), AppErr
 }
 
 /// The name the save dialog proposes: "PSI-Fatture-backup-2026-10-02.db".
-pub fn file_name(today: chrono::NaiveDate) -> String {
-    format!("PSI-Fatture-backup-{}.db", today.format("%Y-%m-%d"))
+pub fn file_name(clock: &dyn Clock) -> String {
+    format!("PSI-Fatture-backup-{}.db", clock.today())
 }
 
 fn staging_path(target: &Path) -> PathBuf {
