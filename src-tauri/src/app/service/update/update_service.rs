@@ -5,7 +5,7 @@ use crate::app::common::AppError;
 use crate::app::model::update::{LatestRelease, Platform, ReleaseVersion, UpdateCheck};
 use crate::app::repository::update::ReleaseGateway;
 
-pub use super::update_install_service::{install, UpdateTarget};
+pub use super::update_install_service::install_over_running_app;
 
 pub async fn check(
     gateway: &dyn ReleaseGateway,

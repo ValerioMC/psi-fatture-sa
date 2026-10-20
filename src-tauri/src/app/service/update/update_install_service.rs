@@ -13,9 +13,11 @@ use crate::app::repository::update::{bundle_file_repository, BundleInstaller, Re
 const DOWNLOAD_PREFIX: &str = "https://github.com/ValerioMC/psi-fatture-sa/releases/download/";
 const IMAGE_NAME: &str = "PSI-Fatture-update.dmg";
 const MOUNT_NAME: &str = "volume";
+/// The scratch folder under the system temp dir where the image is downloaded and mounted.
+const WORK_DIR_NAME: &str = "psi-fatture-update";
 
 /// What the update acts on: the tools, this build and where it may write scratch files.
-pub struct UpdateTarget<'a> {
+pub(super) struct UpdateTarget<'a> {
     pub gateway: &'a dyn ReleaseGateway,
     pub installer: &'a dyn BundleInstaller,
     pub current_version: &'a str,
@@ -24,8 +26,28 @@ pub struct UpdateTarget<'a> {
     pub work_dir: &'a Path,
 }
 
+/// Installs over the app this process runs from, working in the system temp dir.
+pub async fn install_over_running_app(
+    gateway: &dyn ReleaseGateway,
+    installer: &dyn BundleInstaller,
+    current_version: &str,
+    platform: Platform,
+) -> Result<String, AppError> {
+    let running_executable = std::env::current_exe()?;
+    let work_dir = std::env::temp_dir().join(WORK_DIR_NAME);
+    install(UpdateTarget {
+        gateway,
+        installer,
+        current_version,
+        platform,
+        running_executable: &running_executable,
+        work_dir: &work_dir,
+    })
+    .await
+}
+
 /// Returns the installed version. Nothing is downloaded unless a newer bundle for this Mac exists.
-pub async fn install(target: UpdateTarget<'_>) -> Result<String, AppError> {
+pub(super) async fn install(target: UpdateTarget<'_>) -> Result<String, AppError> {
     ensure_mac(target.platform)?;
     let bundle = app_bundle_of(target.running_executable)?;
     let release = target.gateway.latest().await?;
