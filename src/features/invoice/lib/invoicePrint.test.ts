@@ -5,7 +5,6 @@ import {
   paymentCondition,
   printedClientName,
   printedPaymentLabel,
-  professionalFullName,
 } from './invoicePrint'
 
 const PLAIN = { apply_enpap: false, contributo_enpap: 0, ritenuta_acconto: 0, total_tax: 0 }
@@ -62,11 +61,6 @@ describe('payment text', () => {
 })
 
 describe('names', () => {
-  it('joins the professional title and names, skipping the empty ones', () => {
-    expect(professionalFullName({ title: 'Dott.ssa', first_name: 'Maria', last_name: 'Rossi' })).toBe('Dott.ssa Maria Rossi')
-    expect(professionalFullName({ title: '', first_name: 'Maria', last_name: 'Rossi' })).toBe('Maria Rossi')
-  })
-
   it('addresses a person first name first and a company by its name', () => {
     expect(printedClientName({ client_type: 'persona_fisica', first_name: 'Anna', last_name: 'Bianchi' })).toBe('Anna Bianchi')
     expect(printedClientName({ client_type: 'azienda', first_name: '', last_name: 'Studio Alfa' })).toBe('Studio Alfa')

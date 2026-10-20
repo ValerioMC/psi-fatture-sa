@@ -647,6 +647,32 @@ psi-fatture-sa/
 - **API**: ogni chiamata al backend passa da un modulo `features/<feature>/api/`, uno per
   dominio del backend (`invoiceApi.ts`, `pdfApi.ts`, `tsApi.ts`…); viste e componenti non
   usano mai `invoke` direttamente.
+- **Confini tra funzioni**: quale funzione può importare da quale è la tabella `ALLOWED` di
+  `src/architecture.test.ts`, che fallisce su un import non elencato, su una voce che il codice
+  non usa più e su un ciclo. Non contano come dipendenza i tipi di `model/`, che si condividono
+  liberamente, e una vista che incorpora un componente di un'altra funzione o ne legge lo
+  store: le viste sono il punto in cui le funzioni si incontrano. Tutto il resto (`api`, `lib`,
+  `composables`, uno store letto da un componente o da un composable) è una dipendenza.
+
+  | Funzione | Può usare |
+  |---|---|
+  | `appointment` | `client`, `service` |
+  | `client` | `settings` |
+  | `dashboard` | `invoice` |
+  | `email` | `invoice` |
+  | `invoice` | `client`, `service`, `settings` |
+  | `service` | |
+  | `settings` | `terms` |
+  | `sts` | `client`, `invoice` |
+  | `terms` | |
+  | `update` | |
+
+  Come nel backend, `email` e `sts` dipendono da `invoice` e mai il contrario: la lista fatture
+  mostra lo stato email e Sistema TS leggendo i loro store e incorpora `BulkInvoiceEmail`, e il
+  form fattura passa a `useInvoiceForm` il caricamento dello stato Sistema TS da attendere. Le
+  fatture di un paziente nella sua scheda (`ClientInvoiceHistory`) e il riquadro "In carico"
+  dell'anagrafica (`PatientsInCareTile`) sono componenti di `invoice` incorporati dalle viste di
+  `client`.
 - **Test**: i test di `foo.ts` stanno in `foo.test.ts` accanto, un file di test per modulo.
 
 ## Test
@@ -655,7 +681,8 @@ psi-fatture-sa/
 # Frontend (vitest): logica fiscale, validazione (codice fiscale, P.IVA, IBAN…),
 # sigillo delle fatture, soglia forfettario, date locali, ricorrenze, tema, notifiche,
 # filtri e riepiloghi della lista fatture, form di fattura e paziente, agenda e dashboard,
-# testo della fattura stampata, stato e scadenze del Sistema TS, chiave di ricerca
+# testo della fattura stampata, stato e scadenze del Sistema TS, chiave di ricerca,
+# confini tra funzioni (src/architecture.test.ts)
 npm test
 
 # Backend (cargo): calcolo totali fattura, validazione input, Sistema TS (buste SOAP,

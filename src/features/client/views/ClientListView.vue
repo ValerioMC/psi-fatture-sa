@@ -5,17 +5,16 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Activity, Building2, ClipboardList, Pencil, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-vue-next'
-import { listInvoices } from '@/features/invoice/api/invoiceApi'
+import { Building2, ClipboardList, Pencil, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-vue-next'
 import { useClientsStore } from '@/features/client/store/clients'
 import { useToastStore } from '@/common/store/toast'
 import type { Client } from '@/features/client/model/client'
-import type { Invoice } from '@/features/invoice/model/invoice'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import StatTile from '@/components/ui/StatTile.vue'
+import PatientsInCareTile from '@/features/invoice/components/PatientsInCareTile.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -23,9 +22,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { ageOn, clientDisplayName } from '@/features/client/lib/client'
 import { plural } from '@/common/lib/labels'
 import { searchKey } from '@/common/lib/search'
-import { missingFields, patientsInCare, type MissingField } from '@/features/client/lib/patientRegister'
-
-const CARE_WINDOW_DAYS = 90
+import { missingFields, type MissingField } from '@/features/client/lib/patientRegister'
 
 const router = useRouter()
 const clientsStore = useClientsStore()
@@ -35,21 +32,13 @@ const search = ref('')
 const onlyIncomplete = ref(false)
 const toDelete = ref<Client | null>(null)
 const deleting = ref(false)
-const invoices = ref<Invoice[]>([])
 
 onMounted(async () => {
-  await Promise.all([clientsStore.fetchClients(), loadInvoices()])
+  await clientsStore.fetchClients()
   if (clientsStore.error) toast.notifyError(clientsStore.error, 'Caricamento non riuscito')
 })
 
-async function loadInvoices(): Promise<void> {
-  try {
-    invoices.value = await listInvoices({})
-  } catch (error) {
-    toast.notifyError(error, 'Fatture non caricate')
-  }
-}
-
+const patientIds = computed(() => clientsStore.clients.map((client) => client.id))
 const gapsById = computed(() => new Map<number, MissingField[]>(clientsStore.clients.map((client) => [client.id, missingFields(client)])))
 const gapsOf = (client: Client): MissingField[] => gapsById.value.get(client.id) ?? []
 
@@ -73,13 +62,11 @@ const subtitle = computed(() => {
   return `${plural(all.length, 'paziente', 'pazienti')} · ${sts} con consenso al Sistema Tessera Sanitaria`
 })
 
-/** The register at a glance: size, consent, who is in care now, and which records block invoicing. */
+/** The register at a glance: size, consent and which records block invoicing. */
 const stats = computed(() => {
   const all = clientsStore.clients
   const companies = all.filter((client) => client.client_type === 'azienda').length
   const sts = all.filter((client) => client.sts_authorization).length
-  const known = new Set(all.map((client) => client.id))
-  const inCare = [...patientsInCare(invoices.value, CARE_WINDOW_DAYS)].filter((id) => known.has(id)).length
   const incomplete = all.filter((client) => gapsOf(client).length > 0)
   const countMissing = (field: MissingField): number => incomplete.filter((client) => gapsOf(client).includes(field)).length
   return {
@@ -87,8 +74,6 @@ const stats = computed(() => {
     companies,
     sts,
     stsShare: all.length > 0 ? Math.round((sts / all.length) * 100) : 0,
-    inCare,
-    inCareShare: all.length > 0 ? Math.round((inCare / all.length) * 100) : 0,
     incomplete: incomplete.length,
     missingEmail: countMissing('email'),
     missingForInvoice: incomplete.filter((client) => gapsOf(client).some((field) => field !== 'email')).length,
@@ -142,11 +127,7 @@ async function confirmDelete(): Promise<void> {
             <div class="h-full rounded-full bg-gradient-to-r from-safe/70 to-safe transition-[width] duration-700 ease-out-expo" :style="{ width: `${stats.stsShare}%` }" />
           </div>
         </StatTile>
-        <StatTile label="In carico" :value="String(stats.inCare)" :icon="Activity" tone="accent" :hint="`fatturati negli ultimi ${CARE_WINDOW_DAYS} giorni · ${stats.total - stats.inCare} inattivi`">
-          <div class="h-1.5 overflow-hidden rounded-full bg-accent-soft">
-            <div class="h-full rounded-full bg-gradient-to-r from-accent/70 to-accent transition-[width] duration-700 ease-out-expo" :style="{ width: `${stats.inCareShare}%` }" />
-          </div>
-        </StatTile>
+        <PatientsInCareTile :patient-ids="patientIds" />
         <button
           type="button"
           class="min-w-0 rounded-[inherit] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default"

@@ -7,7 +7,7 @@
  */
 import { computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { CalendarRange, CircleCheck, FileText, Hourglass, Pencil, Plus, Search, Send, Sigma, Trash2, X } from 'lucide-vue-next'
+import { CalendarRange, CircleCheck, FileText, Hourglass, Pencil, Plus, Search, Sigma, Trash2, X } from 'lucide-vue-next'
 import { useInvoicesStore } from '@/features/invoice/store/invoices'
 import { useToastStore } from '@/common/store/toast'
 import { useEmailStore } from '@/features/email/store/email'
@@ -27,10 +27,10 @@ import StatTile from '@/components/ui/StatTile.vue'
 import SparkLine from '@/components/ui/SparkLine.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import BulkInvoiceEmail from '@/features/email/components/BulkInvoiceEmail.vue'
 import { useInvoiceListFilters } from '@/features/invoice/composables/useInvoiceListFilters'
 import { useInvoiceSelection } from '@/features/invoice/composables/useInvoiceSelection'
 import { useBulkInvoiceStatus } from '@/features/invoice/composables/useBulkInvoiceStatus'
-import { useBulkInvoiceEmail } from '@/features/email/composables/useBulkInvoiceEmail'
 import { useInvoiceDeletion } from '@/features/invoice/composables/useInvoiceDeletion'
 import { formatCurrency, formatDate } from '@/common/lib/format'
 import { PAYMENT_METHOD_LABEL, plural } from '@/common/lib/labels'
@@ -77,7 +77,6 @@ const STATUS_FILL: Record<InvoiceStatus, string> = {
 const selection = useInvoiceSelection(() => visible.value, () => invoicesStore.invoices)
 const { selected, allVisibleSelected, someVisibleSelected, toggleAll, toggle, clearSelection } = selection
 const { bulkTarget, bulkConfirmOpen, bulkRunning, bulkBlastRadius, runBulk } = useBulkInvoiceStatus(selection)
-const { bulkEmailOpen, bulkEmailProgress, emailable, bulkEmailBlastRadius, bulkEmailMessage, runBulkEmail } = useBulkInvoiceEmail(selection)
 const { toDelete, deleting, confirmDelete } = useInvoiceDeletion()
 
 async function load(): Promise<void> {
@@ -250,9 +249,7 @@ onMounted(() => {
           <SegmentedControl v-model="bulkTarget" :options="BULK_OPTIONS" label="Nuovo stato" size="sm" />
           <AppButton variant="primary" size="sm" @click="bulkConfirmOpen = true">Applica</AppButton>
           <span class="h-5 w-px bg-border" aria-hidden="true" />
-          <span :title="email.ready ? undefined : 'Configura prima la casella in Impostazioni → Email'">
-            <AppButton size="sm" :icon="Send" :disabled="!email.ready || emailable.length === 0" @click="bulkEmailOpen = true">Invia via email</AppButton>
-          </span>
+          <BulkInvoiceEmail :selection="selection" />
           <AppButton variant="ghost" size="sm" :icon="X" label="Annulla selezione" @click="selected = new Set()" />
         </div>
       </Transition>
@@ -267,17 +264,6 @@ onMounted(() => {
       :loading="bulkRunning"
       @confirm="runBulk"
       @cancel="bulkConfirmOpen = false"
-    />
-    <ConfirmDialog
-      :open="bulkEmailOpen"
-      title="Inviare le fatture ai pazienti?"
-      :message="bulkEmailMessage"
-      :blast-radius="bulkEmailBlastRadius"
-      :confirm-label="`Invia ${emailable.length}`"
-      tone="accent"
-      :loading="bulkEmailProgress !== null"
-      @confirm="runBulkEmail"
-      @cancel="bulkEmailOpen = false"
     />
     <ConfirmDialog
       :open="toDelete !== null"

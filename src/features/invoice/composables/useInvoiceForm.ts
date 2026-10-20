@@ -1,6 +1,7 @@
 /**
  * Loads, checks and saves the invoice the form edits. A new invoice starts with
  * one blank line and shows the number it will get; editing loads the saved one.
+ * `waitFor` is what else the view needs before the form shows, such as another feature's state.
  */
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -9,7 +10,6 @@ import { useClientsStore } from '@/features/client/store/clients'
 import { useConfigStore } from '@/features/settings/store/config'
 import { useInvoicesStore } from '@/features/invoice/store/invoices'
 import { useServicesStore } from '@/features/service/store/services'
-import { useStsStore } from '@/features/sts/store/sts'
 import { errorMessage, useToastStore } from '@/common/store/toast'
 import { todayIso } from '@/common/lib/format'
 import {
@@ -24,14 +24,13 @@ import {
   type InvoiceFormErrors,
 } from '@/features/invoice/lib/invoiceForm'
 
-export function useInvoiceForm(editId: number | null) {
+export function useInvoiceForm(editId: number | null, waitFor: () => Promise<void> = () => Promise.resolve()) {
   const route = useRoute()
   const router = useRouter()
   const invoicesStore = useInvoicesStore()
   const clientsStore = useClientsStore()
   const servicesStore = useServicesStore()
   const configStore = useConfigStore()
-  const sts = useStsStore()
   const toast = useToastStore()
 
   const isEdit = editId !== null
@@ -51,7 +50,7 @@ export function useInvoiceForm(editId: number | null) {
         clientsStore.fetchClients(),
         servicesStore.fetchServices(false),
         configStore.isConfigured ? Promise.resolve() : configStore.loadConfig(),
-        isEdit && !sts.loaded ? sts.load() : Promise.resolve(),
+        waitFor(),
       ])
       const presetClient = Number(route.query.client)
       if (!isEdit && Number.isInteger(presetClient) && presetClient > 0) form.client_id = presetClient

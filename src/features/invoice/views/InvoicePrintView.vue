@@ -20,8 +20,8 @@ import {
   paymentCondition,
   printedClientName,
   printedPaymentLabel,
-  professionalFullName,
 } from '@/features/invoice/lib/invoicePrint'
+import { professionalFullName } from '@/features/settings/lib/professional'
 import { useSmoothScroll } from '@/common/composables/useSmoothScroll'
 
 const route = useRoute()

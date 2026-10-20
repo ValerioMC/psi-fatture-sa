@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { InvoiceStatus } from '@/features/invoice/model/invoice'
-import { blankClientForm, cardDescription, cardPlace, checkClientField, historyTotal, newestFirst } from './clientForm'
-import type { Invoice } from '@/features/invoice/model/invoice'
+import { blankClientForm, cardDescription, cardPlace, checkClientField } from './clientForm'
 
 describe('checkClientField', () => {
   it('asks a person for first name and surname, a company only for its name', () => {
@@ -37,15 +35,5 @@ describe('record card', () => {
   it('writes the place on one line and leaves out blank parts', () => {
     expect(cardPlace({ address: 'Via Roma 1', zip_code: '20100', city: 'Milano', province: 'MI' })).toEqual(['Via Roma 1', '20100 Milano (MI)'])
     expect(cardPlace({ address: ' ', zip_code: '', city: 'Milano', province: '' })).toEqual(['Milano'])
-  })
-})
-
-describe('history', () => {
-  const invoice = (status: InvoiceStatus, total_due: number, issue_date: string) => ({ status, total_due, issue_date }) as Invoice
-
-  it('sorts newest first and totals all but cancelled invoices', () => {
-    const list = [invoice('paid', 100, '2026-01-10'), invoice('cancelled', 50, '2026-03-01'), invoice('issued', 30, '2026-02-01')]
-    expect(newestFirst(list).map((i) => i.issue_date)).toEqual(['2026-03-01', '2026-02-01', '2026-01-10'])
-    expect(historyTotal(list)).toBe(130)
   })
 })

@@ -4,7 +4,6 @@
  */
 import type { SegmentOption } from '@/components/ui/types'
 import type { Client, ClientType, CreateClientInput } from '@/features/client/model/client'
-import type { Invoice } from '@/features/invoice/model/invoice'
 import { ageOn } from './client'
 import {
   validateCap,
@@ -100,15 +99,6 @@ export function cardDescription(form: Pick<CreateClientInput, 'client_type' | 'b
 export function cardPlace(form: Pick<CreateClientInput, 'address' | 'zip_code' | 'city' | 'province'>): string[] {
   const place = [form.zip_code, form.city].filter(Boolean).join(' ')
   return [form.address, place + (form.province ? ` (${form.province})` : '')].filter((part) => part.trim() !== '')
-}
-
-export function newestFirst(invoices: readonly Invoice[]): Invoice[] {
-  return [...invoices].sort((a, b) => b.issue_date.localeCompare(a.issue_date))
-}
-
-/** What the patient has been invoiced, cancelled invoices aside. */
-export function historyTotal(invoices: readonly Pick<Invoice, 'status' | 'total_due'>[]): number {
-  return invoices.filter((invoice) => invoice.status !== 'cancelled').reduce((sum, invoice) => sum + invoice.total_due, 0)
 }
 
 function required(value: string | undefined, message: string): ValidationResult {

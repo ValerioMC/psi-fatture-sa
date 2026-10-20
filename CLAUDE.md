@@ -61,6 +61,11 @@ Layering, one-type-per-file, typed errors and test placement are described in
 - **Feature folders.** `src/features/<feature>/{api,model,store,composables,lib,components,views}`,
   features named like the backend domains. What no feature owns goes in `src/common/` or
   `src/components/{ui,layout}`.
+- **Feature boundaries.** Which feature may import which is the `ALLOWED` table in
+  `src/architecture.test.ts`, mirrored in the README; no cycles (`email` and `sts` depend on
+  `invoice`, never the reverse). `model/` types are free, and a view may embed another feature's
+  component or read its store; any other cross-feature import is an edge. When an edge would
+  point the wrong way, the owning feature exports a component the other feature's view embeds.
 - Every backend call goes through a `features/<feature>/api/` module, one per backend domain;
   views and components never call `invoke` directly.
 - Domain logic lives in `features/<feature>/lib/*.ts` (pure, unit-tested) or a composable; a

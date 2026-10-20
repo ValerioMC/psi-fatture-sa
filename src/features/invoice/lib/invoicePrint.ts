@@ -31,10 +31,6 @@ export function paymentCondition(method: PaymentMethod): string | undefined {
   return PAYMENT_CONDITION[method]
 }
 
-export function professionalFullName(person: Pick<ProfessionalConfig, 'title' | 'first_name' | 'last_name'>): string {
-  return [person.title, person.first_name, person.last_name].filter(Boolean).join(' ')
-}
-
 /** The patient as the invoice addresses them: first name first, the business name for companies. */
 export function printedClientName(client: Pick<Client, 'client_type' | 'first_name' | 'last_name'>): string {
   if (client.client_type === 'azienda') return client.last_name

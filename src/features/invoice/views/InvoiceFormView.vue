@@ -40,7 +40,9 @@ const sts = useStsStore()
 
 const editId = route.params.id ? Number(route.params.id) : null
 const isEdit = editId !== null
-const { form, errors, loading, loadError, saving, nextNumber, nextKey, onSubmit } = useInvoiceForm(editId)
+const { form, errors, loading, loadError, saving, nextNumber, nextKey, onSubmit } = useInvoiceForm(editId, () =>
+  isEdit && !sts.loaded ? sts.load() : Promise.resolve(),
+)
 const { addLine, removeLine, applyService, typeAmount, commitAmount, resetAmount } = useInvoiceFormLines(form, nextKey)
 const { hideQuantityChosen, hideQuantityOrigin, chooseHideQuantity } = useHideQuantityDefault(form, isEdit)
 

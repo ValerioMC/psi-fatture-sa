@@ -5,8 +5,8 @@
  * provincia and email are checked when the field is left, and again on save.
  */
 import { computed } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
-import { ArrowRight, Check, FilePlus, FileText, IdCard, MapPin, ShieldCheck, ShieldOff, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { useRoute } from 'vue-router'
+import { Check, FilePlus, IdCard, MapPin, ShieldCheck, ShieldOff, Trash2, TriangleAlert } from 'lucide-vue-next'
 import { useConfigStore } from '@/features/settings/store/config'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import AppButton from '@/components/ui/AppButton.vue'
@@ -17,17 +17,13 @@ import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
-import CardHeader from '@/components/ui/CardHeader.vue'
 import PatientMonogram from '@/components/ui/PatientMonogram.vue'
-import StatusBadge from '@/components/ui/StatusBadge.vue'
+import ClientInvoiceHistory from '@/features/invoice/components/ClientInvoiceHistory.vue'
 import { useClientForm } from '@/features/client/composables/useClientForm'
-import { formatCurrency, formatDateShort } from '@/common/lib/format'
-import { plural } from '@/common/lib/labels'
 import {
   CLIENT_TYPE_OPTIONS as TYPE_OPTIONS,
   cardDescription as describeCard,
   cardPlace as placeOf,
-  historyTotal as totalOf,
 } from '@/features/client/lib/clientForm'
 
 const route = useRoute()
@@ -35,14 +31,13 @@ const configStore = useConfigStore()
 
 const editId = route.params.id ? Number(route.params.id) : null
 const isEdit = editId !== null
-const { form, errors, loading, loadError, saving, deleteOpen, deleting, history, displayName, check, onSubmit, confirmDelete } =
+const { form, errors, loading, loadError, saving, deleteOpen, deleting, displayName, check, onSubmit, confirmDelete } =
   useClientForm(editId)
 
 const profileHidesQuantity = computed(() => configStore.config?.hide_quantity_in_invoice ?? false)
 /** The record card beside the form: how the patient reads at a glance, updated as it is typed. */
 const cardDescription = computed(() => describeCard(form))
 const cardPlace = computed(() => placeOf(form))
-const historyTotal = computed(() => totalOf(history.value))
 </script>
 
 <template>
@@ -222,34 +217,7 @@ const historyTotal = computed(() => totalOf(history.value))
           </div>
         </AppCard>
 
-        <AppCard v-if="isEdit" :padded="false">
-          <CardHeader title="Fatture" :icon="FileText" divided>
-            <template #subtitle>
-              <template v-if="history.length > 0">{{ plural(history.length, 'fattura', 'fatture') }} · {{ formatCurrency(historyTotal) }}</template>
-              <template v-else>Nessuna fattura ancora</template>
-            </template>
-          </CardHeader>
-          <ul v-if="history.length > 0" class="p-1.5">
-            <li v-for="invoice in history.slice(0, 5)" :key="invoice.id">
-              <RouterLink
-                :to="`/invoices/${invoice.id}`"
-                class="group flex items-center gap-3 rounded-control px-3 py-2 transition-colors hover:bg-surface-hover focus-ring"
-              >
-                <span class="min-w-0 flex-1">
-                  <span class="tabular block text-sm font-medium text-text">N. {{ invoice.invoice_number }}/{{ invoice.year }}</span>
-                  <span class="block text-xs text-text-subtle">{{ formatDateShort(invoice.issue_date) }}</span>
-                </span>
-                <span class="tabular text-sm font-medium text-text">{{ formatCurrency(invoice.total_due) }}</span>
-                <StatusBadge type="invoice" :status="invoice.status" />
-              </RouterLink>
-            </li>
-          </ul>
-          <div v-if="history.length > 5" class="border-t border-border px-5 py-2.5">
-            <RouterLink :to="{ path: '/invoices', query: { year: 0, q: displayName } }" class="group inline-flex items-center gap-1 text-sm font-medium text-accent focus-ring">
-              Tutte le fatture <ArrowRight :size="14" class="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </RouterLink>
-          </div>
-        </AppCard>
+        <ClientInvoiceHistory v-if="editId !== null" :client-id="editId" :client-name="displayName" />
       </aside>
     </div>
 

@@ -6,7 +6,7 @@ import type { UpsertConfigInput } from '@/features/settings/model/config'
 import AppCard from '@/components/ui/AppCard.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
 import { PROFESSION_LABEL, TAX_REGIME_LABEL } from '@/common/lib/labels'
-import { professionalFullName } from '@/features/invoice/lib/invoicePrint'
+import { professionalFullName } from '@/features/settings/lib/professional'
 
 const props = defineProps<{ form: UpsertConfigInput }>()
 

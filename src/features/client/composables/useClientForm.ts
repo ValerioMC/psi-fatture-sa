@@ -1,23 +1,20 @@
 /**
  * Loads, checks, saves and deletes the patient the form edits. Fields are checked
- * when left and all again on save; editing also loads the patient's invoices.
+ * when left and all again on save.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getClient } from '@/features/client/api/clientApi'
-import { listInvoices } from '@/features/invoice/api/invoiceApi'
 import { useClientsStore } from '@/features/client/store/clients'
 import { useConfigStore } from '@/features/settings/store/config'
 import { errorMessage, useToastStore } from '@/common/store/toast'
 import type { CreateClientInput } from '@/features/client/model/client'
-import type { Invoice } from '@/features/invoice/model/invoice'
 import { clientDisplayName } from '@/features/client/lib/client'
 import {
   CLIENT_FIELDS,
   blankClientForm,
   checkClientField,
   formFromClient,
-  newestFirst,
   type ClientField,
   type ClientFormErrors,
 } from '@/features/client/lib/clientForm'
@@ -35,8 +32,6 @@ export function useClientForm(editId: number | null) {
   const deleting = ref(false)
   const form = reactive<CreateClientInput>(blankClientForm())
   const errors = reactive<ClientFormErrors>({})
-  /** The patient's invoices, newest first: the history an edit is made against. */
-  const history = ref<Invoice[]>([])
   const displayName = computed(() => clientDisplayName(form))
 
   function check(field: ClientField): void {
@@ -50,13 +45,9 @@ export function useClientForm(editId: number | null) {
     return Object.keys(errors).length === 0
   }
 
-  /** The history is a courtesy: when it cannot load, the form still works. */
   async function load(): Promise<void> {
     if (configStore.config === null) void configStore.loadConfig().catch(() => undefined)
     if (editId === null) return
-    void listInvoices({ client_id: editId })
-      .then((invoices) => { history.value = newestFirst(invoices) })
-      .catch(() => { history.value = [] })
     try {
       Object.assign(form, formFromClient(await getClient(editId)))
     } catch (error) {
@@ -101,5 +92,5 @@ export function useClientForm(editId: number | null) {
 
   onMounted(load)
 
-  return { form, errors, loading, loadError, saving, deleteOpen, deleting, history, displayName, check, onSubmit, confirmDelete }
+  return { form, errors, loading, loadError, saving, deleteOpen, deleting, displayName, check, onSubmit, confirmDelete }
 }
