@@ -1,5 +1,5 @@
 pub mod appointment;
-pub mod backup_repository;
+pub mod backup;
 pub mod client_repository;
 pub mod config_repository;
 pub mod dashboard_repository;

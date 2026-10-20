@@ -50,6 +50,7 @@ Layering, one-type-per-file, typed errors and test placement are described in
   `DEFAULT (datetime('now'))`.
 - **Repositories take `&impl ConnectionTrait`**, so a query runs in the caller's transaction.
   `require(db, id)` is each repository's one must-exist lookup, returning `NotFound`.
+  Of the domain layers only repositories touch the file system (`std::fs`).
 - **Repositories return data, not presentation.** Numbers as numbers, dates as stored; formatting
   (`"007"`, `05/03`, `€ 70,00`) happens in the service or the PDF/email layer.
 - **Rules live in one place.** A business rule that refuses a change (numbering, Sistema TS

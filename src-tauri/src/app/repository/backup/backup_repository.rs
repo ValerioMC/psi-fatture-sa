@@ -1,7 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use sea_orm::{ConnectionTrait, Statement};
 
+use super::StoredFile;
 use crate::app::common::AppError;
 
 /// Writes a consistent copy of the live database to `target`, which must not exist yet.
@@ -14,14 +15,6 @@ pub async fn copy_database_to(db: &impl ConnectionTrait, target: &Path) -> Resul
     ))
     .await?;
     Ok(())
-}
-
-/// A regular file found in the backups folder, before its name is checked.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StoredFile {
-    pub path: PathBuf,
-    pub name: String,
-    pub size_bytes: u64,
 }
 
 pub fn create_folder(folder: &Path) -> Result<(), AppError> {
@@ -68,11 +61,19 @@ pub fn rename(from: &Path, to: &Path) -> Result<(), AppError> {
 
 /// Deletes `path`; a file already gone is not an error.
 pub fn remove(path: &Path) -> Result<(), AppError> {
+    remove_if_present(path)
+        .map_err(|e| AppError::External(format!("Impossibile eliminare {}: {e}", path.display())))
+}
+
+/// Deletes the partial copy a failed export left behind, before a new one is written.
+pub fn clear_staging(path: &Path) -> Result<(), AppError> {
+    remove_if_present(path)
+        .map_err(|e| AppError::External(format!("Impossibile preparare il backup: {e}")))
+}
+
+fn remove_if_present(path: &Path) -> std::io::Result<()> {
     match std::fs::remove_file(path) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(AppError::External(format!(
-            "Impossibile eliminare {}: {e}",
-            path.display()
-        ))),
-        _ => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        result => result,
     }
 }

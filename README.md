@@ -539,6 +539,7 @@ psi-fatture-sa/
 │   │   │   │   ├── pdf/          # PDF della fattura; layout/ disegna la pagina, un modulo per sezione
 │   │   │   │   └── support/      # Funzioni pure condivise: validazione, formati italiani
 │   │   │   ├── repository/   # Accesso dati (SeaORM, SQL) e servizi esterni, una cartella o un file per dominio
+│   │   │   │   ├── backup/       # Copia del database e file nella cartella dei backup
 │   │   │   │   ├── invoice/      # Fatture e proiezione delle righe lette
 │   │   │   │   ├── secret/       # Archivio cifrato delle credenziali
 │   │   │   │   ├── email/        # Casella, modello, registro invii e gateway SMTP (lettre)
@@ -614,7 +615,9 @@ psi-fatture-sa/
 - **Repository**: ogni funzione riceve `&impl ConnectionTrait`, così gira dentro la
   transazione del chiamante. `require(db, id)` è l'unica ricerca che esige che il record
   esista e restituisce `NotFound` con il messaggio in italiano. Un repository non legge
-  l'orologio: riceve l'istante come argomento.
+  l'orologio: riceve l'istante come argomento. Tra i layer di dominio solo i repository toccano il file
+  system (`std::fs`): i service dei backup e degli aggiornamenti passano da
+  `backup_repository`, `bundle_file_repository` e il `BundleInstaller`.
 - **Orologio**: solo `SystemClock` (`app/common/system_clock.rs`) legge l'ora di sistema;
   `lib.rs` lo mette in `AppState` come `Arc<dyn Clock>` e i service lo ricevono dal
   controller o dal worker. Nei test `FixedClock` lo ferma su un istante.

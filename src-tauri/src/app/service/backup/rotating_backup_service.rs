@@ -11,7 +11,7 @@ use sea_orm::DatabaseConnection;
 use crate::app::common::timestamp;
 use crate::app::common::AppError;
 use crate::app::model::backup::{BackupFile, BackupOverview, BackupReason};
-use crate::app::repository::backup_repository;
+use crate::app::repository::backup::backup_repository;
 
 const KEEP: usize = 10;
 const PREFIX: &str = "psi-fatture-";
