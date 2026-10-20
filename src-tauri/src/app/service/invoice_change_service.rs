@@ -8,22 +8,22 @@ use crate::app::model::invoice::{BulkUpdateStatusInput, Invoice, UpdateInvoiceIn
 use crate::app::service::invoice::invoice_service;
 use crate::app::service::ts::ts_submission_service;
 
+/// Invalid input is refused before a Sistema TS lock is reported.
 pub async fn update(
     db: &DatabaseConnection,
     clock: &dyn Clock,
     input: UpdateInvoiceInput,
 ) -> Result<Invoice, AppError> {
-    let current = invoice_service::get(db, input.id).await?;
-    let number = invoice_service::requested_number(&input, &current)?;
+    let checked = invoice_service::check_update(db, input).await?;
     ts_submission_service::ensure_invoice_update_allowed(
         db,
-        &current,
-        number,
-        &input.issue_date,
-        &input.status,
+        checked.current(),
+        checked.number(),
+        &checked.input().issue_date,
+        &checked.input().status,
     )
     .await?;
-    invoice_service::update(db, clock, input).await
+    invoice_service::update(db, clock, checked).await
 }
 
 pub async fn remove(db: &DatabaseConnection, id: i64) -> Result<(), AppError> {

@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 
 use sea_orm::{ActiveValue::Set, ConnectionTrait, DatabaseConnection, TransactionTrait};
 
-use super::{invoice_guard as guard, invoice_validation, ClientSessions, InvoiceContent};
+use super::{
+    invoice_guard as guard, invoice_validation, CheckedUpdate, ClientSessions, InvoiceContent,
+};
 use crate::app::common::{AppError, Clock};
 use crate::app::entity::invoice as invoices;
 use crate::app::entity::service as services;
@@ -48,20 +50,40 @@ pub async fn create(
     invoice_repository::require(db, id).await
 }
 
-/// Rewrites the invoice and its lines. `input.invoice_number` renumbers it, e.g. to
-/// fill the gap a deleted invoice left, and must stay unique within the year.
-pub async fn update(
+/// Validates an update before anything is changed and resolves the invoice it changes.
+/// `input.invoice_number` renumbers it, e.g. to fill the gap a deleted invoice left.
+pub async fn check_update(
     db: &DatabaseConnection,
-    clock: &dyn Clock,
     input: UpdateInvoiceInput,
-) -> Result<Invoice, AppError> {
+) -> Result<CheckedUpdate, AppError> {
     validate::validate_id(input.id, "Fattura")?;
     let content = InvoiceContent::from(&input);
     validate_content(&content)?;
-
     let year = extract_year(content.issue_date)?;
+
     let current = invoice_repository::require(db, input.id).await?;
-    let number = requested_number(&input, &current)?;
+    let number = resolve_invoice_number(input.invoice_number.as_deref(), &current.invoice_number)?;
+    Ok(CheckedUpdate {
+        input,
+        current,
+        number,
+        year,
+    })
+}
+
+/// Rewrites the invoice and its lines. The number must stay unique within the year.
+pub async fn update(
+    db: &DatabaseConnection,
+    clock: &dyn Clock,
+    checked: CheckedUpdate,
+) -> Result<Invoice, AppError> {
+    let CheckedUpdate {
+        input,
+        current,
+        number,
+        year,
+    } = checked;
+    let content = InvoiceContent::from(&input);
 
     let tx = db.begin().await?;
     ensure_update_allowed(&tx, &current, &content, year, number).await?;
@@ -178,11 +200,6 @@ pub async fn bulk_update_status(
     let status = input.status.as_str();
     invoice_repository::bulk_update_status(db, &input.ids, status, &paid_date, &clock.timestamp())
         .await
-}
-
-/// The number an update gives the invoice: the one asked for, or the one it has.
-pub fn requested_number(input: &UpdateInvoiceInput, current: &Invoice) -> Result<i64, AppError> {
-    resolve_invoice_number(input.invoice_number.as_deref(), &current.invoice_number)
 }
 
 fn validate_content(content: &InvoiceContent) -> Result<(), AppError> {

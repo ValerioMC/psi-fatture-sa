@@ -1,7 +1,7 @@
 use sea_orm::ConnectionTrait;
 
 use super::*;
-use crate::app::model::invoice::InvoiceStatus;
+use crate::app::model::invoice::{InvoiceLineInput, InvoiceStatus, PaymentMethod};
 use crate::app::model::ts::{TsSubmissionFilters, TsSubmissionStatus};
 use crate::test_support::ts_database::{force_status, setup};
 use crate::test_support::FixedClock;
@@ -19,6 +19,64 @@ async fn accepted_in_production(db: &DatabaseConnection) -> i64 {
         .unwrap();
     force_status(db, original.id, TsSubmissionStatus::Accettata).await;
     original.id
+}
+
+/// Renumbers invoice 1, which a Sistema TS lock refuses once it is accepted.
+fn renumbering_of_first_invoice(lines: Vec<InvoiceLineInput>) -> UpdateInvoiceInput {
+    UpdateInvoiceInput {
+        id: 1,
+        client_id: 1,
+        invoice_number: Some("9".to_string()),
+        issue_date: "2026-03-01".to_string(),
+        due_date: None,
+        status: InvoiceStatus::Paid,
+        payment_method: PaymentMethod::Bonifico,
+        notes: String::new(),
+        apply_enpap: false,
+        hide_quantity: None,
+        paid_date: Some("2026-03-02".to_string()),
+        lines,
+    }
+}
+
+fn session_line() -> InvoiceLineInput {
+    InvoiceLineInput {
+        service_id: None,
+        description: "Seduta".to_string(),
+        quantity: 1,
+        unit_price: 80.0,
+        vat_rate: 0.0,
+        amount_override: None,
+    }
+}
+
+#[tokio::test]
+async fn an_invalid_update_of_a_transmitted_invoice_is_refused_as_invalid() {
+    let db = setup().await;
+    accepted_in_production(&db).await;
+
+    let error = update(
+        &db,
+        &FixedClock::default(),
+        renumbering_of_first_invoice(vec![]),
+    )
+    .await
+    .unwrap_err();
+
+    assert!(matches!(error, AppError::Invalid(_)), "got {error:?}");
+}
+
+#[tokio::test]
+async fn a_valid_renumbering_of_a_transmitted_invoice_is_refused_as_conflict() {
+    let db = setup().await;
+    accepted_in_production(&db).await;
+
+    let input = renumbering_of_first_invoice(vec![session_line()]);
+    let error = update(&db, &FixedClock::default(), input)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, AppError::Conflict(_)), "got {error:?}");
 }
 
 #[tokio::test]

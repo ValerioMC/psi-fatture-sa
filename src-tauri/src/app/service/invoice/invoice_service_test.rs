@@ -110,6 +110,16 @@ fn update_input_from(invoice: &Invoice, new_number: Option<&str>) -> UpdateInvoi
     }
 }
 
+/// The full update path: the checks, then the change.
+async fn save_update(
+    db: &DatabaseConnection,
+    clock: &dyn Clock,
+    input: UpdateInvoiceInput,
+) -> Result<Invoice, AppError> {
+    let checked = check_update(db, input).await?;
+    update(db, clock, checked).await
+}
+
 #[tokio::test]
 async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
     let db = test_db().await;
@@ -124,7 +134,7 @@ async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
     assert_eq!(second.invoice_number, "002");
 
     // Taking a number already in use must fail with a clear message.
-    let err = update(
+    let err = save_update(
         &db,
         &FixedClock::default(),
         update_input_from(&second, Some("001")),
@@ -134,7 +144,7 @@ async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
     assert!(err.to_string().contains("già utilizzato"));
 
     // Renumbering to a free number works and is zero-padded.
-    let renumbered = update(
+    let renumbered = save_update(
         &db,
         &FixedClock::default(),
         update_input_from(&second, Some("7")),
@@ -147,7 +157,7 @@ async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
     let third = create(&db, &FixedClock::default(), invoice_input("2026-04-01"))
         .await
         .unwrap();
-    let filled = update(
+    let filled = save_update(
         &db,
         &FixedClock::default(),
         update_input_from(&third, Some("2")),
@@ -157,7 +167,7 @@ async fn renumbering_enforces_uniqueness_per_year_and_fills_gaps() {
     assert_eq!(filled.invoice_number, "002");
 
     // Update without a number keeps the current one.
-    let untouched = update(
+    let untouched = save_update(
         &db,
         &FixedClock::default(),
         update_input_from(&renumbered, None),
@@ -178,7 +188,9 @@ async fn moving_issue_date_to_another_year_updates_year_column() {
 
     let mut input = update_input_from(&invoice, None);
     input.issue_date = "2025-12-31".to_string();
-    let moved = update(&db, &FixedClock::default(), input).await.unwrap();
+    let moved = save_update(&db, &FixedClock::default(), input)
+        .await
+        .unwrap();
     assert_eq!(moved.year, 2025);
 }
 
@@ -213,7 +225,7 @@ async fn hand_typed_amount_is_taxed_and_kept_on_the_line() {
     assert_eq!(invoice.lines[0].line_total, 250.0);
 
     // Saving it again unchanged keeps the amount instead of recomputing 4 × 70.
-    let resaved = update(
+    let resaved = save_update(
         &db,
         &FixedClock::default(),
         update_input_from(&invoice, None),
@@ -292,7 +304,7 @@ async fn update_without_visibility_keeps_the_saved_one() {
     input.hide_quantity = Some(true);
     let invoice = create(&db, &FixedClock::default(), input).await.unwrap();
 
-    let kept = update(
+    let kept = save_update(
         &db,
         &FixedClock::default(),
         update_input_from(&invoice, None),
@@ -304,7 +316,7 @@ async fn update_without_visibility_keeps_the_saved_one() {
     let mut shown = update_input_from(&invoice, None);
     shown.hide_quantity = Some(false);
     assert!(
-        !update(&db, &FixedClock::default(), shown)
+        !save_update(&db, &FixedClock::default(), shown)
             .await
             .unwrap()
             .hide_quantity

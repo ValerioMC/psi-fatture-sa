@@ -33,7 +33,8 @@ Layering, one-type-per-file, typed errors and test placement are described in
   in the same commit, or the code changes instead. No cycles: `ts` depends on `invoice`, never
   the reverse.
 - **A cross-entity flow is its own small service** that calls the entity services and holds no
-  queries (`invoice_change_service`: Sistema TS rules first, then `invoice_service`).
+  queries (`invoice_change_service`: `invoice_service::check_update` validates the input, then the
+  Sistema TS rules, then `invoice_service::update` applies the `CheckedUpdate`).
 - **One service per entity.** `service/<entity>_service.rs`, or a package `service/<entity>/`
   when the entity needs collaborators. In a package only `<entity>_service` is `pub`; the other
   files (rules, value types) are private modules with `pub(super)` items, re-exported by `mod.rs`.

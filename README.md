@@ -594,8 +594,10 @@ psi-fatture-sa/
 
   Il Sistema TS invia le fatture, quindi `ts` dipende da `invoice` e mai il contrario: ciò che
   una trasmissione accettata vieta (cambiare numero, data o stato pagato, eliminare la
-  fattura) sta in `service/ts/ts_invoice_guard.rs`, e `invoice_change_service` lo controlla
-  prima di passare la modifica a `invoice_service`.
+  fattura) sta in `service/ts/ts_invoice_guard.rs`. `invoice_change_service` chiede prima a
+  `invoice_service::check_update` di validare i dati (così un input non valido risponde
+  `Invalid` anche su una fattura trasmessa), poi controlla le regole del Sistema TS e infine
+  applica la modifica con il `CheckedUpdate` ottenuto, che solo `check_update` costruisce.
 - **Un tipo per file**: ogni `struct`, `enum` e `trait` ha il suo file, chiamato come
   il tipo in snake_case (`TsSubmissionStatus` → `ts_submission_status.rs`). Il
   `mod.rs` del package lo riesporta, così si importa `model::ts::TsSubmission`.
@@ -603,7 +605,8 @@ psi-fatture-sa/
   e le struct di riga dichiarate dentro una sola funzione di query.
 - **Un service per entità**: in `service/invoice/` solo `invoice_service` è pubblico; le
   regole (`invoice_guard`, `invoice_validation`) e i tipi di appoggio (`ClientSessions`,
-  `InvoiceContent`) sono moduli privati del package. Allo stesso modo `backup/` espone
+  `InvoiceContent`) sono moduli privati del package; ne esce solo `CheckedUpdate`, la
+  modifica già validata che `invoice_change_service` passa a `update`. Allo stesso modo `backup/` espone
   `backup_service` e `RotatingBackups`, `update/` solo `update_service` (che riesporta
   l'installazione) e in `ts/` `ts_document_service` e `ts_invoice_guard` sono privati
   (`ts_submission_service` riesporta le regole del secondo). Le regole di qualità del
