@@ -1,5 +1,5 @@
 use super::*;
-use crate::test_support::FixedClock;
+use crate::test_support::{empty_database, FixedClock};
 
 fn valid_input() -> UpsertConfigInput {
     UpsertConfigInput {
@@ -93,11 +93,7 @@ fn rejects_out_of_range_numbers() {
 /// deserialized, saved on a migrated in-memory SQLite and read back.
 #[tokio::test]
 async fn registration_persists_profession_and_psicoanalista_flag() {
-    use sea_orm::Database;
-    use sea_orm_migration::MigratorTrait;
-
-    let db = Database::connect("sqlite::memory:").await.unwrap();
-    crate::migration::Migrator::up(&db, None).await.unwrap();
+    let db = empty_database::setup().await;
 
     let payload = r#"{
         "title": "Dott.ssa", "first_name": "Maria", "last_name": "Rossi",
@@ -127,11 +123,7 @@ async fn registration_persists_profession_and_psicoanalista_flag() {
 
 #[tokio::test]
 async fn registration_rejects_invalid_fiscal_code_with_clear_message() {
-    use sea_orm::Database;
-    use sea_orm_migration::MigratorTrait;
-
-    let db = Database::connect("sqlite::memory:").await.unwrap();
-    crate::migration::Migrator::up(&db, None).await.unwrap();
+    let db = empty_database::setup().await;
 
     let mut input = valid_input();
     input.fiscal_code = "RSSMRA80A41H501X".to_string();
@@ -158,4 +150,20 @@ fn profession_round_trips_through_storage_string() {
         Profession::Psicologo
     );
     assert_eq!(Profession::Psicoterapeuta.as_str(), "psicoterapeuta");
+}
+
+#[tokio::test]
+async fn the_profile_keeps_its_creation_time_across_saves() {
+    let db = empty_database::setup().await;
+
+    let first = upsert(&db, &FixedClock::at("2026-05-04 08:30:00"), valid_input())
+        .await
+        .unwrap();
+    let second = upsert(&db, &FixedClock::at("2026-06-01 12:00:00"), valid_input())
+        .await
+        .unwrap();
+
+    assert_eq!(first.created_at, "2026-05-04 08:30:00");
+    assert_eq!(second.created_at, "2026-05-04 08:30:00");
+    assert_eq!(second.updated_at, "2026-06-01 12:00:00");
 }

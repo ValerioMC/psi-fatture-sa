@@ -22,7 +22,7 @@ pub async fn create_appointment(
     state: State<'_, AppState>,
     input: CreateAppointmentInput,
 ) -> Result<Appointment, AppError> {
-    appointment_service::create(&state.db, input).await
+    appointment_service::create(&state.db, state.clock.as_ref(), input).await
 }
 
 /// Creates multiple recurring appointments in a transaction.
@@ -31,7 +31,7 @@ pub async fn create_recurring_appointments(
     state: State<'_, AppState>,
     input: CreateRecurringAppointmentsInput,
 ) -> Result<Vec<Appointment>, AppError> {
-    appointment_service::create_recurring(&state.db, input).await
+    appointment_service::create_recurring(&state.db, state.clock.as_ref(), input).await
 }
 
 #[tauri::command]

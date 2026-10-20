@@ -2,6 +2,7 @@
 
 pub mod clock;
 pub mod email_database;
+pub mod empty_database;
 pub mod fake_gateway;
 pub mod fake_mail_gateway;
 pub mod fixed_clock;

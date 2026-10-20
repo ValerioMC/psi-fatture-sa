@@ -248,7 +248,10 @@ async fn create_in_tx<C: ConnectionTrait>(
         Some(hide) => hide,
         None => invoice_repository::default_hide_quantity(tx, content.client_id).await?,
     };
-    let record = invoice_record(&content, year, number, &totals, hide_quantity, clock);
+    let mut record = invoice_record(&content, year, number, &totals, hide_quantity, clock);
+    let now = clock.timestamp();
+    record.created_at = Set(now.clone());
+    record.updated_at = Set(now);
 
     let invoice = invoice_repository::insert_invoice(tx, record).await?;
     invoice_repository::insert_lines(tx, invoice.id, content.lines).await?;

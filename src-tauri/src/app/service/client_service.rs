@@ -21,14 +21,21 @@ pub async fn get(db: &DatabaseConnection, id: i64) -> Result<Client, AppError> {
 }
 
 /// Creates a new client and returns the created record.
-pub async fn create(db: &DatabaseConnection, input: CreateClientInput) -> Result<Client, AppError> {
+pub async fn create(
+    db: &DatabaseConnection,
+    clock: &dyn Clock,
+    input: CreateClientInput,
+) -> Result<Client, AppError> {
     validate_client_fields(
         &input.last_name,
         &input.fiscal_code,
         input.vat_number.as_deref(),
     )?;
 
-    let active = client_record(input);
+    let mut active = client_record(input);
+    let now = clock.timestamp();
+    active.created_at = Set(now.clone());
+    active.updated_at = Set(now);
 
     let model = client_repository::insert(db, active).await?;
     Ok(into_domain(model))
@@ -131,3 +138,7 @@ pub(crate) fn into_domain(m: client::Model) -> Client {
         updated_at: m.updated_at,
     }
 }
+
+#[cfg(test)]
+#[path = "client_service_test.rs"]
+mod tests;

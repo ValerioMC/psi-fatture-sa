@@ -14,14 +14,18 @@ pub async fn list(db: &DatabaseConnection, active_only: bool) -> Result<Vec<Serv
 /// Creates a new service and returns the created record.
 pub async fn create(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     input: CreateServiceInput,
 ) -> Result<Service, AppError> {
+    let now = clock.timestamp();
     let active = ActiveModel {
         name: Set(input.name),
         description: Set(input.description),
         default_price: Set(input.default_price),
         vat_rate: Set(input.vat_rate),
         is_active: Set(input.is_active as i32),
+        created_at: Set(now.clone()),
+        updated_at: Set(now),
         ..Default::default()
     };
 
@@ -71,3 +75,7 @@ fn into_domain(m: service::Model) -> Service {
         updated_at: m.updated_at,
     }
 }
+
+#[cfg(test)]
+#[path = "service_service_test.rs"]
+mod tests;

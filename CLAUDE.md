@@ -46,7 +46,8 @@ Layering, one-type-per-file, typed errors and test placement are described in
   service function with `&state.db` and the gateways it needs. It never names a repository.
 - **Time comes from `Clock`.** Only `SystemClock` reads the system time; services receive
   `&dyn Clock` (or a `now` taken from it), repositories receive the timestamp as an argument,
-  tests use `FixedClock`.
+  tests use `FixedClock`. Every insert sets its time columns; never rely on the migrations'
+  `DEFAULT (datetime('now'))`.
 - **Repositories take `&impl ConnectionTrait`**, so a query runs in the caller's transaction.
   `require(db, id)` is each repository's one must-exist lookup, returning `NotFound`.
 - **Repositories return data, not presentation.** Numbers as numbers, dates as stored; formatting

@@ -23,7 +23,7 @@ pub async fn create_client(
     state: State<'_, AppState>,
     input: CreateClientInput,
 ) -> Result<Client, AppError> {
-    client_service::create(&state.db, input).await
+    client_service::create(&state.db, state.clock.as_ref(), input).await
 }
 
 #[tauri::command]

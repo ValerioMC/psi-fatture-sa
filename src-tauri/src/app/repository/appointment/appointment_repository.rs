@@ -91,9 +91,11 @@ pub async fn delete(db: &impl ConnectionTrait, id: i64) -> Result<(), sea_orm::D
 pub async fn insert_recurrence_group(
     db: &impl sea_orm::ConnectionTrait,
     client_id: i64,
+    created_at: &str,
 ) -> Result<i64, sea_orm::DbErr> {
     let active = recurrence_groups::ActiveModel {
         client_id: Set(client_id),
+        created_at: Set(created_at.to_owned()),
         ..Default::default()
     };
     let model = active.insert(db).await?;

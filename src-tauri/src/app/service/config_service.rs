@@ -19,9 +19,8 @@ pub async fn upsert(
     input: UpsertConfigInput,
 ) -> Result<ProfessionalConfig, AppError> {
     validate_config_input(&input)?;
-    let mut active = build_active_model(&input);
-    active.updated_at = Set(clock.timestamp());
-    let model = config_repository::save(db, active).await?;
+    let active = build_active_model(&input);
+    let model = config_repository::save(db, active, &clock.timestamp()).await?;
     Ok(into_domain(model))
 }
 

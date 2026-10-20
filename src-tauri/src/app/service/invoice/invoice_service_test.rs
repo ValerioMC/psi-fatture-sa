@@ -418,3 +418,16 @@ async fn monthly_invoicing_takes_an_explicit_issue_date() {
     assert_eq!(created[0].issue_date, "2026-04-03");
     assert_eq!(created[0].invoice_number, "002");
 }
+
+#[tokio::test]
+async fn a_new_invoice_is_stamped_by_the_clock() {
+    let db = test_db().await;
+    let clock = FixedClock::at("2026-05-04 08:30:00");
+
+    let invoice = create(&db, &clock, invoice_input("2026-05-04"))
+        .await
+        .unwrap();
+
+    assert_eq!(invoice.created_at, "2026-05-04 08:30:00");
+    assert_eq!(invoice.updated_at, "2026-05-04 08:30:00");
+}

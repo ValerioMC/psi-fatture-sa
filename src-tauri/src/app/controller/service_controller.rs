@@ -18,7 +18,7 @@ pub async fn create_service(
     state: State<'_, AppState>,
     input: CreateServiceInput,
 ) -> Result<Service, AppError> {
-    service_service::create(&state.db, input).await
+    service_service::create(&state.db, state.clock.as_ref(), input).await
 }
 
 #[tauri::command]

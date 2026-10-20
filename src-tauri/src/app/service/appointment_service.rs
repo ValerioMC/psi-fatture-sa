@@ -21,6 +21,7 @@ pub async fn list(
 /// Creates a single appointment and returns it.
 pub async fn create(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     input: CreateAppointmentInput,
 ) -> Result<Appointment, AppError> {
     validate_appointment_fields(
@@ -39,6 +40,7 @@ pub async fn create(
         input.status.as_str(),
         Some(input.notes),
         input.recurrence_group_id,
+        &clock.timestamp(),
     );
 
     let model = appointment_repository::insert(db, active).await?;
@@ -48,11 +50,12 @@ pub async fn create(
 /// Creates multiple recurring appointments in a transaction.
 pub async fn create_recurring(
     db: &DatabaseConnection,
+    clock: &dyn Clock,
     input: CreateRecurringAppointmentsInput,
 ) -> Result<Vec<Appointment>, AppError> {
     validate_recurrence(&input)?;
     let tx = db.begin().await?;
-    let ids = insert_recurrence(&tx, &input).await?;
+    let ids = insert_recurrence(&tx, &input, &clock.timestamp()).await?;
     tx.commit().await?;
 
     let mut created = Vec::with_capacity(ids.len());
@@ -119,8 +122,10 @@ fn validate_recurrence(input: &CreateRecurringAppointmentsInput) -> Result<(), A
 async fn insert_recurrence(
     db: &impl ConnectionTrait,
     input: &CreateRecurringAppointmentsInput,
+    now: &str,
 ) -> Result<Vec<i64>, AppError> {
-    let group_id = appointment_repository::insert_recurrence_group(db, input.client_id).await?;
+    let group_id =
+        appointment_repository::insert_recurrence_group(db, input.client_id, now).await?;
     let mut ids = Vec::with_capacity(input.dates.len());
     for date in &input.dates {
         let active = build_active(
@@ -132,6 +137,7 @@ async fn insert_recurrence(
             "scheduled",
             Some(input.notes.clone()),
             Some(group_id),
+            now,
         );
         ids.push(appointment_repository::insert(db, active).await?.id);
     }
@@ -167,6 +173,7 @@ fn build_active(
     status: &str,
     notes: Option<String>,
     recurrence_group_id: Option<i64>,
+    now: &str,
 ) -> appointments::ActiveModel {
     appointments::ActiveModel {
         client_id: Set(client_id),
@@ -177,6 +184,12 @@ fn build_active(
         status: Set(status.to_owned()),
         notes: Set(notes),
         recurrence_group_id: Set(recurrence_group_id),
+        created_at: Set(now.to_owned()),
+        updated_at: Set(now.to_owned()),
         ..Default::default()
     }
 }
+
+#[cfg(test)]
+#[path = "appointment_service_test.rs"]
+mod tests;

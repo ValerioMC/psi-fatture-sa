@@ -618,6 +618,9 @@ psi-fatture-sa/
 - **Orologio**: solo `SystemClock` (`app/common/system_clock.rs`) legge l'ora di sistema;
   `lib.rs` lo mette in `AppState` come `Arc<dyn Clock>` e i service lo ricevono dal
   controller o dal worker. Nei test `FixedClock` lo ferma su un istante.
+  Ogni insert valorizza le sue colonne temporali (`created_at`, `updated_at`, `sent_at`,
+  `accepted_at`, `next_attempt_at`) con l'orologio: i `DEFAULT (datetime('now'))` delle
+  migrazioni restano solo per compatibilità e non vanno mai usati.
 - **Errori tipizzati**: controller, service e repository restituiscono
   `Result<_, AppError>` (`app/common/app_error.rs`): `Invalid` (dato da correggere),
   `NotFound`, `Conflict` (contrasta con lo stato salvato: numero già usato, fattura
