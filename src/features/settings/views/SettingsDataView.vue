@@ -2,30 +2,39 @@
 /**
  * The archive and its copies: one file with patients, invoices, agenda and settings.
  * A rotation of automatic copies sits beside it; saving one elsewhere is one click;
- * restoring is replacing the file by hand.
+ * restoring one asks first, then the app restarts on it.
  */
 import { computed, onMounted, ref } from 'vue'
-import { DatabaseBackup, FolderOpen, HardDriveDownload, History, RefreshCw, TriangleAlert } from 'lucide-vue-next'
+import { ArchiveRestore, DatabaseBackup, FolderOpen, HardDriveDownload, History, RefreshCw, TriangleAlert } from 'lucide-vue-next'
 import { save as chooseSavePath } from '@tauri-apps/plugin-dialog'
-import { createBackup, exportBackup, getBackupFileName, getBackupOverview, revealBackupsFolder } from '@/features/settings/api/backupApi'
+import { createBackup, exportBackup, getBackupFileName, getBackupOverview, restoreBackup, revealBackupsFolder } from '@/features/settings/api/backupApi'
 import { useToastStore } from '@/common/store/toast'
 import { formatBytes, formatLocalTimestamp } from '@/common/lib/format'
-import type { BackupOverview, BackupReason } from '@/features/settings/model/backup'
+import type { BackupFile, BackupOverview, BackupReason } from '@/features/settings/model/backup'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import CardHeader from '@/components/ui/CardHeader.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 
 const toast = useToastStore()
 const overview = ref<BackupOverview | null>(null)
 const backingUp = ref(false)
 const saving = ref(false)
+const restoreCandidate = ref<BackupFile | null>(null)
+const restoring = ref(false)
 
 const REASON_LABEL: Record<BackupReason, string> = { auto: 'Automatico', manual: 'Manuale' }
 
 const subtitle = computed(() =>
   overview.value ? `Uno al giorno, si tengono gli ultimi ${overview.value.keep}` : 'Uno al giorno',
+)
+
+const restoreBlastRadius = computed(() =>
+  restoreCandidate.value
+    ? `Pazienti, fatture e agenda tornano a come erano il ${formatLocalTimestamp(restoreCandidate.value.created_at)}: quello che hai inserito dopo non ci sarà più. Una copia di adesso resta tra i backup.`
+    : '',
 )
 
 async function load(): Promise<void> {
@@ -71,11 +80,39 @@ async function saveBackup(): Promise<void> {
   }
 }
 
+async function restoreSelected(): Promise<void> {
+  if (restoreCandidate.value === null) return
+  restoring.value = true
+  try {
+    await restoreBackup(restoreCandidate.value.name)
+  } catch (error) {
+    restoring.value = false
+    restoreCandidate.value = null
+    toast.notifyError(error, 'Backup non ripristinato')
+    await load()
+  }
+}
+
 onMounted(load)
 </script>
 
 <template>
   <div class="max-w-2xl space-y-6">
+    <AppCard :padded="false" class="settle">
+      <CardHeader title="Salva una copia altrove" subtitle="Pazienti, fatture, agenda e impostazioni in un solo file" :icon="DatabaseBackup" />
+      <div class="space-y-4 px-5 pb-5 text-sm leading-relaxed text-text-muted">
+        <p>
+          L’archivio vive solo su questo computer: se il disco si guasta o il computer viene perso, le fatture se ne vanno con lui.
+          Salva una copia almeno una volta al mese su un disco esterno o in una cartella sincronizzata.
+        </p>
+        <p class="text-xs text-text-subtle">
+          La copia contiene dati sanitari dei pazienti: conservala in un posto protetto. Password del Sistema TS e della
+          casella email non sono incluse: dopo un ripristino su un altro computer vanno reinserite.
+        </p>
+        <AppButton variant="primary" :icon="HardDriveDownload" :loading="saving" @click="saveBackup">Salva un backup…</AppButton>
+      </div>
+    </AppCard>
+
     <AppCard :padded="false" class="settle">
       <CardHeader title="Backup automatici" :subtitle="subtitle" :icon="History" divided>
         <AppButton size="sm" :icon="RefreshCw" :loading="backingUp" @click="backUpNow">Backup ora</AppButton>
@@ -116,30 +153,24 @@ onMounted(load)
           </span>
           <AppBadge :tone="backup.reason === 'auto' ? 'neutral' : 'accent'">{{ REASON_LABEL[backup.reason] }}</AppBadge>
           <span class="w-16 text-right text-xs text-text-muted tabular-nums">{{ formatBytes(backup.size_bytes) }}</span>
+          <AppButton variant="ghost" size="sm" :icon="ArchiveRestore" @click="restoreCandidate = backup">Ripristina</AppButton>
         </li>
       </ul>
 
-      <p class="border-t border-border px-5 py-4 text-xs leading-relaxed text-text-subtle">
-        Per ripristinare un backup chiudi l’app, sostituisci <code class="font-mono">database.db</code> con la copia scelta
-        rinominandola <code class="font-mono">database.db</code> ed elimina, se ci sono, i file che finiscono in
-        <code class="font-mono">-wal</code> e <code class="font-mono">-shm</code>. Le copie restano su questo computer: per
-        proteggerti da un guasto del disco salvane una anche altrove.
+      <p class="border-t border-border px-5 py-4 text-sm leading-relaxed text-text-muted">
+        Ripristinando un backup l’app si riavvia con i dati di quella copia, dopo averne salvata una di quelli attuali.
       </p>
     </AppCard>
 
-    <AppCard :padded="false" class="settle">
-      <CardHeader title="Salva una copia altrove" subtitle="Pazienti, fatture, agenda e impostazioni in un solo file" :icon="DatabaseBackup" />
-      <div class="space-y-4 px-5 pb-5 text-sm leading-relaxed text-text-muted">
-        <p>
-          L’archivio vive solo su questo computer: se il disco si guasta o il computer viene perso, le fatture se ne vanno con lui.
-          Salva una copia almeno una volta al mese su un disco esterno o in una cartella sincronizzata.
-        </p>
-        <p class="text-xs text-text-subtle">
-          La copia contiene dati sanitari dei pazienti: conservala in un posto protetto. Password del Sistema TS e della
-          casella email non sono incluse: dopo un ripristino su un altro computer vanno reinserite.
-        </p>
-        <AppButton variant="primary" :icon="HardDriveDownload" :loading="saving" @click="saveBackup">Salva un backup…</AppButton>
-      </div>
-    </AppCard>
+    <ConfirmDialog
+      :open="restoreCandidate !== null"
+      title="Ripristinare questo backup?"
+      message="L’app si riavvia con i dati della copia scelta."
+      :blast-radius="restoreBlastRadius"
+      confirm-label="Ripristina e riavvia"
+      :loading="restoring"
+      @confirm="restoreSelected"
+      @cancel="restoreCandidate = null"
+    />
   </div>
 </template>

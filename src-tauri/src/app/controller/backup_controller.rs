@@ -43,3 +43,18 @@ pub fn reveal_backups_folder(app: AppHandle, state: State<'_, AppState>) -> Resu
         .open_path(folder.to_string_lossy(), None::<&str>)
         .map_err(|e| AppError::External(format!("Cartella non apribile: {e}")))
 }
+
+/// Replaces the archive with the named backup and restarts the app. A copy of the current
+/// archive is kept in the rotation first.
+#[tauri::command]
+pub async fn restore_backup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<(), AppError> {
+    state
+        .backups
+        .stage_restore(&state.db, &name, state.clock.local_now())
+        .await?;
+    app.restart()
+}

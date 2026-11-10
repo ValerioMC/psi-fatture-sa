@@ -203,3 +203,145 @@ fn the_overview_names_the_database_and_the_folder() {
     assert!(overview.backups.is_empty());
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+async fn row_count(path: &Path, table: &str) -> i64 {
+    let db = Database::connect(format!("sqlite://{}?mode=ro", path.display()))
+        .await
+        .unwrap();
+    db.query_one(sea_orm::Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        format!("SELECT COUNT(*) AS total FROM {table}"),
+    ))
+    .await
+    .unwrap()
+    .unwrap()
+    .try_get::<i64>("", "total")
+    .unwrap()
+}
+
+#[tokio::test]
+async fn staging_a_restore_copies_the_chosen_backup_and_keeps_a_safety_copy() {
+    let dir = scratch_dir("stage");
+    let db = live_database(&dir).await;
+    let backups = rotation(&dir);
+    let chosen = backups
+        .back_up(&db, BackupReason::Auto, at("2026-10-01 09:00:00"))
+        .await
+        .unwrap();
+    db.execute_unprepared(
+        "INSERT INTO clients (first_name, last_name, fiscal_code) VALUES ('Anna', 'Bianchi', 'X')",
+    )
+    .await
+    .unwrap();
+
+    backups
+        .stage_restore(&db, &chosen.name, at("2026-10-05 18:00:00"))
+        .await
+        .unwrap();
+
+    let staged = staged_restore_path(&dir.join("live.db"));
+    assert_eq!(row_count(&staged, "clients").await, 0);
+    let safety = &backups.list().unwrap()[0];
+    assert_eq!(safety.created_at, "2026-10-05 18:00:00");
+    assert_eq!(row_count(Path::new(&safety.path), "clients").await, 1);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[tokio::test]
+async fn a_backup_that_is_not_in_the_rotation_is_not_found() {
+    let dir = scratch_dir("unknown");
+    let db = live_database(&dir).await;
+
+    let error = rotation(&dir)
+        .stage_restore(
+            &db,
+            "psi-fatture-20250101-000000-auto.db",
+            at("2026-10-05 18:00:00"),
+        )
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, AppError::NotFound(_)));
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[tokio::test]
+async fn a_file_that_is_not_an_archive_is_refused_and_nothing_is_staged() {
+    let dir = scratch_dir("garbage");
+    let db = live_database(&dir).await;
+    let folder = dir.join("backups");
+    std::fs::create_dir_all(&folder).unwrap();
+    let name = "psi-fatture-20261001-090000-auto.db";
+    std::fs::write(folder.join(name), b"not a database at all").unwrap();
+
+    let error = rotation(&dir)
+        .stage_restore(&db, name, at("2026-10-05 18:00:00"))
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, AppError::Invalid(_)));
+    assert!(!staged_restore_path(&dir.join("live.db")).exists());
+    assert_eq!(rotation(&dir).list().unwrap().len(), 1);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[tokio::test]
+async fn a_backup_from_a_newer_app_is_refused() {
+    let dir = scratch_dir("newer");
+    let db = live_database(&dir).await;
+    let backups = rotation(&dir);
+    let chosen = backups
+        .back_up(&db, BackupReason::Auto, at("2026-10-01 09:00:00"))
+        .await
+        .unwrap();
+    let copy = Database::connect(format!("sqlite://{}?mode=rw", chosen.path))
+        .await
+        .unwrap();
+    copy.execute_unprepared(
+        "INSERT INTO seaql_migrations (version, applied_at) VALUES ('m29990101_000000_from_the_future', 0)",
+    )
+    .await
+    .unwrap();
+    copy.close().await.unwrap();
+
+    let error = backups
+        .stage_restore(&db, &chosen.name, at("2026-10-05 18:00:00"))
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, AppError::Conflict(_)));
+    assert!(!staged_restore_path(&dir.join("live.db")).exists());
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn the_staged_restore_replaces_the_database_and_its_journal_files() {
+    let dir = scratch_dir("apply");
+    let database = dir.join("live.db");
+    std::fs::write(&database, b"old data").unwrap();
+    std::fs::write(dir.join("live.db-wal"), b"old journal").unwrap();
+    std::fs::write(dir.join("live.db-shm"), b"old index").unwrap();
+    std::fs::write(staged_restore_path(&database), b"restored data").unwrap();
+
+    apply_staged_restore(&database).unwrap();
+
+    assert_eq!(std::fs::read(&database).unwrap(), b"restored data");
+    assert!(!dir.join("live.db-wal").exists());
+    assert!(!dir.join("live.db-shm").exists());
+    assert!(!staged_restore_path(&database).exists());
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn without_a_staged_restore_the_database_is_left_alone() {
+    let dir = scratch_dir("untouched");
+    let database = dir.join("live.db");
+    std::fs::write(&database, b"current data").unwrap();
+    std::fs::write(dir.join("live.db-wal"), b"journal").unwrap();
+
+    apply_staged_restore(&database).unwrap();
+
+    assert_eq!(std::fs::read(&database).unwrap(), b"current data");
+    assert!(dir.join("live.db-wal").exists());
+    std::fs::remove_dir_all(&dir).unwrap();
+}

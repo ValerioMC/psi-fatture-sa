@@ -185,7 +185,7 @@ onMounted(() => Promise.all([clientsStore.fetchClients(), servicesStore.fetchSer
                 :class="[CHIP_SLIP[appointment.status], cell.inMonth ? '' : 'opacity-60']"
               >
                 <span class="size-1.5 shrink-0 rounded-full" :class="CHIP_DOT[appointment.status]" aria-hidden="true" />
-                <span class="tabular hidden shrink-0 text-text-subtle @min-[92rem]/pane:inline">{{ appointment.start_time.slice(0, 5) }}</span>
+                <span class="tabular hidden shrink-0 text-text-subtle @min-[60rem]/pane:inline @min-[78rem]/pane:hidden @min-[92rem]/pane:inline">{{ appointment.start_time.slice(0, 5) }}</span>
                 <span class="truncate" :title="`${appointment.start_time.slice(0, 5)} ${appointment.client_name}`">{{ appointment.client_name.split(' ')[0] }}</span>
               </span>
               <span v-if="(byDate.get(cell.date) ?? []).length > 3" class="px-1 text-2xs text-text-subtle">

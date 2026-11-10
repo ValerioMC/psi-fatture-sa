@@ -83,7 +83,7 @@ const heldBySts = computed(() => {
         <AppButton to="/invoices">Torna alle fatture</AppButton>
       </EmptyState>
 
-      <form v-else class="grid grid-cols-1 items-start gap-5 @min-[72rem]/pane:grid-cols-[minmax(0,1fr)_19rem] @min-[84rem]/pane:grid-cols-[minmax(0,1fr)_22rem]" novalidate @submit.prevent="onSubmit">
+      <form v-else class="grid grid-cols-1 items-start gap-5 @min-[56rem]/pane:grid-cols-[minmax(0,1fr)_19rem] @min-[84rem]/pane:grid-cols-[minmax(0,1fr)_22rem]" novalidate @submit.prevent="onSubmit">
         <div class="space-y-5">
           <!-- ── Who and when ─────────────────────────────────────────────── -->
           <AppCard class="settle" :padded="false">
@@ -232,7 +232,7 @@ const heldBySts = computed(() => {
         </div>
 
         <!-- ── Live summary and save ─────────────────────────────────────── -->
-        <aside class="settle @min-[72rem]/pane:sticky @min-[72rem]/pane:top-30" style="--settle: 1">
+        <aside class="settle @min-[56rem]/pane:sticky @min-[56rem]/pane:top-30" style="--settle: 1">
           <AppCard :padded="false">
             <CardHeader title="Riepilogo" subtitle="Si aggiorna mentre scrivi" :icon="Receipt" />
             <div class="px-5 pb-5">

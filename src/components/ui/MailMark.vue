@@ -73,7 +73,7 @@ onBeforeUnmount(() => {
 }
 .is-arriving .mark-seal {
   transform-origin: 16.2px 15.2px;
-  animation: seal-press 520ms 120ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation: seal-press 520ms 120ms var(--ease-stamp) both;
 }
 @keyframes envelope-settle {
   from { transform: translate(-3px, 1px); opacity: 0.4; }

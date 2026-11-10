@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::{ConnectionTrait, Database, Statement};
 
 use super::StoredFile;
 use crate::app::common::AppError;
@@ -76,4 +76,59 @@ fn remove_if_present(path: &Path) -> std::io::Result<()> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         result => result,
     }
+}
+
+/// The migrations a backup has applied, read after SQLite's own integrity check.
+/// A file that is not a readable archive is `Invalid`, whatever went wrong inside it.
+pub async fn read_applied_migrations(archive: &Path) -> Result<Vec<String>, AppError> {
+    read_migration_versions(archive).await.map_err(|error| {
+        log::warn!(target: "backup", path:? = archive, error:% = error; "backup not readable");
+        AppError::Invalid("Il backup scelto non è un archivio di PSI Fatture leggibile".to_string())
+    })
+}
+
+async fn read_migration_versions(archive: &Path) -> Result<Vec<String>, sea_orm::DbErr> {
+    let connection = Database::connect(format!("sqlite://{}?mode=ro", archive.display())).await?;
+    let sqlite = sea_orm::DatabaseBackend::Sqlite;
+    let check = connection
+        .query_one(Statement::from_string(sqlite, "PRAGMA integrity_check"))
+        .await?
+        .map(|row| row.try_get::<String>("", "integrity_check"))
+        .transpose()?;
+    if check.as_deref() != Some("ok") {
+        return Err(sea_orm::DbErr::Custom("integrity check failed".to_string()));
+    }
+    let rows = connection
+        .query_all(Statement::from_string(
+            sqlite,
+            "SELECT version FROM seaql_migrations",
+        ))
+        .await?;
+    let versions = rows
+        .iter()
+        .map(|row| row.try_get::<String>("", "version"))
+        .collect::<Result<Vec<_>, _>>()?;
+    connection.close().await?;
+    Ok(versions)
+}
+
+pub fn copy_file(from: &Path, to: &Path) -> Result<(), AppError> {
+    std::fs::copy(from, to)
+        .map(|_| ())
+        .map_err(|e| AppError::External(format!("Impossibile preparare il ripristino: {e}")))
+}
+
+/// Replaces the database with the file a restore staged, dropping the old database's
+/// `-wal` and `-shm` files, which belong to the replaced data. Without a staged file it does nothing.
+pub fn apply_staged_restore(database: &Path, staged: &Path) -> Result<(), AppError> {
+    if !staged.exists() {
+        return Ok(());
+    }
+    for suffix in ["-wal", "-shm"] {
+        let mut name = database.file_name().unwrap_or_default().to_os_string();
+        name.push(suffix);
+        remove(&database.with_file_name(name))?;
+    }
+    std::fs::rename(staged, database)
+        .map_err(|e| AppError::External(format!("Ripristino del backup non riuscito: {e}")))
 }

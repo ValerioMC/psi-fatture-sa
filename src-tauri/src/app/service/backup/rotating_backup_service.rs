@@ -7,6 +7,7 @@ use std::sync::Mutex;
 
 use chrono::NaiveDateTime;
 use sea_orm::DatabaseConnection;
+use sea_orm_migration::MigratorTrait;
 
 use crate::app::common::timestamp;
 use crate::app::common::AppError;
@@ -85,6 +86,29 @@ impl RotatingBackups {
                 .collect();
         parsed.sort_by_key(|(name, _)| std::cmp::Reverse((name.created_at, name.sequence)));
         Ok(parsed.into_iter().map(|(_, file)| file).collect())
+    }
+
+    /// Stages `name` to replace the database at the next start, after a safety copy of the
+    /// current archive joins the rotation. Without that copy nothing is staged.
+    pub async fn stage_restore(
+        &self,
+        db: &DatabaseConnection,
+        name: &str,
+        now: NaiveDateTime,
+    ) -> Result<(), AppError> {
+        let chosen = self
+            .list()?
+            .into_iter()
+            .find(|file| file.name == name)
+            .ok_or_else(|| AppError::NotFound("Backup non trovato".to_string()))?;
+        ensure_restorable(Path::new(&chosen.path)).await?;
+        let staged = staged_restore_path(&self.database);
+        backup_repository::copy_file(Path::new(&chosen.path), &staged)?;
+        if let Err(error) = self.back_up(db, BackupReason::Manual, now).await {
+            backup_repository::remove(&staged)?;
+            return Err(error);
+        }
+        Ok(())
     }
 
     /// Writes a copy through a hidden staging file, so a failure never leaves half a backup, then prunes.
@@ -185,6 +209,31 @@ impl RotatingBackups {
     fn record_failure(&self, error: &AppError) {
         log::warn!(target: "backup", error:% = error; "backup failed");
         *self.last_failure.lock().expect("never poisoned") = Some(error.to_string());
+    }
+}
+
+/// Where a restore waits, beside the database, for the next start to swap it in.
+pub fn staged_restore_path(database: &Path) -> PathBuf {
+    database.with_extension("restore")
+}
+
+/// Swaps in the restore staged before the app was closed, if there is one.
+pub fn apply_staged_restore(database: &Path) -> Result<(), AppError> {
+    backup_repository::apply_staged_restore(database, &staged_restore_path(database))
+}
+
+async fn ensure_restorable(archive: &Path) -> Result<(), AppError> {
+    let known: Vec<String> = crate::migration::Migrator::migrations()
+        .iter()
+        .map(|migration| migration.name().to_string())
+        .collect();
+    let applied = backup_repository::read_applied_migrations(archive).await?;
+    match applied.iter().any(|version| !known.contains(version)) {
+        true => Err(AppError::Conflict(
+            "Il backup viene da una versione più recente dell’app: aggiorna PSI Fatture prima di ripristinarlo"
+                .to_string(),
+        )),
+        false => Ok(()),
     }
 }
 

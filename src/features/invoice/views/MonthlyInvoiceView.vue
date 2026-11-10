@@ -244,7 +244,7 @@ async function generate(): Promise<void> {
 </template>
 
 <style scoped>
-.stamp { animation: stamp-land 560ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.stamp { animation: stamp-land 560ms var(--ease-stamp) both; }
 @keyframes stamp-land {
   0% { transform: scale(1.5) rotate(-12deg); opacity: 0; }
   55% { transform: scale(0.92) rotate(2deg); opacity: 1; }

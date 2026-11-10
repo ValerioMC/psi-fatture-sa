@@ -21,7 +21,7 @@ use app::repository::email::LettreMailGateway;
 use app::repository::secret::{EncryptedFileSecretStore, OsMachineId, SecretStore};
 use app::repository::ts::sistema_ts::{HttpSistemaTsGateway, SistemaTsGateway};
 use app::repository::update::{DiskImageInstaller, GithubReleaseGateway, ReleaseGateway};
-use app::service::backup::RotatingBackups;
+use app::service::backup::{apply_staged_restore, RotatingBackups};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -81,6 +81,7 @@ pub fn run() {
             get_backup_overview,
             create_backup,
             reveal_backups_folder,
+            restore_backup,
             get_app_version,
             check_for_update,
             install_update,
@@ -119,6 +120,9 @@ pub fn run() {
 
 /// Opens the archive and builds every gateway the commands share. A failure here stops the app.
 fn build_app_state() -> AppState {
+    if let Err(error) = apply_staged_restore(&app::db::connection::db_path()) {
+        log::error!(target: "backup", error:% = error; "staged restore not applied");
+    }
     let db = tauri::async_runtime::block_on(app::db::connection::init_db())
         .expect("Failed to initialize database");
     let secrets: Arc<dyn SecretStore> = Arc::new(EncryptedFileSecretStore::new(

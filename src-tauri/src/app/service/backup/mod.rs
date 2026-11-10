@@ -2,4 +2,4 @@ pub mod backup_service;
 
 mod rotating_backup_service;
 
-pub use rotating_backup_service::RotatingBackups;
+pub use rotating_backup_service::{apply_staged_restore, RotatingBackups};

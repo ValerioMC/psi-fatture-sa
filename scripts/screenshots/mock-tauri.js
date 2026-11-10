@@ -378,6 +378,7 @@
       return file
     },
     reveal_backups_folder: () => null,
+    restore_backup: () => new Promise(() => {}),
     get_app_version: () => '0.9.7',
     install_update: () => new Promise(() => {}),
     check_for_update: () => ({ current_version: '0.9.7', latest_version: '0.9.8', update_available: true, download_url: 'https://github.com/ValerioMC/psi-fatture-sa/releases/latest/download/PSI-Fatture-macOS-arm64.dmg', platform: 'mac_os_arm64', platform_label: 'Mac con chip Apple' }),

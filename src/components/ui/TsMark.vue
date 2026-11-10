@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
 /* Accepted: the card lands like a stamp, then the check draws itself. */
 .is-arriving .mark-stamp {
   transform-origin: 10px 10px;
-  animation: mark-land 520ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation: mark-land 520ms var(--ease-stamp) both;
 }
 .is-arriving .mark-check {
   stroke-dasharray: 1;

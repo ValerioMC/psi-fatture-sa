@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
 /* Stamp: lands from slightly above and larger, overshoots, settles. */
 .arrive-stamp .seal-stamp {
   transform-origin: 10px 10px;
-  animation: stamp-land 520ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation: stamp-land 520ms var(--ease-stamp) both;
 }
 .arrive-stamp .seal-check {
   stroke-dasharray: 1;

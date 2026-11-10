@@ -7,13 +7,17 @@ MANIFEST   := src-tauri/Cargo.toml
 BUNDLE_DIR := src-tauri/target/release/bundle
 
 .DEFAULT_GOAL := help
-.PHONY: help dev build build-sogei app install install-prod test test-frontend test-backend lint lint-backend lint-frontend fmt
+.PHONY: help dev seed build build-sogei app install install-prod test test-frontend test-backend lint lint-backend lint-frontend fmt
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 dev: ## Start the app in dev mode (hot-reload)
 	$(NPM) run tauri dev
+
+# Overwrites every row of the target database, the app's own one by default: pass DB=<file> to seed another.
+seed: ## Load demo data into the app database, replacing what is there (DB=<file> for another database)
+	./scripts/seed.sh $(if $(DB),--db $(DB))
 
 build: ## Build the frontend and bundle the desktop app (unsigned) into src-tauri/target/release/bundle
 	$(NPM) install

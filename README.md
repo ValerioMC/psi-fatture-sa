@@ -188,13 +188,13 @@ Lo script `scripts/seed_db.py` popola il database locale con dati realistici, so
 **Prerequisito:** avviare l'app almeno una volta (crea e inizializza il DB).
 
 ```bash
-bash scripts/seed.sh
-# oppure
-python3 scripts/seed_db.py
+make seed
 
 # percorso DB custom
-python3 scripts/seed_db.py --db /percorso/database.db
+make seed DB=/percorso/database.db
 ```
+
+`make seed` lancia `scripts/seed.sh`, che a sua volta esegue `scripts/seed_db.py`.
 
 Dati generati:
 
@@ -426,8 +426,15 @@ computer.
 - La pagina *Dati e backup* mostra il percorso dell'archivio, la cartella dei backup (*Apri*
   la mostra nel Finder o in Esplora file) e l'elenco delle copie.
 
-Per ripristinare: chiudi l'app, sostituisci `database.db` con la copia (rinominandola)
-e cancella `database.db-wal` e `database.db-shm` se presenti, poi riapri l'app.
+**Ripristino**: *Ripristina* accanto a una copia della cartella `backups/` chiede conferma e chiama
+`restore_backup`. `RotatingBackups::stage_restore` controlla che il file sia un archivio
+leggibile (`PRAGMA integrity_check`) e non venga da una versione più recente dell'app, lo
+copia in `database.restore` accanto a `database.db` e aggiunge alle copie una di quello
+attuale; se questa non riesce non si ripristina nulla. L'app poi si riavvia e, prima di aprire
+il database, `apply_staged_restore` sostituisce `database.db` con quel file ed elimina
+`database.db-wal` e `database.db-shm`. Una copia salvata altrove non è nella cartella dei
+backup: si ripristina a mano, chiudendo l'app, sostituendo `database.db` con la copia
+(rinominandola), cancellando `-wal` e `-shm` e riaprendo l'app.
 
 ## Aggiornamenti
 
